@@ -87,6 +87,36 @@ fi
 
 print_step "All pre-flight checks passed"
 
+# Step 0b: Determine which Python version to use
+print_step "Checking Python version compatibility..."
+
+# Try to find Python 3.11 (preferred for wheel compatibility)
+PYTHON_CMD="python3"
+if command_exists python3.11; then
+    PYTHON_CMD="python3.11"
+    PYTHON_VERSION=$(python3.11 --version 2>&1)
+    print_step "Found Python 3.11: $PYTHON_VERSION"
+else
+    # Check current Python version
+    PYTHON_VERSION=$(python3 --version 2>&1)
+    PYTHON_MINOR=$(echo "$PYTHON_VERSION" | sed -n 's/.*\.\([0-9]*\)\..*/\1/p')
+    
+    if [ -n "$PYTHON_MINOR" ] && [ "$PYTHON_MINOR" -lt 11 ]; then
+        print_step "Found: $PYTHON_VERSION"
+        print_warning "Python 3.11+ is recommended for better wheel compatibility"
+        print_step "Attempting to install Python 3.11..."
+        
+        if sudo apt-get install -y python3.11 python3.11-venv; then
+            PYTHON_CMD="python3.11"
+            print_step "Python 3.11 installed successfully"
+        else
+            print_warning "Could not install Python 3.11, will use $PYTHON_VERSION"
+        fi
+    else
+        print_step "Found: $PYTHON_VERSION (acceptable)"
+    fi
+fi
+
 # Step 1: Clone the repository
 print_step "Cloning Pi Podcast repository..."
 
@@ -135,12 +165,17 @@ sudo apt-get update
 sudo apt-get upgrade -y
 
 # Step 3: Install Python 3
-print_step "Installing Python 3..."
-sudo apt-get install -y python3 python3-pip python3-venv
+print_step "Installing Python development packages..."
+sudo apt-get install -y python3 python3-pip python3-dev python3-venv
+
+# If using Python 3.11, ensure it's fully installed
+if [ "$PYTHON_CMD" = "python3.11" ]; then
+    sudo apt-get install -y python3.11-dev python3.11-venv
+fi
 
 # Verify Python
-PYTHON_VERSION=$(python3 --version 2>&1)
-print_step "Found: $PYTHON_VERSION"
+SELECTED_VERSION=$($PYTHON_CMD --version 2>&1)
+print_step "Using: $SELECTED_VERSION"
 
 # Step 4: Install Bluetooth libraries
 print_step "Installing Bluetooth libraries..."
@@ -191,8 +226,8 @@ print_step "Setting up Python virtual environment for API..."
 cd "$INSTALL_DIR/api"
 
 if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    print_step "Virtual environment created"
+    $PYTHON_CMD -m venv venv
+    print_step "Virtual environment created with $($PYTHON_CMD --version 2>&1)"
 else
     print_step "Virtual environment already exists"
 fi
