@@ -14,10 +14,11 @@ echo "  1. Verify system requirements"
 echo "  2. Clone the Pi Podcast repository"
 echo "  3. Update system packages"
 echo "  4. Install Python 3 and Bluetooth support"
-echo "  5. Install and configure Nginx"
-echo "  6. Configure Bluetooth permissions"
-echo "  7. Setup Python virtual environment"
-echo "  8. Configure and start services"
+echo "  5. Install Rust compiler"
+echo "  6. Install and configure Nginx"
+echo "  7. Configure Bluetooth permissions"
+echo "  8. Setup Python virtual environment"
+echo "  9. Configure and start services"
 echo ""
 echo "Press Enter to continue, or Ctrl+C to cancel..."
 read -r
@@ -180,6 +181,17 @@ print_step "Using: $SELECTED_VERSION"
 # Step 4: Install Bluetooth libraries
 print_step "Installing Bluetooth libraries..."
 sudo apt-get install -y bluez python3-bluez libglib2.0-dev
+
+# Step 4b: Install Rust compiler
+print_step "Installing Rust compiler (required for Python dependencies)..."
+sudo apt-get install -y rustc cargo
+
+# Verify Rust is available
+if ! command_exists rustc; then
+    print_error "Rust compiler installation failed"
+    exit 1
+fi
+print_step "Rust compiler installed: $(rustc --version)"
 
 # Step 5: Install Nginx
 print_step "Installing Nginx..."
