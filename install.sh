@@ -16,9 +16,10 @@ echo "  3. Update system packages"
 echo "  4. Install Python 3 and Bluetooth support"
 echo "  5. Install Rust compiler"
 echo "  6. Install and configure Nginx"
-echo "  7. Configure Bluetooth permissions"
-echo "  8. Setup Python virtual environment"
-echo "  9. Configure and start services"
+echo "  7. Deploy frontend to /var/www/html"
+echo "  8. Configure Bluetooth permissions"
+echo "  9. Setup Python virtual environment"
+echo "  10. Configure and start services"
 echo ""
 echo "Press Enter to continue, or Ctrl+C to cancel..."
 read -r
@@ -206,7 +207,77 @@ if ! wait_for_service nginx 10; then
 fi
 print_step "Nginx is running"
 
-# Step 6: Configure Bluetooth
+# Step 6: Deploy frontend to /var/www/html
+print_step "Deploying frontend to /var/www/html..."
+
+# Verify frontend files exist
+if [ ! -f "$INSTALL_DIR/client/dist/index.html" ]; then
+    print_error "Frontend not found at $INSTALL_DIR/client/dist/index.html"
+    print_error "Please build the frontend first: cd client && npm run build"
+    exit 1
+fi
+
+# Copy frontend files to standard Nginx location
+sudo rm -rf /var/www/html/*
+sudo cp -r "$INSTALL_DIR/client/dist"/* /var/www/html/
+sudo chown -R www-data:www-data /var/www/html
+
+print_step "Frontend files deployed to /var/www/html"
+
+# Configure Nginx
+print_step "Configuring Nginx..."
+sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.backup
+
+# Create Nginx config pointing to /var/www/html
+cat > /tmp/nginx-config << 'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name _;
+
+    # Serve static files from /var/www/html
+    root /var/www/html;
+    index index.html;
+
+    # Frontend routes - serve index.html for any route not matching a file
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API requests to the FastAPI backend
+    location /api/ {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Proxy health check endpoint
+    location /health {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+}
+EOF
+
+sudo cp /tmp/nginx-config /etc/nginx/sites-available/default
+
+# Test Nginx config
+if ! sudo nginx -t 2>&1 | grep -q "successful"; then
+    print_error "Nginx configuration test failed"
+    sudo cat /var/log/nginx/error.log
+    exit 1
+fi
+print_step "Nginx configuration is valid"
+sudo systemctl reload nginx
+
+# Step 7: Configure Bluetooth
 print_step "Configuring Bluetooth..."
 sudo systemctl enable bluetooth
 sudo systemctl start bluetooth
@@ -233,7 +304,7 @@ else
     fi
 fi
 
-# Step 7: Setup Python virtual environment for API
+# Step 8: Setup Python virtual environment for API
 print_step "Setting up Python virtual environment for API..."
 cd "$INSTALL_DIR/api"
 
@@ -277,69 +348,6 @@ if ! grep -q "API_PORT" .env; then
 fi
 
 deactivate
-
-# Step 8: Configure Nginx
-print_step "Configuring Nginx..."
-
-# Verify frontend files exist
-if [ ! -f "$INSTALL_DIR/client/dist/index.html" ]; then
-    print_error "Frontend not found at $INSTALL_DIR/client/dist/index.html"
-    print_error "Please build the frontend first: cd client && npm run build"
-    exit 1
-fi
-
-sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.backup
-
-# Create Nginx config with user's home directory
-cat > /tmp/nginx-config << 'EOF'
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-
-    server_name _;
-
-    # Serve static files from the Vite build
-    root $INSTALL_DIR_PLACEHOLDER/client/dist;
-    index index.html;
-
-    # Frontend routes - serve index.html for any route not matching a file
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Proxy API requests to the FastAPI backend
-    location /api/ {
-        proxy_pass http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Proxy health check endpoint
-    location /health {
-        proxy_pass http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-    }
-}
-EOF
-
-# Replace placeholder with actual path
-sed -i "s|\$INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" /tmp/nginx-config
-sudo cp /tmp/nginx-config /etc/nginx/sites-available/default
-
-# Test Nginx config
-if ! sudo nginx -t 2>&1 | grep -q "successful"; then
-    print_error "Nginx configuration test failed"
-    sudo cat /var/log/nginx/error.log
-    exit 1
-fi
-print_step "Nginx configuration is valid"
-sudo systemctl reload nginx
 
 # Step 9: Create systemd service for API
 print_step "Creating systemd service for API..."
