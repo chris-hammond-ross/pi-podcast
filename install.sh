@@ -17,11 +17,10 @@ echo "  4. Install Python 3 and Bluetooth support"
 echo "  5. Install Rust compiler"
 echo "  6. Install and configure Nginx"
 echo "  7. Deploy frontend to /var/www/html"
-echo "  8. Configure Bluetooth permissions"
+echo "  8. Configure Bluetooth and enable adapter"
 echo "  9. Setup Python virtual environment"
 echo "  10. Configure and start services"
 echo ""
-echo "Press Enter to continue, or Ctrl+C to cancel..."
 read -r
 
 # Color codes for output
@@ -53,7 +52,7 @@ wait_for_service() {
     local service=$1
     local timeout=${2:-30}
     local elapsed=0
-    
+
     while [ $elapsed -lt $timeout ]; do
         if sudo systemctl is-active --quiet "$service"; then
             return 0
@@ -61,7 +60,7 @@ wait_for_service() {
         sleep 1
         ((elapsed++))
     done
-    
+
     return 1
 }
 
@@ -102,12 +101,12 @@ else
     # Check current Python version
     PYTHON_VERSION=$(python3 --version 2>&1)
     PYTHON_MINOR=$(echo "$PYTHON_VERSION" | sed -n 's/.*\.\([0-9]*\)\..*/\1/p')
-    
+
     if [ -n "$PYTHON_MINOR" ] && [ "$PYTHON_MINOR" -lt 11 ]; then
         print_step "Found: $PYTHON_VERSION"
         print_warning "Python 3.11+ is recommended for better wheel compatibility"
         print_step "Attempting to install Python 3.11..."
-        
+
         if sudo apt-get install -y python3.11 python3.11-venv; then
             PYTHON_CMD="python3.11"
             print_step "Python 3.11 installed successfully"
@@ -135,7 +134,7 @@ if [ -d "$INSTALL_DIR" ]; then
 else
     # Create parent directory if needed
     mkdir -p "$(dirname "$INSTALL_DIR")"
-    
+
     # Clone with error handling
     if ! git clone https://github.com/chris-hammond-ross/pi-podcast.git "$INSTALL_DIR"; then
         print_error "Failed to clone repository. Please check:"
@@ -277,7 +276,7 @@ fi
 print_step "Nginx configuration is valid"
 sudo systemctl reload nginx
 
-# Step 7: Configure Bluetooth
+# Step 7: Configure Bluetooth and enable adapter
 print_step "Configuring Bluetooth..."
 sudo systemctl enable bluetooth
 sudo systemctl start bluetooth
@@ -285,6 +284,20 @@ sudo systemctl start bluetooth
 # Verify Bluetooth started
 if ! wait_for_service bluetooth 10; then
     print_warning "Bluetooth service may not have started. Continuing anyway..."
+fi
+
+# Unblock Bluetooth RF-kill and power on adapter
+print_step "Enabling Bluetooth adapter..."
+sudo rfkill unblock bluetooth
+
+# Wait a moment for the rfkill change to take effect
+sleep 1
+
+# Power on the Bluetooth adapter
+if command_exists hciconfig; then
+    sudo hciconfig hci0 up 2>/dev/null || print_warning "Could not power on Bluetooth adapter (may need manual intervention)"
+else
+    print_warning "hciconfig not found, skipping adapter power-up"
 fi
 
 # Add user to bluetooth group
