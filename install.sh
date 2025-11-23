@@ -400,7 +400,7 @@ else
 fi
 
 # Verify the API is responding
-sleep 2
+sleep 6
 if curl -s http://localhost:8000/health > /dev/null 2>&1; then
     print_step "API is responding to health checks"
 else
