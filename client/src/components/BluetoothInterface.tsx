@@ -5,7 +5,7 @@
  */
 
 import { useEffect } from 'react';
-import { Stack, Group, Text, Alert, Button, Box, Switch } from '@mantine/core';
+import { Stack, Group, Text, Alert, Button, Box } from '@mantine/core';
 import { AlertCircle, Bluetooth, Check } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket } from '../hooks';
 import type { BluetoothDevice } from '../services';
