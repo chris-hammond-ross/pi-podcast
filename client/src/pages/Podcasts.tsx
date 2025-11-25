@@ -2,7 +2,7 @@ import { Container, Title, Text } from '@mantine/core';
 
 function Podcasts() {
 	return (
-		<Container size="xl">
+		<Container size="sm" py="md">
 			<Title order={1} mb="md">
 				Podcasts
 			</Title>
