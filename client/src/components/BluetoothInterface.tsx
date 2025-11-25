@@ -6,7 +6,7 @@
 
 import { useEffect } from 'react';
 import { Stack, Group, Text, Alert, Button, Box, Switch } from '@mantine/core';
-import { AlertCircle, Bluetooth, BluetoothOff, Check } from 'lucide-react';
+import { AlertCircle, Bluetooth, Check } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket } from '../hooks';
 import type { BluetoothDevice } from '../services';
 
@@ -59,7 +59,7 @@ export function BluetoothInterface() {
 			{/* Header with scanning indicator */}
 			<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" bdrs={8}>
 				<ScanningIndicator />
-				<Switch size="md" checked={isScanning} />
+				{/*<Switch size="md" checked={isScanning} />*/}
 			</Group>
 
 			{/* Error Alert */}
@@ -145,7 +145,8 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, isFirst, is
 		<Button
 			p="xs"
 			justify="left"
-			c="blue"
+			color={isConnected ? "green" : "blue"}
+			c={isConnected ? "green" : "blue"}
 			variant="light"
 			onClick={onPress}
 			disabled={isLoading}
@@ -165,26 +166,6 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, isFirst, is
 		>
 			<Group justify="space-between" wrap="nowrap">
 				<Group gap="md" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-					<Box
-						style={{
-							width: 30,
-							height: 30,
-							borderRadius: '50%',
-							backgroundColor: isConnected
-								? 'teal'
-								: 'gray',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							flexShrink: 0,
-						}}
-					>
-						{isConnected ? (
-							<Bluetooth size={18} color="green" />
-						) : (
-							<BluetoothOff size={18} color="white" />
-						)}
-					</Box>
 					<Box style={{ minWidth: 0, flex: 1, justifyItems: "baseline" }}>
 						<Text fw={500} truncate>
 							{device.name}
