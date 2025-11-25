@@ -4,7 +4,7 @@ A standalone podcast player for Raspberry Pi. Connects to a Bluetooth speaker an
 
 Currently implements Bluetooth speaker management. Podcast playback and subscription features are in development.
 
-## Requirements
+## Prerequisites
 
 - [Raspberry Pi Zero 2 W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/) (recommended) - inexpensive and low power consumption, ideal for always-on operation. Other Raspberry Pi models with Bluetooth should also work.
 - Debian-based OS (Raspberry Pi OS recommended) - [getting started guide](https://www.raspberrypi.com/documentation/computers/getting-started.html)
@@ -23,12 +23,26 @@ curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/
 The installer will:
 
 - Update system packages
-- Install Node.js 20.x, git, and Bluetooth dependencies (bluez, bluez-tools)
+- Install Node.js 20.x, git, Bluetooth dependencies (bluez, bluez-tools), and Avahi for mDNS
+- Set the hostname to `pi-podcast` for access via `http://pi-podcast.local`
 - Clone the repository to `/opt/pi-podcast`
 - Build the React frontend
-- Create and start a systemd service
+- Create and start a systemd service on port 80
 
-Once complete, access the application at `http://<raspberry-pi-ip>:3000`.
+Once complete, access the application at `http://pi-podcast.local` or via the device's IP address.
+
+### Installer Options
+
+| Flag | Description |
+|------|-------------|
+| `--skip-hostname` | Do not change the system hostname |
+| `-h, --help` | Show help message |
+
+Example with flags:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/install.sh | sudo bash -s -- --skip-hostname
+```
 
 ### Uninstall
 
@@ -44,6 +58,7 @@ Requirements:
 
 - Node.js 18+
 - Bluetooth stack (bluez)
+- Avahi daemon (for .local address)
 
 ```bash
 git clone https://github.com/chris-hammond-ross/pi-podcast.git
@@ -60,8 +75,8 @@ npm install
 mkdir -p public
 cp -r ../client/dist/* public/
 
-# Start server
-node server.js
+# Start server (requires root for port 80)
+sudo node server.js
 ```
 
 ## Project Structure
@@ -116,10 +131,6 @@ After installation, the application runs as a systemd service.
 | `sudo systemctl restart pi-podcast` | Restart the service |
 | `sudo systemctl status pi-podcast` | Check service status |
 | `sudo journalctl -u pi-podcast -f` | View logs |
-
-## Configuration
-
-The service runs on port 3000 by default. This can be changed by editing the systemd service file at `/etc/systemd/system/pi-podcast.service` and modifying the `PORT` environment variable.
 
 ## License
 
