@@ -123,8 +123,4 @@ The service runs on port 3000 by default. This can be changed by editing the sys
 
 ## License
 
-ISC
-
-## License
-
 This project is licensed under the ISC License.
