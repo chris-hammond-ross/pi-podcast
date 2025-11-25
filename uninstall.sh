@@ -167,7 +167,7 @@ print_uninstall_summary() {
     echo "  - bluez / bluez-tools"
     echo ""
     echo "To remove these packages manually (if not needed by other applications):"
-    echo "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools${NC}"
+    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools${NC}"
     echo ""
 }
 
