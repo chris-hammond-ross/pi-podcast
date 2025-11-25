@@ -2,7 +2,7 @@
 
 # Pi Podcast - Raspberry Pi Installation Script
 # Clones repository and sets up the application on clean Debian
-# Usage: curl -sSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/install.sh | sudo bash
 
 set -e
 
@@ -52,6 +52,30 @@ INSTALL_DIR="/opt/pi-podcast"
 SERVICE_FILE="/etc/systemd/system/pi-podcast.service"
 NODE_VERSION="20"
 INSTALL_USER="${SUDO_USER:-pi}"
+HOSTNAME="pi-podcast"
+PORT="80"
+
+# Parse arguments
+SKIP_HOSTNAME=false
+
+for arg in "$@"; do
+    case $arg in
+        --skip-hostname)
+            SKIP_HOSTNAME=true
+            shift
+            ;;
+        -h|--help)
+            echo "Pi Podcast Installer"
+            echo ""
+            echo "Usage: sudo ./install.sh [options]"
+            echo ""
+            echo "Options:"
+            echo "  --skip-hostname   Do not change the system hostname to pi-podcast"
+            echo "  -h, --help        Show this help message"
+            exit 0
+            ;;
+    esac
+done
 
 # Helper functions
 print_header() {
@@ -131,7 +155,8 @@ install_dependencies() {
         git \
         bluez \
         bluez-tools \
-        libdbus-1-dev
+        libdbus-1-dev \
+        avahi-daemon
 
     print_success "Dependencies installed"
 
@@ -139,6 +164,35 @@ install_dependencies() {
     systemctl enable bluetooth
     systemctl start bluetooth
     print_success "Bluetooth service enabled and started"
+
+    # Enable Avahi for mDNS (.local)
+    systemctl enable avahi-daemon
+    systemctl start avahi-daemon
+    print_success "Avahi daemon enabled and started"
+}
+
+configure_hostname() {
+    if [ "$SKIP_HOSTNAME" = true ]; then
+        print_info "Skipping hostname configuration (--skip-hostname flag set)"
+        return 0
+    fi
+
+    print_header "Configuring hostname"
+
+    CURRENT_HOSTNAME=$(hostname)
+    if [ "$CURRENT_HOSTNAME" = "$HOSTNAME" ]; then
+        print_info "Hostname already set to $HOSTNAME"
+        return 0
+    fi
+
+    # Set the hostname
+    hostnamectl set-hostname "$HOSTNAME"
+
+    # Update /etc/hosts
+    sed -i "s/127.0.1.1.*/127.0.1.1\t$HOSTNAME/" /etc/hosts
+
+    print_success "Hostname set to $HOSTNAME"
+    print_info "The device will be accessible at http://${HOSTNAME}.local"
 }
 
 clone_repository() {
@@ -203,12 +257,12 @@ Wants=bluetooth.service
 
 [Service]
 Type=simple
-User=$INSTALL_USER
+User=root
 WorkingDirectory=$INSTALL_DIR/api
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=10
-Environment="PORT=3000"
+Environment="PORT=$PORT"
 StandardOutput=journal
 StandardError=journal
 
@@ -231,7 +285,7 @@ print_installation_summary() {
     echo "Service Information:"
     echo "  - Service name: pi-podcast"
     echo "  - Installation directory: $INSTALL_DIR"
-    echo "  - Port: 3000"
+    echo "  - Port: $PORT"
     echo ""
     echo "Useful commands:"
     echo "  Start service:    ${BLUE}sudo systemctl start pi-podcast${NC}"
@@ -241,7 +295,11 @@ print_installation_summary() {
     echo "  Restart service:  ${BLUE}sudo systemctl restart pi-podcast${NC}"
     echo ""
     echo "Access the application:"
-    echo "  Open your browser and navigate to: http://<raspberry-pi-ip>:3000"
+    if [ "$SKIP_HOSTNAME" = false ]; then
+        echo "  ${BLUE}http://${HOSTNAME}.local${NC}"
+    fi
+    LOCAL_IP=$(hostname -I | awk '{print $1}')
+    echo "  ${BLUE}http://${LOCAL_IP}${NC}"
     echo ""
 }
 
@@ -273,6 +331,7 @@ main() {
     update_system
     install_dependencies
     install_nodejs
+    configure_hostname
     clone_repository
     install_api_dependencies
     build_react_frontend
