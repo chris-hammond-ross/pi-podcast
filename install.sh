@@ -155,6 +155,7 @@ install_dependencies() {
         git \
         bluez \
         bluez-tools \
+        rfkill \
         libdbus-1-dev \
         avahi-daemon
 
@@ -169,6 +170,34 @@ install_dependencies() {
     systemctl enable avahi-daemon
     systemctl start avahi-daemon
     print_success "Avahi daemon enabled and started"
+}
+
+enable_bluetooth_adapter() {
+    print_header "Enabling Bluetooth adapter"
+
+    # Unblock Bluetooth with rfkill
+    rfkill unblock bluetooth
+    print_success "Bluetooth unblocked"
+
+    # Give it a moment to settle
+    sleep 1
+
+    # Bring up the hci0 adapter
+    if hciconfig hci0 up 2>/dev/null; then
+        print_success "Bluetooth adapter enabled"
+    else
+        print_error "Failed to enable Bluetooth adapter"
+        print_info "Try running manually: sudo rfkill unblock bluetooth && sudo hciconfig hci0 up"
+        exit 1
+    fi
+
+    # Verify it's actually up
+    sleep 1
+    if hciconfig | grep -q "hci0.*UP RUNNING"; then
+        print_success "Bluetooth adapter verified as running"
+    else
+        print_info "Bluetooth adapter status may still be settling, continuing..."
+    fi
 }
 
 configure_hostname() {
@@ -330,6 +359,7 @@ main() {
     # Installation steps
     update_system
     install_dependencies
+    enable_bluetooth_adapter
     install_nodejs
     configure_hostname
     clone_repository
