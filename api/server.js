@@ -111,6 +111,13 @@ function parseDeviceOutput(output) {
 					return;
 				}
 
+				// Skip devices with ManufacturerData.Key patterns as names
+				// Examples: "ManufacturerData.Key: 0x0003 (3)", "ManufacturerData.Key: 0x28c0 (10432)"
+				if (/^ManufacturerData\.Key:/i.test(name)) {
+					console.log('[devices] Skipping device with ManufacturerData.Key as name:', mac, name);
+					return;
+				}
+
 				if (name && name.length > 0) {
 					// Check if device already exists
 					const existing = currentDevices.find((d) => d.mac === mac);
