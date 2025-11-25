@@ -50,6 +50,7 @@ NC='\033[0m' # No Color
 REPO_URL="https://github.com/chris-hammond-ross/pi-podcast.git"
 INSTALL_DIR="/opt/pi-podcast"
 SERVICE_FILE="/etc/systemd/system/pi-podcast.service"
+DB_FILE="/opt/pi-podcast/api/podcast.db"
 NODE_VERSION="20"
 INSTALL_USER="${SUDO_USER:-pi}"
 HOSTNAME="pi-podcast"
@@ -150,14 +151,15 @@ install_nodejs() {
 install_dependencies() {
     print_header "Installing dependencies"
 
-    # Install git, bluez and related packages
+    # Install git, bluez, sqlite3 and related packages
     apt-get install -y \
         git \
         bluez \
         bluez-tools \
         rfkill \
         libdbus-1-dev \
-        avahi-daemon
+        avahi-daemon \
+        sqlite3
 
     print_success "Dependencies installed"
 
@@ -245,6 +247,73 @@ clone_repository() {
     print_success "Repository cloned to $INSTALL_DIR"
 }
 
+initialize_database() {
+    print_header "Initializing SQLite database"
+
+    # Create database file if it doesn't exist
+    if [ ! -f "$DB_FILE" ]; then
+        touch "$DB_FILE"
+        chown "$INSTALL_USER:$INSTALL_USER" "$DB_FILE"
+        chmod 644 "$DB_FILE"
+
+        # Create database schema
+        sqlite3 "$DB_FILE" << 'EOF'
+-- Podcast subscriptions table
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    feed_url TEXT NOT NULL UNIQUE,
+    title TEXT,
+    description TEXT,
+    image_url TEXT,
+    last_fetched INTEGER,
+    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
+-- Playlists table
+CREATE TABLE IF NOT EXISTS playlists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at INTEGER DEFAULT (strftime('%s', 'now')),
+    updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
+-- Playlist episodes table (many-to-many relationship)
+CREATE TABLE IF NOT EXISTS playlist_episodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    playlist_id INTEGER NOT NULL,
+    episode_url TEXT NOT NULL,
+    episode_title TEXT,
+    position INTEGER DEFAULT 0,
+    added_at INTEGER DEFAULT (strftime('%s', 'now')),
+    FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
+    UNIQUE(playlist_id, episode_url)
+);
+
+-- Bluetooth devices table
+CREATE TABLE IF NOT EXISTS bluetooth_devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mac_address TEXT NOT NULL UNIQUE,
+    name TEXT,
+    rssi INTEGER,
+    last_seen INTEGER DEFAULT (strftime('%s', 'now')),
+    paired INTEGER DEFAULT 0,
+    trusted INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_playlist_episodes_playlist_id ON playlist_episodes(playlist_id);
+CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_mac ON bluetooth_devices(mac_address);
+CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_last_seen ON bluetooth_devices(last_seen);
+EOF
+
+        print_success "Database initialized at $DB_FILE"
+    else
+        print_info "Database already exists at $DB_FILE"
+    fi
+}
+
 install_api_dependencies() {
     print_header "Installing API dependencies"
 
@@ -253,7 +322,7 @@ install_api_dependencies() {
     # Only run npm init if package.json doesn't exist
     if [ ! -f "package.json" ]; then
         npm init -y
-        npm install express ws
+        npm install express ws better-sqlite3
     else
         npm install
     fi
@@ -314,6 +383,7 @@ print_installation_summary() {
     echo "Service Information:"
     echo "  - Service name: pi-podcast"
     echo "  - Installation directory: $INSTALL_DIR"
+    echo "  - Database: $DB_FILE"
     echo "  - Port: $PORT"
     echo ""
     echo "Useful commands:"
@@ -363,6 +433,7 @@ main() {
     install_nodejs
     configure_hostname
     clone_repository
+    initialize_database
     install_api_dependencies
     build_react_frontend
     create_systemd_service
