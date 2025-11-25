@@ -392,6 +392,12 @@ app.get('/api/status', (req, res) => {
 	});
 });
 
+// Catch-all route for React Router (SPA support)
+// This must come after all API routes
+app.get('*', (req, res) => {
+	res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // WebSocket for real-time updates
 wss.on('connection', (ws) => {
 	console.log('[websocket] Client connected');
