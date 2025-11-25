@@ -98,45 +98,81 @@ function parseDeviceOutput(output) {
 				const mac = match[1];
 				let name = match[2].trim();
 
-				// Skip BLE-only devices (marked with LE_ prefix or containing "LE " pattern)
-				if (name.startsWith('LE_') || name.includes('LE ')) {
+				// Skip empty names
+				if (!name || name.length === 0) {
+					return;
+				}
+
+				// Skip devices with RSSI: prefix (raw addresses)
+				if (/^RSSI:/i.test(name)) {
+					console.log('[devices] Skipping device with RSSI prefix:', mac, name);
+					return;
+				}
+
+				// Skip BLE-only devices (various patterns)
+				if (name.startsWith('LE_') || /\bLE\b/i.test(name) || /\bBLE\b/i.test(name)) {
 					console.log('[devices] Skipping BLE device:', mac, name);
 					return;
 				}
 
-				// Skip devices where the name is just the MAC address (with dashes or colons)
+				// Skip BLE beacons and mesh devices
+				if (/\bBeacon\b/i.test(name) || /\bMesh\b/i.test(name)) {
+					console.log('[devices] Skipping BLE beacon/mesh device:', mac, name);
+					return;
+				}
+
+				// Skip known LE-only device types (fitness trackers, smart home, etc.)
+				const knownLEPatterns = [
+					/^Mi\s?(Band|Scale|Fit)/i,  // Xiaomi fitness devices
+					/^Fitbit/i,                  // Fitbit trackers
+					/^Tile\b/i,                  // Tile trackers
+					/^AirTag/i,                  // Apple AirTags
+					/^Galaxy\s?Fit/i,            // Samsung fitness bands
+					/^Amazfit/i,                 // Amazfit watches
+					/^WHOOP/i,                   // Whoop fitness bands
+					/^Oura/i,                    // Oura rings
+				];
+
+				if (knownLEPatterns.some(pattern => pattern.test(name))) {
+					console.log('[devices] Skipping known LE-only device:', mac, name);
+					return;
+				}
+
+				// Skip devices where the name is just the MAC address
 				// Examples: "C0-28-8D-02-4B-77", "C0:28:8D:02:4B:77", "C0_28_8D_02_4B_77"
 				if (/^[0-9A-Fa-f]{2}[-:_]([0-9A-Fa-f]{2}[-:_]){4}[0-9A-Fa-f]{2}$/.test(name)) {
 					console.log('[devices] Skipping device with MAC address as name:', mac, name);
 					return;
 				}
 
-				// Skip devices with ManufacturerData.Key patterns as names
-				// Examples: "ManufacturerData.Key: 0x0003 (3)", "ManufacturerData.Key: 0x28c0 (10432)"
-				if (/^ManufacturerData\.Key:/i.test(name)) {
-					console.log('[devices] Skipping device with ManufacturerData.Key as name:', mac, name);
+				// Skip devices with ManufacturerData/TxPower patterns as names
+				if (/^ManufacturerData\.(Key|Value):/i.test(name)) {
+					console.log('[devices] Skipping device with ManufacturerData as name:', mac, name);
 					return;
 				}
 
-				if (name && name.length > 0) {
-					// Check if device already exists
-					const existing = currentDevices.find((d) => d.mac === mac);
-					if (!existing) {
-						const newDevice = {
-							mac,
-							name,
-							rssi: -70, // Default RSSI value (will be updated if available)
-							is_connected: false
-						};
-						currentDevices.push(newDevice);
-						console.log('[devices] Found:', mac, name);
+				if (/^TxPower:/i.test(name)) {
+					console.log('[devices] Skipping device with TxPower as name:', mac, name);
+					return;
+				}
 
-						// Notify all clients of new device
-						broadcastMessage({
-							type: 'device-found',
-							device: newDevice
-						});
-					}
+				// Check if device already exists
+				const existing = currentDevices.find((d) => d.mac === mac);
+				if (!existing) {
+					const newDevice = {
+						mac,
+						name,
+						rssi: -70, // Default RSSI value (will be updated if available)
+						is_connected: false
+					};
+					currentDevices.push(newDevice);
+					console.log('[devices] Found:', mac, name);
+
+					// Notify all clients of new device
+					broadcastMessage({
+						type: 'device-found',
+						device: newDevice
+					});
 				}
 			}
 		});
@@ -217,7 +253,7 @@ app.post('/api/scan', async (req, res) => {
 			});
 		}
 
-		const command = `scan ${state ? 'on' : 'off'}`;
+		const command = `scan ${state ? 'bredr' : 'off'}`;
 		const output = await sendCommand(command);
 		res.json({ success: true, command, output });
 	} catch (err) {

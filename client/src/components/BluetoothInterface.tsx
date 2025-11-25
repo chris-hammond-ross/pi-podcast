@@ -10,53 +10,6 @@ import { AlertCircle, Bluetooth, BluetoothOff, Check } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket } from '../hooks';
 import type { BluetoothDevice } from '../services';
 
-/**
- * Patterns that indicate a device should be filtered out
- * - Raw addresses without friendly names (RSSI: prefix)
- * - Bluetooth Low Energy devices (not audio-capable)
- */
-const FILTERED_NAME_PATTERNS = [
-	/^RSSI:/i, // Raw device addresses
-	/\bLE\b/i, // Bluetooth Low Energy indicator (e.g., "Gear S3 (189A) LE")
-	/\bBLE\b/i, // Alternative BLE indicator
-	/\bBeacon\b/i, // BLE beacons
-	/\bMesh\b/i, // BLE mesh devices
-];
-
-/**
- * Device types commonly known to be LE-only (fitness trackers, smart home, etc.)
- * These often don't include "LE" in their name but are not audio devices
- */
-const KNOWN_LE_DEVICE_PATTERNS = [
-	/^Mi\s?(Band|Scale|Fit)/i, // Xiaomi fitness devices
-	/^Fitbit/i, // Fitbit trackers
-	/^Tile\b/i, // Tile trackers
-	/^AirTag/i, // Apple AirTags
-	/^Galaxy\s?Fit/i, // Samsung fitness bands
-	/^Amazfit/i, // Amazfit watches (LE only)
-	/^WHOOP/i, // Whoop fitness bands
-	/^Oura/i, // Oura rings
-];
-
-/**
- * Determines if a device should be filtered from the list
- */
-function isFilteredDevice(device: BluetoothDevice): boolean {
-	const name = device.name;
-
-	// Check against filtered patterns
-	if (FILTERED_NAME_PATTERNS.some((pattern) => pattern.test(name))) {
-		return true;
-	}
-
-	// Check against known LE-only devices
-	if (KNOWN_LE_DEVICE_PATTERNS.some((pattern) => pattern.test(name))) {
-		return true;
-	}
-
-	return false;
-}
-
 export function BluetoothInterface() {
 	const {
 		devices: wsDevices,
@@ -86,16 +39,12 @@ export function BluetoothInterface() {
 		scan();
 	}, [scan]);
 
-	// Filter and sort devices
-	// - Filter out devices without friendly names (raw RSSI addresses)
-	// - Filter out Bluetooth Low Energy devices (not audio-capable)
-	const sortedDevices = [...devices]
-		.filter((device) => !isFilteredDevice(device))
-		.sort((a, b) => {
-			if (a.is_connected && !b.is_connected) return -1;
-			if (!a.is_connected && b.is_connected) return 1;
-			return (b.rssi ?? -100) - (a.rssi ?? -100);
-		});
+	// Sort devices: connected first, then by RSSI
+	const sortedDevices = [...devices].sort((a, b) => {
+		if (a.is_connected && !b.is_connected) return -1;
+		if (!a.is_connected && b.is_connected) return 1;
+		return (b.rssi ?? -100) - (a.rssi ?? -100);
+	});
 
 	const handleDevicePress = (device: BluetoothDevice) => {
 		if (device.is_connected) {
@@ -111,7 +60,6 @@ export function BluetoothInterface() {
 			<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" bdrs={8}>
 				<ScanningIndicator />
 				<Switch size="md" checked={isScanning} />
-				{/*{isScanning && <ScanningIndicator />}*/}
 			</Group>
 
 			{/* Error Alert */}
