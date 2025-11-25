@@ -288,18 +288,18 @@ print_installation_summary() {
     echo "  - Port: $PORT"
     echo ""
     echo "Useful commands:"
-    echo "  Start service:    ${BLUE}sudo systemctl start pi-podcast${NC}"
-    echo "  Stop service:     ${BLUE}sudo systemctl stop pi-podcast${NC}"
-    echo "  View logs:        ${BLUE}sudo journalctl -u pi-podcast -f${NC}"
-    echo "  Check status:     ${BLUE}sudo systemctl status pi-podcast${NC}"
-    echo "  Restart service:  ${BLUE}sudo systemctl restart pi-podcast${NC}"
+    echo -e "  Start service:    ${BLUE}sudo systemctl start pi-podcast${NC}"
+    echo -e "  Stop service:     ${BLUE}sudo systemctl stop pi-podcast${NC}"
+    echo -e "  View logs:        ${BLUE}sudo journalctl -u pi-podcast -f${NC}"
+    echo -e "  Check status:     ${BLUE}sudo systemctl status pi-podcast${NC}"
+    echo -e "  Restart service:  ${BLUE}sudo systemctl restart pi-podcast${NC}"
     echo ""
     echo "Access the application:"
     if [ "$SKIP_HOSTNAME" = false ]; then
-        echo "  ${BLUE}http://${HOSTNAME}.local${NC}"
+        echo -e "  ${BLUE}http://${HOSTNAME}.local${NC}"
     fi
     LOCAL_IP=$(hostname -I | awk '{print $1}')
-    echo "  ${BLUE}http://${LOCAL_IP}${NC}"
+    echo -e "  ${BLUE}http://${LOCAL_IP}${NC}"
     echo ""
 }
 
