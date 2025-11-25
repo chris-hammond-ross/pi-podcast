@@ -12,24 +12,24 @@ cleanup() {
     if [ $exit_code -ne 0 ]; then
         echo -e "${RED}Installation failed with exit code $exit_code${NC}"
         echo -e "${YELLOW}Cleaning up...${NC}"
-        
+
         # Stop and disable service if it was created
         if systemctl is-enabled pi-podcast &>/dev/null; then
             systemctl stop pi-podcast 2>/dev/null || true
             systemctl disable pi-podcast 2>/dev/null || true
         fi
-        
+
         # Remove service file if it exists
         [ -f "$SERVICE_FILE" ] && rm -f "$SERVICE_FILE"
-        
+
         # Remove installation directory if it was created during this run
         if [ "$INSTALL_DIR_CREATED" = "true" ] && [ -d "$INSTALL_DIR" ]; then
             rm -rf "$INSTALL_DIR"
             echo -e "${YELLOW}Removed $INSTALL_DIR${NC}"
         fi
-        
+
         systemctl daemon-reload 2>/dev/null || true
-        
+
         echo -e "${RED}Installation aborted. Please check the errors above and try again.${NC}"
     fi
 }
@@ -96,14 +96,14 @@ update_system() {
 
 install_nodejs() {
     print_header "Installing Node.js and npm"
-    
+
     local need_install=false
-    
+
     if command -v node &> /dev/null; then
         NODE_CURRENT=$(node --version)
         NODE_MAJOR=$(echo "$NODE_CURRENT" | sed 's/v\([0-9]*\).*/\1/')
         print_info "Node.js already installed: $NODE_CURRENT"
-        
+
         if [ "$NODE_MAJOR" -lt "$NODE_VERSION" ]; then
             print_info "Node.js version $NODE_CURRENT is older than required v$NODE_VERSION. Upgrading..."
             need_install=true
@@ -111,30 +111,30 @@ install_nodejs() {
     else
         need_install=true
     fi
-    
+
     if [ "$need_install" = true ]; then
         # Add NodeSource repository for latest Node.js LTS
         curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
         apt-get install -y nodejs
         print_success "Node.js and npm installed"
     fi
-    
+
     print_info "Node version: $(node --version)"
     print_info "npm version: $(npm --version)"
 }
 
 install_dependencies() {
     print_header "Installing dependencies"
-    
+
     # Install git, bluez and related packages
     apt-get install -y \
         git \
         bluez \
         bluez-tools \
         libdbus-1-dev
-    
+
     print_success "Dependencies installed"
-    
+
     # Enable Bluetooth service
     systemctl enable bluetooth
     systemctl start bluetooth
@@ -143,7 +143,7 @@ install_dependencies() {
 
 clone_repository() {
     print_header "Cloning Pi Podcast repository"
-    
+
     if [ -d "$INSTALL_DIR" ]; then
         print_info "Installation directory already exists. Updating..."
         cd "$INSTALL_DIR"
@@ -153,20 +153,20 @@ clone_repository() {
         INSTALL_DIR_CREATED="true"
         git clone "$REPO_URL" "$INSTALL_DIR"
     fi
-    
+
     cd "$INSTALL_DIR"
-    
+
     # Set ownership to install user
     chown -R "$INSTALL_USER:$INSTALL_USER" "$INSTALL_DIR"
-    
+
     print_success "Repository cloned to $INSTALL_DIR"
 }
 
 install_api_dependencies() {
     print_header "Installing API dependencies"
-    
+
     cd "$INSTALL_DIR/api"
-    
+
     # Only run npm init if package.json doesn't exist
     if [ ! -f "package.json" ]; then
         npm init -y
@@ -174,27 +174,27 @@ install_api_dependencies() {
     else
         npm install
     fi
-    
+
     print_success "API dependencies installed"
 }
 
 build_react_frontend() {
     print_header "Building React frontend"
-    
+
     cd "$INSTALL_DIR/client"
     npm install
-    npm run build
-    
+    npm run build-no-ts
+
     # Copy built files to api/public for serving
     mkdir -p "$INSTALL_DIR/api/public"
     cp -r "$INSTALL_DIR/client/dist"/* "$INSTALL_DIR/api/public/"
-    
+
     print_success "React frontend built and copied to server public directory"
 }
 
 create_systemd_service() {
     print_header "Creating systemd service"
-    
+
     cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=Pi Podcast Application
@@ -215,16 +215,16 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     systemctl daemon-reload
     systemctl enable pi-podcast
-    
+
     print_success "Systemd service created and enabled"
 }
 
 print_installation_summary() {
     print_header "Installation Complete"
-    
+
     echo ""
     echo -e "${GREEN}Pi Podcast has been successfully installed!${NC}"
     echo ""
@@ -247,10 +247,10 @@ print_installation_summary() {
 
 start_service() {
     print_header "Starting Pi Podcast service"
-    
+
     systemctl start pi-podcast
     sleep 2
-    
+
     if systemctl is-active --quiet pi-podcast; then
         print_success "Pi Podcast service is running"
     else
@@ -264,11 +264,11 @@ main() {
     print_header "Pi Podcast Installation"
     echo "This script will install and configure Pi Podcast on your Raspberry Pi Zero 2"
     echo ""
-    
+
     # Checks
     check_root
     check_pi_zero_2
-    
+
     # Installation steps
     update_system
     install_dependencies
@@ -278,7 +278,7 @@ main() {
     build_react_frontend
     create_systemd_service
     start_service
-    
+
     # Summary
     print_installation_summary
 }
