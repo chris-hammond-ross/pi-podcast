@@ -16,6 +16,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 INSTALL_DIR="/opt/pi-podcast"
+DB_FILE="/opt/pi-podcast/api/podcast.db"
 SERVICE_NAME="pi-podcast"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
@@ -85,9 +86,10 @@ confirm_uninstall() {
     echo "  - Service file: ${SERVICE_FILE}"
     if [ "$KEEP_DATA" = false ]; then
         echo "  - Installation directory: ${INSTALL_DIR}"
+        echo "  - Database file: ${DB_FILE}"
     fi
     echo ""
-    echo -e "${YELLOW}Note: System packages (Node.js, git, bluez) will NOT be removed.${NC}"
+    echo -e "${YELLOW}Note: System packages (Node.js, git, bluez, sqlite3) will NOT be removed.${NC}"
     echo ""
 
     read -p "Are you sure you want to continue? [y/N] " -n 1 -r
@@ -137,13 +139,13 @@ remove_install_directory() {
     print_header "Removing installation directory"
 
     if [ "$KEEP_DATA" = true ]; then
-        print_info "Keeping installation directory (--keep-data flag set)"
+        print_info "Keeping installation directory and database (--keep-data flag set)"
         return 0
     fi
 
     if [ -d "$INSTALL_DIR" ]; then
         rm -rf "$INSTALL_DIR"
-        print_success "Installation directory removed"
+        print_success "Installation directory and database removed"
     else
         print_info "Installation directory does not exist"
     fi
@@ -157,7 +159,9 @@ print_uninstall_summary() {
     echo ""
 
     if [ "$KEEP_DATA" = true ]; then
-        echo -e "${YELLOW}Note: Installation directory was kept at: ${INSTALL_DIR}${NC}"
+        echo -e "${YELLOW}Note: Installation directory and database were kept at:${NC}"
+        echo "  - ${INSTALL_DIR}"
+        echo "  - ${DB_FILE}"
         echo ""
     fi
 
@@ -165,9 +169,10 @@ print_uninstall_summary() {
     echo "  - Node.js"
     echo "  - git"
     echo "  - bluez / bluez-tools"
+    echo "  - sqlite3"
     echo ""
     echo "To remove these packages manually (if not needed by other applications):"
-    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools${NC}"
+    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3${NC}"
     echo ""
 }
 
