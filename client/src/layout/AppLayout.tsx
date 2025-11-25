@@ -1,4 +1,4 @@
-import { AppShell, Button, Group, rem } from '@mantine/core';
+import { AppShell, Button, Group, Container, rem } from '@mantine/core';
 import { Mic, ListMusic, Search, Settings } from 'lucide-react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
@@ -26,32 +26,35 @@ function AppLayout() {
 			}}
 		>
 			<AppShell.Header>
-				<Group
-					justify="space-between"
-					h="100%"
-					px={isMobile ? 8 : 16}
-				>
-					<Group gap="xs">
-						{navItems.map(({ path, label, icon: Icon }) => (
-							<Button
-								key={path}
-								variant={isActive(path) ? 'filled' : 'light'}
-								leftSection={isMobile ? undefined : <Icon size={18} />}
-								onClick={() => navigate(path)}
-							>
-								{isMobile ? <Icon size={18} /> : label}
-							</Button>
-						))}
-					</Group>
-
-					<Button
-						variant={isActive('/settings') ? 'filled' : 'light'}
-						leftSection={isMobile ? undefined : <Settings size={18} />}
-						onClick={() => navigate('/settings')}
+				<Container size="sm" px="0" h="100%">
+					<Group
+						align='center'
+						justify="space-between"
+						h="100%"
+						px={isMobile ? 8 : 16}
 					>
-						{isMobile ? <Settings size={18} /> : "Settings"}
-					</Button>
-				</Group>
+						<Group gap="xs">
+							{navItems.map(({ path, label, icon: Icon }) => (
+								<Button
+									key={path}
+									variant={isActive(path) ? 'filled' : 'light'}
+									leftSection={isMobile ? undefined : <Icon size={18} />}
+									onClick={() => navigate(path)}
+								>
+									{isMobile ? <Icon size={18} /> : label}
+								</Button>
+							))}
+						</Group>
+
+						<Button
+							variant={isActive('/settings') ? 'filled' : 'light'}
+							leftSection={isMobile ? undefined : <Settings size={18} />}
+							onClick={() => navigate('/settings')}
+						>
+							{isMobile ? <Settings size={18} /> : "Settings"}
+						</Button>
+					</Group>
+				</Container>
 			</AppShell.Header>
 
 			<AppShell.Main>

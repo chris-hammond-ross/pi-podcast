@@ -27,6 +27,7 @@ const DEMO_DEVICES: BluetoothDevice[] = [
 
 /**
  * Demo implementation of useScanBluetooth
+ * Simulates progressive device discovery with realistic timing
  */
 export function useScanBluetoothDemo(): UseScanBluetoothReturn {
 	const [devices, setDevices] = useState<BluetoothDevice[]>([]);
@@ -58,6 +59,7 @@ export function useScanBluetoothDemo(): UseScanBluetoothReturn {
 
 /**
  * Demo implementation of useBluetoothConnection
+ * Simulates device connection with realistic delays and occasional failures
  */
 export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 	const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
@@ -86,7 +88,7 @@ export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 		setIsConnecting(false);
 	}, []);
 
-	const disconnect = useCallback(async (_deviceAddress: string) => {
+	const disconnect = useCallback(async () => {
 		setIsDisconnecting(true);
 		setError(null);
 
@@ -109,7 +111,7 @@ export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 
 /**
  * Demo implementation of useBluetoothWebSocket
- * This simulates real-time updates without an actual WebSocket connection
+ * Simulates real-time updates without an actual WebSocket connection
  */
 export function useBluetoothWebSocketDemo(): UseBluetoothWebSocketReturn {
 	const [devices, setDevices] = useState<BluetoothDevice[]>([]);
@@ -118,23 +120,23 @@ export function useBluetoothWebSocketDemo(): UseBluetoothWebSocketReturn {
 
 	// Simulate initial device discovery on mount
 	useEffect(() => {
-		setIsScanning(true);
-
-		// Add devices progressively
 		const timeouts: ReturnType<typeof setTimeout>[] = [];
 
+		// Add devices progressively
 		DEMO_DEVICES.forEach((device, index) => {
 			const timeout = setTimeout(() => {
 				setDevices((prev) => [...prev, device]);
+
+				// Stop scanning after the last device is added
+				if (index === DEMO_DEVICES.length - 1) {
+					setIsScanning(false);
+				}
 			}, (index + 1) * 400);
 			timeouts.push(timeout);
 		});
 
-		// Stop scanning after all devices discovered
-		const stopTimeout = setTimeout(() => {
-			setIsScanning(false);
-		}, DEMO_DEVICES.length * 400 + 1000);
-		timeouts.push(stopTimeout);
+		// Ensure scanning starts
+		setIsScanning(true);
 
 		return () => {
 			timeouts.forEach(clearTimeout);
@@ -143,19 +145,25 @@ export function useBluetoothWebSocketDemo(): UseBluetoothWebSocketReturn {
 
 	// Update device connection status when connectedDevice changes
 	useEffect(() => {
+		if (!connectedDevice) {
+			setDevices((prev) => prev.map((d) => ({ ...d, is_connected: false })));
+			return;
+		}
+
 		setDevices((prev) =>
 			prev.map((d) => ({
 				...d,
-				is_connected: d.mac === connectedDevice?.mac,
+				is_connected: d.mac === connectedDevice.mac,
 			}))
 		);
-	}, [connectedDevice]);
+	}, [connectedDevice?.mac]);
 
 	return {
 		isConnected: true, // Pretend WebSocket is connected
 		connectionError: null,
 		devices,
 		connectedDevice,
+		setConnectedDevice,
 		isScanning,
 		bluetoothConnected: true,
 		error: null,

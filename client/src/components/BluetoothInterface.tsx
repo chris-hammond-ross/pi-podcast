@@ -5,8 +5,8 @@
  */
 
 import { useEffect } from 'react';
-import { Stack, Group, Text, Alert, Button, Box } from '@mantine/core';
-import { AlertCircle, Bluetooth, BluetoothSearching, BluetoothOff, Check } from 'lucide-react';
+import { Stack, Group, Text, Alert, Button, Box, Switch } from '@mantine/core';
+import { AlertCircle, Bluetooth, BluetoothOff, Check } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket } from '../hooks';
 import type { BluetoothDevice } from '../services';
 
@@ -108,14 +108,10 @@ export function BluetoothInterface() {
 	return (
 		<Stack gap="md">
 			{/* Header with scanning indicator */}
-			<Group justify="space-between" align="center">
-				<Group gap="xs">
-					<Bluetooth size={20} />
-					<Text fw={500} size="lg">
-						Bluetooth
-					</Text>
-				</Group>
-				{isScanning && <ScanningIndicator />}
+			<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" bdrs={8}>
+				<ScanningIndicator />
+				<Switch size="md" checked={isScanning} />
+				{/*{isScanning && <ScanningIndicator />}*/}
 			</Group>
 
 			{/* Error Alert */}
@@ -157,11 +153,18 @@ export function BluetoothInterface() {
 function ScanningIndicator() {
 	return (
 		<Box
+			bg="blue"
 			style={{
 				animation: 'pulse 1.5s ease-in-out infinite',
+				borderRadius: "50%",
+				height: "30px",
+				width: "30px",
+				display: "flex",
+				justifyContent: "center",
+				alignItems: "center",
 			}}
 		>
-			<BluetoothSearching size={18} color="var(--mantine-color-blue-5)" />
+			<Bluetooth size={18} color="white" />
 			<style>
 				{`
 					@keyframes pulse {
@@ -170,7 +173,7 @@ function ScanningIndicator() {
 					}
 				`}
 			</style>
-		</Box>
+		</Box >
 	);
 }
 
@@ -211,14 +214,6 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, isFirst, is
 				opacity: isLoading ? 0.6 : 1,
 				transition: 'background-color 150ms ease',
 			}}
-			onMouseEnter={(e) => {
-				if (!isLoading) {
-					e.currentTarget.style.backgroundColor = 'var(--mantine-color-gray-1)';
-				}
-			}}
-			onMouseLeave={(e) => {
-				e.currentTarget.style.backgroundColor = 'var(--mantine-color-body)';
-			}}
 		>
 			<Group justify="space-between" wrap="nowrap">
 				<Group gap="md" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
@@ -228,8 +223,8 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, isFirst, is
 							height: 30,
 							borderRadius: '50%',
 							backgroundColor: isConnected
-								? 'var(--mantine-color-blue-1)'
-								: 'var(--mantine-color-gray-1)',
+								? 'teal'
+								: 'gray',
 							display: 'flex',
 							alignItems: 'center',
 							justifyContent: 'center',
@@ -237,9 +232,9 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, isFirst, is
 						}}
 					>
 						{isConnected ? (
-							<Bluetooth size={18} color="var(--mantine-color-blue-6)" />
+							<Bluetooth size={18} color="green" />
 						) : (
-							<BluetoothOff size={18} color="var(--mantine-color-gray-5)" />
+							<BluetoothOff size={18} color="white" />
 						)}
 					</Box>
 					<Box style={{ minWidth: 0, flex: 1, justifyItems: "baseline" }}>

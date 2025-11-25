@@ -3,17 +3,18 @@ import { BluetoothInterface } from '../components';
 
 function Settings() {
 	return (
-
 		<Tabs defaultValue="bluetooth">
-			<Tabs.List>
-				<Tabs.Tab value="bluetooth">
-					Bluetooth
-				</Tabs.Tab>
-				<Tabs.Tab value="appearance">
-					Appearance
-				</Tabs.Tab>
-			</Tabs.List>
-			<Container size="xl" py="xl">
+			<Container size="sm">
+				<Tabs.List>
+					<Tabs.Tab value="bluetooth">
+						Bluetooth
+					</Tabs.Tab>
+					<Tabs.Tab value="appearance">
+						Appearance
+					</Tabs.Tab>
+				</Tabs.List>
+			</Container>
+			<Container size="sm" py="md">
 				<Stack gap="xl">
 					<Tabs.Panel value="bluetooth">
 						{/* Bluetooth Speaker Configuration */}
@@ -25,7 +26,6 @@ function Settings() {
 				</Stack>
 			</Container>
 		</Tabs>
-
 	);
 }
 
