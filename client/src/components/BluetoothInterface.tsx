@@ -5,8 +5,8 @@
  */
 
 import { useEffect } from 'react';
-import { Stack, Group, Text, Alert, Button, Box } from '@mantine/core';
-import { AlertCircle, Bluetooth } from 'lucide-react';
+import { Stack, Group, Text, Alert, Button, Box, ActionIcon } from '@mantine/core';
+import { AlertCircle, Bluetooth, AudioWaveform } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket } from '../hooks';
 import type { BluetoothDevice } from '../services';
 
@@ -54,12 +54,46 @@ export function BluetoothInterface() {
 		}
 	};
 
+	// Plays a simple beep tone using Web Audio API
+	function playTone() {
+		const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+		const oscillator = audioContext.createOscillator();
+		const gainNode = audioContext.createGain();
+
+		oscillator.connect(gainNode);
+		gainNode.connect(audioContext.destination);
+
+		// Configure the tone
+		oscillator.frequency.value = 440; // A4 note (440 Hz)
+		oscillator.type = 'sine'; // Can be 'sine', 'square', 'sawtooth', 'triangle'
+
+		// Fade in/out to avoid clicks
+		gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+		gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+		gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+		// Play for 500ms
+		oscillator.start(audioContext.currentTime);
+		oscillator.stop(audioContext.currentTime + 0.5);
+
+		// Clean up
+		oscillator.onended = () => {
+			audioContext.close();
+		};
+	}
+
 	return (
 		<Stack gap="md">
 			{/* Header with scanning indicator */}
 			<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" bdrs={8}>
 				<ScanningIndicator />
-				{/*<Switch size="md" checked={isScanning} />*/}
+				<ActionIcon
+					size="md"
+					variant="light"
+					onClick={playTone}
+				>
+					<AudioWaveform size={16} />
+				</ActionIcon>
 			</Group>
 
 			{/* Error Alert */}

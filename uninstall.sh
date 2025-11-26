@@ -89,7 +89,7 @@ confirm_uninstall() {
         echo "  - Database file: ${DB_FILE}"
     fi
     echo ""
-    echo -e "${YELLOW}Note: System packages (Node.js, git, bluez, sqlite3) will NOT be removed.${NC}"
+    echo -e "${YELLOW}Note: System packages (Node.js, git, bluez, sqlite3, pulseaudio) will NOT be removed.${NC}"
     echo ""
 
     read -p "Are you sure you want to continue? [y/N] " -n 1 -r
@@ -170,9 +170,11 @@ print_uninstall_summary() {
     echo "  - git"
     echo "  - bluez / bluez-tools"
     echo "  - sqlite3"
+    echo "  - pulseaudio / pulseaudio-module-bluetooth"
+    echo "  - avahi-daemon"
     echo ""
     echo "To remove these packages manually (if not needed by other applications):"
-    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3${NC}"
+    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3 pulseaudio pulseaudio-module-bluetooth${NC}"
     echo ""
 }
 
