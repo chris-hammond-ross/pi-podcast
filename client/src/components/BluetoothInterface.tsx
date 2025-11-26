@@ -1,13 +1,13 @@
 /**
  * BluetoothInterface Component
  * Simple, mobile-style UI for managing Bluetooth device connections
- * Automatically scans on mount and shows real-time updates
+ * Includes power on/off and manual scanning controls
  */
 
 import { useEffect } from 'react';
-import { Stack, Group, Text, Alert, Button, Box, ActionIcon } from '@mantine/core';
-import { AlertCircle, Bluetooth, AudioWaveform } from 'lucide-react';
-import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket } from '../hooks';
+import { Stack, Group, Text, Alert, Button, Box, ActionIcon, Switch } from '@mantine/core';
+import { AlertCircle, Bluetooth, AudioWaveform, Search, SearchX } from 'lucide-react';
+import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket, useBluetoothPower } from '../hooks';
 import type { BluetoothDevice } from '../services';
 
 export function BluetoothInterface() {
@@ -16,9 +16,10 @@ export function BluetoothInterface() {
 		isConnected: wsConnected,
 		connectionError: wsConnectionError,
 		isScanning: wsIsScanning,
+		bluetoothPowered: wsPowered,
 	} = useBluetoothWebSocket();
 
-	const { devices: httpDevices, isScanning: httpIsScanning, error: scanError, scan } = useScanBluetooth();
+	const { devices: httpDevices, isScanning: httpIsScanning, error: scanError, startScan, stopScan } = useScanBluetooth();
 	const {
 		isConnecting,
 		isDisconnecting,
@@ -26,18 +27,21 @@ export function BluetoothInterface() {
 		connect,
 		disconnect,
 	} = useBluetoothConnection();
+	
+	const {
+		isPowered,
+		isTogglingPower,
+		error: powerError,
+		togglePower,
+	} = useBluetoothPower();
 
 	// Prefer WebSocket data when available, fall back to HTTP data
 	const devices = wsConnected && wsDevices.length > 0 ? wsDevices : httpDevices;
 	const isScanning = wsConnected ? wsIsScanning : httpIsScanning;
+	const bluetoothPowered = wsConnected ? wsPowered : isPowered;
 
 	// Combine errors
-	const error = scanError || wsConnectionError || connectionError;
-
-	// Auto-scan on mount
-	useEffect(() => {
-		scan();
-	}, [scan]);
+	const error = scanError || wsConnectionError || connectionError || powerError;
 
 	// Sort devices: connected first, then by RSSI
 	const sortedDevices = [...devices].sort((a, b) => {
@@ -51,6 +55,14 @@ export function BluetoothInterface() {
 			disconnect(device.mac);
 		} else {
 			connect(device.mac, device.name);
+		}
+	};
+
+	const handleScanToggle = async () => {
+		if (isScanning) {
+			await stopScan();
+		} else {
+			await startScan();
 		}
 	};
 
@@ -84,17 +96,44 @@ export function BluetoothInterface() {
 
 	return (
 		<Stack gap="md">
-			{/* Header with scanning indicator */}
-			<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" bdrs={8}>
-				<ScanningIndicator />
-				<ActionIcon
+			{/* Bluetooth Power Control */}
+			<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" style={{ borderRadius: 8 }}>
+				<Group gap="sm">
+					<Bluetooth size={20} />
+					<Text size="sm" fw={500}>Bluetooth</Text>
+				</Group>
+				<Switch
+					checked={bluetoothPowered}
+					onChange={togglePower}
+					disabled={isTogglingPower}
 					size="md"
-					variant="light"
-					onClick={playTone}
-				>
-					<AudioWaveform size={16} />
-				</ActionIcon>
+				/>
 			</Group>
+
+			{/* Scanning Controls - Only show when Bluetooth is on */}
+			{bluetoothPowered && (
+				<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" style={{ borderRadius: 8 }}>
+					{isScanning ? <ScanningIndicator /> : <IdleIndicator />}
+					<Group gap="xs">
+						<ActionIcon
+							size="md"
+							variant="light"
+							onClick={playTone}
+						>
+							<AudioWaveform size={16} />
+						</ActionIcon>
+						<Button
+							size="xs"
+							variant={isScanning ? "light" : "filled"}
+							color={isScanning ? "red" : "blue"}
+							leftSection={isScanning ? <SearchX size={16} /> : <Search size={16} />}
+							onClick={handleScanToggle}
+						>
+							{isScanning ? 'Stop Scan' : 'Scan'}
+						</Button>
+					</Group>
+				</Group>
+			)}
 
 			{/* Error Alert */}
 			{error && (
@@ -103,34 +142,45 @@ export function BluetoothInterface() {
 				</Alert>
 			)}
 
-			{/* Device List */}
-			<Stack gap={0}>
-				{sortedDevices.length > 0 ? (
-					sortedDevices.map((device, index) => (
-						<DeviceRow
-							key={device.mac}
-							device={device}
-							onPress={() => handleDevicePress(device)}
-							isConnecting={isConnecting}
-							isDisconnecting={isDisconnecting}
-							isFirst={index === 0}
-							isLast={index === sortedDevices.length - 1}
-						/>
-					))
-				) : (
-					<Box py="xl" ta="center">
-						<Text c="dimmed" size="sm">
-							{isScanning ? 'Searching for devices...' : 'No devices found'}
-						</Text>
-					</Box>
-				)}
-			</Stack>
+			{/* Device List - Only show when Bluetooth is on */}
+			{bluetoothPowered && (
+				<Stack gap={0}>
+					{sortedDevices.length > 0 ? (
+						sortedDevices.map((device, index) => (
+							<DeviceRow
+								key={device.mac}
+								device={device}
+								onPress={() => handleDevicePress(device)}
+								isConnecting={isConnecting}
+								isDisconnecting={isDisconnecting}
+								isFirst={index === 0}
+								isLast={index === sortedDevices.length - 1}
+							/>
+						))
+					) : (
+						<Box py="xl" ta="center">
+							<Text c="dimmed" size="sm">
+								{isScanning ? 'Searching for devices...' : 'No devices found. Tap "Scan" to search.'}
+							</Text>
+						</Box>
+					)}
+				</Stack>
+			)}
+
+			{/* Bluetooth Off Message */}
+			{!bluetoothPowered && (
+				<Box py="xl" ta="center">
+					<Text c="dimmed" size="sm">
+						Bluetooth is turned off
+					</Text>
+				</Box>
+			)}
 		</Stack>
 	);
 }
 
 /**
- * Scanning Indicator - Pulsing BluetoothSearching icon
+ * Scanning Indicator - Pulsing Bluetooth icon
  */
 function ScanningIndicator() {
 	return (
@@ -155,7 +205,28 @@ function ScanningIndicator() {
 					}
 				`}
 			</style>
-		</Box >
+		</Box>
+	);
+}
+
+/**
+ * Idle Indicator - Static Bluetooth icon
+ */
+function IdleIndicator() {
+	return (
+		<Box
+			bg="gray"
+			style={{
+				borderRadius: "50%",
+				height: "30px",
+				width: "30px",
+				display: "flex",
+				justifyContent: "center",
+				alignItems: "center",
+			}}
+		>
+			<Bluetooth size={18} color="white" />
+		</Box>
 	);
 }
 

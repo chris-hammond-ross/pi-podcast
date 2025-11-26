@@ -10,7 +10,8 @@ export interface UseScanBluetoothReturn {
 	devices: BluetoothDevice[];
 	isScanning: boolean;
 	error: string | null;
-	scan: () => Promise<void>;
+	startScan: () => Promise<void>;
+	stopScan: () => Promise<void>;
 }
 
 export function useScanBluetooth(): UseScanBluetoothReturn {
@@ -18,7 +19,7 @@ export function useScanBluetooth(): UseScanBluetoothReturn {
 	const [isScanning, setIsScanning] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const scan = useCallback(async () => {
+	const startScan = useCallback(async () => {
 		setIsScanning(true);
 		setError(null);
 
@@ -30,11 +31,22 @@ export function useScanBluetooth(): UseScanBluetoothReturn {
 			const response: DevicesResponse = await getBluetoothDevices();
 			setDevices(response.devices);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to scan devices';
+			const message = err instanceof Error ? err.message : 'Failed to start scan';
 			setError(message);
-			setDevices([]);
-		} finally {
 			setIsScanning(false);
+		}
+	}, []);
+
+	const stopScan = useCallback(async () => {
+		setError(null);
+
+		try {
+			// Stop the scan on the backend
+			await setScan(false);
+			setIsScanning(false);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to stop scan';
+			setError(message);
 		}
 	}, []);
 
@@ -42,6 +54,7 @@ export function useScanBluetooth(): UseScanBluetoothReturn {
 		devices,
 		isScanning,
 		error,
-		scan,
+		startScan,
+		stopScan,
 	};
 }

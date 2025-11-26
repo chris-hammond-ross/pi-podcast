@@ -8,6 +8,7 @@
 import { useScanBluetooth as useScanBluetoothReal } from './useScanBluetooth';
 import { useBluetoothConnection as useBluetoothConnectionReal } from './useBluetoothConnection';
 import { useBluetoothWebSocket as useBluetoothWebSocketReal } from './useBluetoothWebSocket';
+import { useBluetoothPower as useBluetoothPowerReal } from './useBluetoothPower';
 import {
 	useScanBluetoothDemo,
 	useBluetoothConnectionDemo,
@@ -18,6 +19,7 @@ import {
 export type { UseScanBluetoothReturn } from './useScanBluetooth';
 export type { UseBluetoothConnectionReturn } from './useBluetoothConnection';
 export type { UseBluetoothWebSocketReturn } from './useBluetoothWebSocket';
+export type { UseBluetoothPowerReturn } from './useBluetoothPower';
 
 // Check demo mode
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
@@ -35,3 +37,4 @@ export const useBluetoothWebSocket = isDemoMode ? useBluetoothWebSocketDemo : us
 // These don't need demo versions
 export { useBluetoothStatus } from './useBluetoothStatus';
 export { useApiHealth } from './useApiHealth';
+export const useBluetoothPower = useBluetoothPowerReal;
