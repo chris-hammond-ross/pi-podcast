@@ -176,16 +176,50 @@ install_dependencies() {
     print_success "Avahi daemon enabled and started"
 }
 
+configure_user_permissions() {
+    print_header "Configuring user permissions"
+
+    # Add user to bluetooth group
+    if groups "$INSTALL_USER" | grep -q "\bbluetooth\b"; then
+        print_info "User $INSTALL_USER already in bluetooth group"
+    else
+        usermod -aG bluetooth "$INSTALL_USER"
+        print_success "Added $INSTALL_USER to bluetooth group"
+    fi
+
+    # Add user to audio group (for PulseAudio)
+    if groups "$INSTALL_USER" | grep -q "\baudio\b"; then
+        print_info "User $INSTALL_USER already in audio group"
+    else
+        usermod -aG audio "$INSTALL_USER"
+        print_success "Added $INSTALL_USER to audio group"
+    fi
+
+    print_success "User permissions configured"
+}
+
 configure_pulseaudio() {
     print_header "Configuring PulseAudio for Bluetooth"
+
+    # Kill any existing PulseAudio instances for the user
+    su - "$INSTALL_USER" -c "pulseaudio --kill" 2>/dev/null || true
+    sleep 1
 
     # Restart Bluetooth to pick up PulseAudio module
     systemctl restart bluetooth
     print_success "Bluetooth service restarted"
 
-    # Start PulseAudio as the install user
-    su - "$INSTALL_USER" -c "pulseaudio --start" 2>/dev/null || true
-    print_info "PulseAudio started for user $INSTALL_USER"
+    # Start PulseAudio as the install user in daemon mode
+    su - "$INSTALL_USER" -c "pulseaudio --start --daemonize" 2>/dev/null || true
+    sleep 1
+
+    # Verify PulseAudio is running
+    if su - "$INSTALL_USER" -c "pulseaudio --check" 2>/dev/null; then
+        print_success "PulseAudio started for user $INSTALL_USER"
+    else
+        print_error "Failed to start PulseAudio"
+        print_info "Will attempt to start during service startup"
+    fi
 
     # Load Bluetooth discovery module
     su - "$INSTALL_USER" -c "pactl load-module module-bluetooth-discover" 2>/dev/null || true
@@ -370,13 +404,14 @@ create_systemd_service() {
     cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=Pi Podcast Application
-After=network.target bluetooth.service
+After=network.target bluetooth.service pulseaudio.service
 Wants=bluetooth.service
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=$INSTALL_DIR/api
+ExecStartPre=/bin/su - $INSTALL_USER -c "pulseaudio --check || pulseaudio --start --daemonize"
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=10
@@ -404,7 +439,12 @@ print_installation_summary() {
     echo "  - Service name: pi-podcast"
     echo "  - Installation directory: $INSTALL_DIR"
     echo "  - Database: $DB_FILE"
+    echo "  - Running as: root (PulseAudio runs as $INSTALL_USER)"
     echo "  - Port: $PORT"
+    echo ""
+    echo "User Configuration:"
+    echo "  - User: $INSTALL_USER"
+    echo "  - Groups: bluetooth, audio"
     echo ""
     echo "Useful commands:"
     echo -e "  Start service:    ${BLUE}sudo systemctl start pi-podcast${NC}"
@@ -412,6 +452,11 @@ print_installation_summary() {
     echo -e "  View logs:        ${BLUE}sudo journalctl -u pi-podcast -f${NC}"
     echo -e "  Check status:     ${BLUE}sudo systemctl status pi-podcast${NC}"
     echo -e "  Restart service:  ${BLUE}sudo systemctl restart pi-podcast${NC}"
+    echo ""
+    echo "PulseAudio commands (as $INSTALL_USER):"
+    echo -e "  Check status:     ${BLUE}pulseaudio --check && echo 'Running' || echo 'Not running'${NC}"
+    echo -e "  Start:            ${BLUE}pulseaudio --start${NC}"
+    echo -e "  Restart:          ${BLUE}pulseaudio --kill && pulseaudio --start${NC}"
     echo ""
     echo "Access the application:"
     if [ "$SKIP_HOSTNAME" = false ]; then
@@ -449,6 +494,7 @@ main() {
     # Installation steps
     update_system
     install_dependencies
+    configure_user_permissions
     configure_pulseaudio
     enable_bluetooth_adapter
     install_nodejs
