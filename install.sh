@@ -151,7 +151,7 @@ install_nodejs() {
 install_dependencies() {
     print_header "Installing dependencies"
 
-    # Install git, bluez, sqlite3 and related packages
+    # Install git, bluez, sqlite3, pulseaudio and related packages
     apt-get install -y \
         git \
         bluez \
@@ -159,7 +159,9 @@ install_dependencies() {
         rfkill \
         libdbus-1-dev \
         avahi-daemon \
-        sqlite3
+        sqlite3 \
+        pulseaudio \
+        pulseaudio-module-bluetooth
 
     print_success "Dependencies installed"
 
@@ -172,6 +174,24 @@ install_dependencies() {
     systemctl enable avahi-daemon
     systemctl start avahi-daemon
     print_success "Avahi daemon enabled and started"
+}
+
+configure_pulseaudio() {
+    print_header "Configuring PulseAudio for Bluetooth"
+
+    # Restart Bluetooth to pick up PulseAudio module
+    systemctl restart bluetooth
+    print_success "Bluetooth service restarted"
+
+    # Start PulseAudio as the install user
+    su - "$INSTALL_USER" -c "pulseaudio --start" 2>/dev/null || true
+    print_info "PulseAudio started for user $INSTALL_USER"
+
+    # Load Bluetooth discovery module
+    su - "$INSTALL_USER" -c "pactl load-module module-bluetooth-discover" 2>/dev/null || true
+    print_success "Bluetooth discover module loaded"
+
+    print_info "PulseAudio configured for A2DP audio source"
 }
 
 enable_bluetooth_adapter() {
@@ -429,6 +449,7 @@ main() {
     # Installation steps
     update_system
     install_dependencies
+    configure_pulseaudio
     enable_bluetooth_adapter
     install_nodejs
     configure_hostname
