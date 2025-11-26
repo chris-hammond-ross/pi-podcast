@@ -21,6 +21,7 @@ export interface UseBluetoothWebSocketReturn {
 
 	// System state
 	bluetoothConnected: boolean;
+	bluetoothPowered: boolean;
 
 	// Error handling
 	error: string | null;
@@ -37,6 +38,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 	const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
 	const [isScanning, setIsScanning] = useState(false);
 	const [bluetoothConnected, setBluetoothConnected] = useState(false);
+	const [bluetoothPowered, setBluetoothPowered] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const unsubscribeRef = useRef<(() => void) | null>(null);
 	const serviceRef = useRef(getWebSocketService());
@@ -105,7 +107,19 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 
 			case 'system-status':
 				setBluetoothConnected(message.bluetooth_connected ?? false);
+				setBluetoothPowered(message.bluetooth_powered ?? true);
 				setConnectedDevice(message.connected_device || null);
+				setIsScanning(message.is_scanning ?? false);
+				break;
+
+			case 'bluetooth-power-changed':
+				setBluetoothPowered(message.powered ?? true);
+				setIsScanning(message.is_scanning ?? false);
+				if (!message.powered) {
+					// Clear devices when Bluetooth is turned off
+					setDevices([]);
+					setConnectedDevice(null);
+				}
 				break;
 
 			case 'scan-started':
@@ -178,6 +192,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 		connectedDevice,
 		isScanning,
 		bluetoothConnected,
+		bluetoothPowered,
 		error,
 	};
 }
