@@ -157,28 +157,52 @@ function parseConnectionChanges(output) {
 
 				console.log(`[connection] Device ${mac} connection changed: ${isNowConnected ? 'connected' : 'disconnected'}`);
 
-				// Update device in current session
-				const device = currentDevices.find(d => d.mac === mac);
-				if (device) {
-					device.is_connected = isNowConnected;
-					
-					if (isNowConnected) {
-						connectedDeviceMac = mac;
+				// Find or create device in current session
+				let device = currentDevices.find(d => d.mac === mac);
+
+				if (!device) {
+					// Device not in current session - check database
+					const dbDevice = getDeviceByMac.get(mac);
+					if (dbDevice) {
+						console.log('[connection] Loading device from database:', mac, dbDevice.name);
+						device = {
+							mac,
+							name: dbDevice.name,
+							rssi: dbDevice.rssi || -70,
+							is_connected: false
+						};
+						currentDevices.push(device);
+
+						// Notify clients of the device
 						broadcastMessage({
-							type: 'device-connected',
+							type: 'device-found',
 							device: device
 						});
-						// Auto-stop scanning when device connects
-						autoStopScanOnConnect();
 					} else {
-						if (connectedDeviceMac === mac) {
-							connectedDeviceMac = null;
-						}
-						broadcastMessage({
-							type: 'device-disconnected',
-							device: device
-						});
+						console.log('[connection] Device not in database, ignoring connection state change');
+						return;
 					}
+				}
+
+				// Update connection state
+				device.is_connected = isNowConnected;
+
+				if (isNowConnected) {
+					connectedDeviceMac = mac;
+					broadcastMessage({
+						type: 'device-connected',
+						device: device
+					});
+					// Auto-stop scanning when device connects
+					autoStopScanOnConnect();
+				} else {
+					if (connectedDeviceMac === mac) {
+						connectedDeviceMac = null;
+					}
+					broadcastMessage({
+						type: 'device-disconnected',
+						device: device
+					});
 				}
 			}
 		});
@@ -228,21 +252,21 @@ function parseDeviceOutput(output) {
 
 				// Check if device exists in database
 				const dbDevice = getDeviceByMac.get(mac);
-				
+
 				if (dbDevice) {
 					// Device exists in database - use stored name and skip filtering
 					console.log('[devices] Found known device from database:', mac, dbDevice.name);
-					
+
 					// Parse RSSI if present in the current output
 					let rssi = -70; // Default
 					const rssiMatch = name.match(/RSSI:\s*0x([0-9a-fA-F]+)\s*\((-?\d+)\)/);
 					if (rssiMatch) {
 						rssi = parseInt(rssiMatch[2], 10);
 					}
-					
+
 					// Update device in database with new RSSI and last_seen
 					updateDevice.run(dbDevice.name, rssi, mac);
-					
+
 					// Check if device already exists in current session
 					const existing = currentDevices.find((d) => d.mac === mac);
 					if (!existing) {
@@ -253,7 +277,7 @@ function parseDeviceOutput(output) {
 							is_connected: false
 						};
 						currentDevices.push(knownDevice);
-						
+
 						// Notify all clients of device
 						broadcastMessage({
 							type: 'device-found',
@@ -263,12 +287,12 @@ function parseDeviceOutput(output) {
 						// Update RSSI if device already in current session
 						existing.rssi = rssi;
 					}
-					
+
 					return; // Skip filtering logic
 				}
 
 				// Device not in database - proceed with filtering
-				
+
 				// Skip empty names
 				if (!name || name.length === 0) {
 					return;
@@ -329,7 +353,7 @@ function parseDeviceOutput(output) {
 
 				// Device passed all filters - add to database and current devices
 				const rssi = -70; // Default RSSI value (will be updated if available)
-				
+
 				try {
 					insertDevice.run(mac, name, rssi);
 					console.log('[database] Added new device:', mac, name);
@@ -410,15 +434,15 @@ app.post('/api/power', async (req, res) => {
 		const { state } = req.body;
 		const command = `power ${state ? 'on' : 'off'}`;
 		const output = await sendCommand(command);
-		
+
 		bluetoothPowered = state;
-		
+
 		// If turning off, stop scanning and clear connections
 		if (!state) {
 			isScanning = false;
 			connectedDeviceMac = null;
 			currentDevices = currentDevices.map(d => ({ ...d, is_connected: false }));
-			
+
 			broadcastMessage({
 				type: 'bluetooth-power-changed',
 				powered: false,
@@ -431,7 +455,7 @@ app.post('/api/power', async (req, res) => {
 				is_scanning: isScanning
 			});
 		}
-		
+
 		res.json({ success: true, command, output, powered: bluetoothPowered });
 	} catch (err) {
 		res.status(500).json({ success: false, error: err.message });
@@ -483,7 +507,7 @@ app.post('/api/pair', async (req, res) => {
 		if (!mac) throw new Error('MAC address required');
 
 		const output = await sendCommand(`pair ${mac}`);
-		
+
 		// Update paired status in database
 		try {
 			updateDevicePaired.run(1, mac);
@@ -491,7 +515,7 @@ app.post('/api/pair', async (req, res) => {
 		} catch (err) {
 			console.error('[database] Error updating paired status:', err.message);
 		}
-		
+
 		res.json({ success: true, command: `pair ${mac}`, output });
 	} catch (err) {
 		res.status(500).json({ success: false, error: err.message });
@@ -504,7 +528,7 @@ app.post('/api/trust', async (req, res) => {
 		if (!mac) throw new Error('MAC address required');
 
 		const output = await sendCommand(`trust ${mac}`);
-		
+
 		// Update trusted status in database
 		try {
 			updateDeviceTrusted.run(1, mac);
@@ -512,7 +536,7 @@ app.post('/api/trust', async (req, res) => {
 		} catch (err) {
 			console.error('[database] Error updating trusted status:', err.message);
 		}
-		
+
 		res.json({ success: true, command: `trust ${mac}`, output });
 	} catch (err) {
 		res.status(500).json({ success: false, error: err.message });
