@@ -6,7 +6,7 @@
 
 import { useEffect } from 'react';
 import { Stack, Group, Text, Alert, Button, Box } from '@mantine/core';
-import { AlertCircle, Bluetooth, Check } from 'lucide-react';
+import { AlertCircle, Bluetooth } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket } from '../hooks';
 import type { BluetoothDevice } from '../services';
 
@@ -175,9 +175,6 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, isFirst, is
 						</Text>
 					</Box>
 				</Group>
-				{isConnected && (
-					<Check size={18} color="var(--mantine-color-blue-6)" style={{ flexShrink: 0 }} />
-				)}
 			</Group>
 		</Button>
 	);
