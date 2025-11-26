@@ -23,6 +23,7 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 # Parse arguments
 SKIP_CONFIRM=true
 KEEP_DATA=false
+KEEP_BLUETOOTH_DEVICES=false
 
 for arg in "$@"; do
     case $arg in
@@ -34,6 +35,10 @@ for arg in "$@"; do
             KEEP_DATA=true
             shift
             ;;
+        --keep-bluetooth)
+            KEEP_BLUETOOTH_DEVICES=true
+            shift
+            ;;
         -h|--help)
             echo "Pi Podcast Uninstaller"
             echo ""
@@ -42,6 +47,7 @@ for arg in "$@"; do
             echo "Options:"
             echo "  -i, --interactive   Prompt for confirmation before uninstalling"
             echo "  --keep-data         Keep the installation directory (only remove service)"
+            echo "  --keep-bluetooth    Keep paired/trusted Bluetooth devices"
             echo "  -h, --help          Show this help message"
             exit 0
             ;;
@@ -87,6 +93,9 @@ confirm_uninstall() {
     if [ "$KEEP_DATA" = false ]; then
         echo "  - Installation directory: ${INSTALL_DIR}"
         echo "  - Database file: ${DB_FILE}"
+    fi
+    if [ "$KEEP_BLUETOOTH_DEVICES" = false ]; then
+        echo "  - All paired/trusted Bluetooth devices"
     fi
     echo ""
     echo -e "${YELLOW}Note: System packages (Node.js, git, bluez, sqlite3, pulseaudio) will NOT be removed.${NC}"
@@ -135,6 +144,63 @@ remove_service_file() {
     fi
 }
 
+remove_bluetooth_devices() {
+    print_header "Removing paired/trusted Bluetooth devices"
+
+    if [ "$KEEP_BLUETOOTH_DEVICES" = true ]; then
+        print_info "Keeping Bluetooth devices (--keep-bluetooth flag set)"
+        return 0
+    fi
+
+    # Check if bluetoothctl is available
+    if ! command -v bluetoothctl &> /dev/null; then
+        print_info "bluetoothctl not found, skipping Bluetooth cleanup"
+        return 0
+    fi
+
+    # Get list of paired devices from bluetoothctl
+    local devices=$(echo "devices" | bluetoothctl 2>/dev/null | grep "^Device" | awk '{print $2}')
+
+    if [ -z "$devices" ]; then
+        print_info "No Bluetooth devices to remove"
+        return 0
+    fi
+
+    local removed_count=0
+
+    # Remove each device
+    while IFS= read -r mac; do
+        if [ -n "$mac" ]; then
+            # Get device name for logging
+            local device_name=$(echo "info $mac" | bluetoothctl 2>/dev/null | grep "Name:" | cut -d':' -f2- | xargs)
+
+            # Disconnect if connected
+            echo "disconnect $mac" | bluetoothctl &> /dev/null || true
+            sleep 0.5
+
+            # Remove device
+            echo "remove $mac" | bluetoothctl &> /dev/null
+
+            if [ $? -eq 0 ]; then
+                if [ -n "$device_name" ]; then
+                    print_success "Removed device: $device_name ($mac)"
+                else
+                    print_success "Removed device: $mac"
+                fi
+                ((removed_count++))
+            else
+                print_error "Failed to remove device: $mac"
+            fi
+
+            sleep 0.5
+        fi
+    done <<< "$devices"
+
+    if [ $removed_count -gt 0 ]; then
+        print_success "Removed $removed_count Bluetooth device(s)"
+    fi
+}
+
 remove_install_directory() {
     print_header "Removing installation directory"
 
@@ -165,6 +231,14 @@ print_uninstall_summary() {
         echo ""
     fi
 
+    if [ "$KEEP_BLUETOOTH_DEVICES" = true ]; then
+        echo -e "${YELLOW}Note: Bluetooth devices were kept (paired/trusted)${NC}"
+        echo "To manually remove them, use: bluetoothctl"
+        echo "  - List devices: devices"
+        echo "  - Remove device: remove XX:XX:XX:XX:XX:XX"
+        echo ""
+    fi
+
     echo "The following system packages were NOT removed:"
     echo "  - Node.js"
     echo "  - git"
@@ -174,7 +248,7 @@ print_uninstall_summary() {
     echo "  - avahi-daemon"
     echo ""
     echo "To remove these packages manually (if not needed by other applications):"
-    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3 pulseaudio pulseaudio-module-bluetooth${NC}"
+    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3 pulseaudio pulseaudio-module-bluetooth avahi-daemon${NC}"
     echo ""
 }
 
@@ -190,6 +264,7 @@ main() {
     stop_service
     disable_service
     remove_service_file
+    remove_bluetooth_devices
     remove_install_directory
 
     # Summary

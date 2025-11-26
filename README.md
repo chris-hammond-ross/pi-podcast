@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/
 curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/uninstall.sh | sudo bash
 ```
 
-Use `--interactive` to be prompted for confirmation before removal. Use `--keep-data` to remove the service but retain the installation directory.
+Use `--interactive` to be prompted for confirmation before removal. Use `--keep-data` to remove the service but retain the installation directory. Use `--keep-bluetooth` to remove the service but retain the paired bluetooth devices.
 
 ### Manual Installation
 
