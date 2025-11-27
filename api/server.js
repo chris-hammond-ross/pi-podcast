@@ -21,6 +21,7 @@ console.log('[database] Connected to SQLite database at', dbPath);
 
 // Prepared statements for Bluetooth devices
 const getDeviceByMac = db.prepare('SELECT * FROM bluetooth_devices WHERE mac_address = ?');
+const getAllPairedDevices = db.prepare('SELECT * FROM bluetooth_devices WHERE paired = 1');
 const insertDevice = db.prepare(`
 	INSERT INTO bluetooth_devices (mac_address, name, rssi, last_seen)
 	VALUES (?, ?, ?, strftime('%s', 'now'))
@@ -43,12 +44,16 @@ const updateDeviceTrusted = db.prepare(`
 
 let bluetoothctl = null;
 let isConnected = false;
-let currentDevices = []; // Array of { mac, name, rssi, is_connected }
+let currentDevices = []; // Array of { mac, name, rssi, is_connected, paired, trusted, is_online }
 let outputBuffer = '';
 let clientSocket = null;
 let connectedDeviceMac = null; // Track which device is currently connected
 let isScanning = false; // Track scanning state
 let bluetoothPowered = true; // Track Bluetooth power state
+let lastSeenTimestamps = new Map(); // Track when devices were last seen during scan
+
+// How long before a device is considered offline (in ms)
+const DEVICE_OFFLINE_THRESHOLD = 30000; // 30 seconds
 
 // Helper function to broadcast WebSocket messages to all connected clients
 function broadcastMessage(message) {
@@ -175,7 +180,10 @@ function parseConnectionChanges(output) {
 							mac,
 							name: dbDevice.name,
 							rssi: dbDevice.rssi || -70,
-							is_connected: false
+							is_connected: false,
+							paired: !!dbDevice.paired,
+							trusted: !!dbDevice.trusted,
+							is_online: true
 						};
 						currentDevices.push(device);
 
@@ -240,6 +248,35 @@ function parseDeviceOutput(output) {
 	// Remove ANSI codes
 	const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '').replace(/\[0;9[0-9]m/g, '').replace(/\[0m/g, '');
 
+	// Check for device removal: [DEL] Device XX:XX:XX:XX:XX:XX DeviceName
+	const delMatches = cleanOutput.match(/\[DEL\]\s+Device\s+([0-9A-Fa-f:]{17})/g);
+	if (delMatches) {
+		delMatches.forEach((line) => {
+			const match = line.match(/\[DEL\]\s+Device\s+([0-9A-Fa-f:]{17})/);
+			if (match) {
+				const mac = match[1];
+				console.log('[devices] Device removed/went offline:', mac);
+				
+				// Mark device as offline
+				const device = currentDevices.find(d => d.mac === mac);
+				if (device) {
+					device.is_online = false;
+					device.is_connected = false;
+					lastSeenTimestamps.delete(mac);
+					
+					if (connectedDeviceMac === mac) {
+						connectedDeviceMac = null;
+					}
+					
+					broadcastMessage({
+						type: 'device-updated',
+						device: device
+					});
+				}
+			}
+		});
+	}
+
 	// Match device lines: [NEW] Device XX:XX:XX:XX:XX:XX DeviceName
 	// or: Device XX:XX:XX:XX:XX:XX DeviceName
 	// But NOT lines that are about connection status changes
@@ -254,6 +291,11 @@ function parseDeviceOutput(output) {
 
 			// Skip lines that are property changes (RSSI, TxPower, etc.)
 			if (/\[CHG\]/i.test(line)) {
+				return;
+			}
+			
+			// Skip deletion lines
+			if (/\[DEL\]/i.test(line)) {
 				return;
 			}
 
@@ -286,9 +328,13 @@ function parseDeviceOutput(output) {
 							mac,
 							name: dbDevice.name,
 							rssi,
-							is_connected: false
+							is_connected: false,
+							paired: !!dbDevice.paired,
+							trusted: !!dbDevice.trusted,
+							is_online: true
 						};
 						currentDevices.push(knownDevice);
+						lastSeenTimestamps.set(mac, Date.now());
 
 						// Notify all clients of device
 						broadcastMessage({
@@ -296,8 +342,10 @@ function parseDeviceOutput(output) {
 							device: knownDevice
 						});
 					} else {
-						// Update RSSI if device already in current session
+						// Update RSSI and online status if device already in current session
 						existing.rssi = rssi;
+						existing.is_online = true;
+						lastSeenTimestamps.set(mac, Date.now());
 					}
 
 					return; // Skip filtering logic
@@ -382,9 +430,13 @@ function parseDeviceOutput(output) {
 						mac,
 						name,
 						rssi,
-						is_connected: false
+						is_connected: false,
+						paired: false,
+						trusted: false,
+						is_online: true
 					};
 					currentDevices.push(newDevice);
+					lastSeenTimestamps.set(mac, Date.now());
 					console.log('[devices] Found:', mac, name);
 
 					// Notify all clients of new device
@@ -392,6 +444,10 @@ function parseDeviceOutput(output) {
 						type: 'device-found',
 						device: newDevice
 					});
+				} else {
+					// Update online status
+					existing.is_online = true;
+					lastSeenTimestamps.set(mac, Date.now());
 				}
 			}
 		});
@@ -678,9 +734,11 @@ app.post('/api/connect', async (req, res) => {
 				results.pair = await sendCommand(`pair ${mac}`, 10000);
 				console.log('[connect] Pair result:', results.pair.substring(0, 100));
 
-				// Update paired status in database
+				// Update paired status in database and current devices
 				try {
 					updateDevicePaired.run(1, mac);
+					const device = currentDevices.find(d => d.mac === mac);
+					if (device) device.paired = true;
 				} catch (dbErr) {
 					console.error('[database] Error updating paired status:', dbErr.message);
 				}
@@ -696,9 +754,11 @@ app.post('/api/connect', async (req, res) => {
 				results.trust = await sendCommand(`trust ${mac}`, 5000);
 				console.log('[connect] Trust result:', results.trust.substring(0, 100));
 
-				// Update trusted status in database
+				// Update trusted status in database and current devices
 				try {
 					updateDeviceTrusted.run(1, mac);
+					const device = currentDevices.find(d => d.mac === mac);
+					if (device) device.trusted = true;
 				} catch (dbErr) {
 					console.error('[database] Error updating trusted status:', dbErr.message);
 				}

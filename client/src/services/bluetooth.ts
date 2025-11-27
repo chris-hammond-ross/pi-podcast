@@ -9,6 +9,9 @@ export interface BluetoothDevice {
 	name: string;
 	rssi?: number;
 	is_connected?: boolean;
+	paired?: boolean;
+	trusted?: boolean;
+	is_online?: boolean;
 }
 
 export interface ScanResponse {

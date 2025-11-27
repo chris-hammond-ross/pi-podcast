@@ -1,10 +1,10 @@
 /**
  * BluetoothInterface Component
- * Simple, mobile-style UI for managing Bluetooth device connections
- * Includes power on/off and manual scanning controls
+ * Mobile-style UI for managing Bluetooth device connections
+ * Devices are grouped by: Connected, Paired, Discovered
  */
 
-import { Stack, Group, Text, Alert, Button, Box, ActionIcon, Switch, Loader, Center } from '@mantine/core';
+import { Stack, Group, Text, Alert, Button, Box, ActionIcon, Switch, Loader, Center, Divider } from '@mantine/core';
 import { AlertCircle, Bluetooth, AudioWaveform, Search, SearchX } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket, useBluetoothPower } from '../hooks';
 import type { BluetoothDevice } from '../services';
@@ -21,6 +21,8 @@ export function BluetoothInterface() {
 
 	const { devices: httpDevices, isScanning: httpIsScanning, error: scanError, startScan, stopScan } = useScanBluetooth();
 	const {
+		connectingDeviceMac,
+		disconnectingDeviceMac,
 		isConnecting,
 		isDisconnecting,
 		connectionStatus,
@@ -44,12 +46,21 @@ export function BluetoothInterface() {
 	// Combine errors
 	const error = scanError || wsConnectionError || connectionError || powerError;
 
-	// Sort devices: connected first, then by RSSI
-	const sortedDevices = [...devices].sort((a, b) => {
-		if (a.is_connected && !b.is_connected) return -1;
-		if (!a.is_connected && b.is_connected) return 1;
+	// Group devices by status
+	const connectedDevices = devices.filter(d => d.is_connected);
+	const pairedDevices = devices.filter(d => d.paired && !d.is_connected);
+	const discoveredDevices = devices.filter(d => !d.paired && !d.is_connected);
+
+	// Sort each group by online status (online first) then by RSSI
+	const sortByOnlineAndRssi = (a: BluetoothDevice, b: BluetoothDevice) => {
+		if (a.is_online && !b.is_online) return -1;
+		if (!a.is_online && b.is_online) return 1;
 		return (b.rssi ?? -100) - (a.rssi ?? -100);
-	});
+	};
+
+	const sortedConnected = [...connectedDevices].sort(sortByOnlineAndRssi);
+	const sortedPaired = [...pairedDevices].sort(sortByOnlineAndRssi);
+	const sortedDiscovered = [...discoveredDevices].sort(sortByOnlineAndRssi);
 
 	const handleDevicePress = (device: BluetoothDevice) => {
 		if (device.is_connected) {
@@ -76,20 +87,16 @@ export function BluetoothInterface() {
 		oscillator.connect(gainNode);
 		gainNode.connect(audioContext.destination);
 
-		// Configure the tone
-		oscillator.frequency.value = 440; // A4 note (440 Hz)
-		oscillator.type = 'sine'; // Can be 'sine', 'square', 'sawtooth', 'triangle'
+		oscillator.frequency.value = 440;
+		oscillator.type = 'sine';
 
-		// Fade in/out to avoid clicks
 		gainNode.gain.setValueAtTime(0, audioContext.currentTime);
 		gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
 		gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
 
-		// Play for 500ms
 		oscillator.start(audioContext.currentTime);
 		oscillator.stop(audioContext.currentTime + 0.5);
 
-		// Clean up
 		oscillator.onended = () => {
 			audioContext.close();
 		};
@@ -106,6 +113,8 @@ export function BluetoothInterface() {
 			</Center>
 		);
 	}
+
+	const hasDevices = devices.length > 0;
 
 	return (
 		<Stack gap="md">
@@ -155,37 +164,53 @@ export function BluetoothInterface() {
 				</Alert>
 			)}
 
-			{/* Connection Status - Show when connecting */}
-			{isConnecting && (
-				<Alert color="blue" variant="light">
-					<Group gap="sm">
-						<Loader size="xs" />
-						<Text size="sm">
-							{connectionStatus === 'pairing' && 'Pairing with device...'}
-							{connectionStatus === 'trusting' && 'Trusting device...'}
-							{connectionStatus === 'connecting' && 'Connecting...'}
-							{connectionStatus === 'idle' && 'Preparing connection...'}
-						</Text>
-					</Group>
-				</Alert>
-			)}
-
-			{/* Device List - Only show when Bluetooth is on */}
+			{/* Device Lists - Only show when Bluetooth is on */}
 			{bluetoothPowered && (
-				<Stack gap={0}>
-					{sortedDevices.length > 0 ? (
-						sortedDevices.map((device, index) => (
-							<DeviceRow
-								key={device.mac}
-								device={device}
-								onPress={() => handleDevicePress(device)}
-								isConnecting={isConnecting}
-								isDisconnecting={isDisconnecting}
-								isFirst={index === 0}
-								isLast={index === sortedDevices.length - 1}
+				<Stack gap="md">
+					{/* Connected Devices */}
+					{sortedConnected.length > 0 && (
+						<>
+							<Divider label="Connected" labelPosition="left" />
+							<DeviceGroup
+								devices={sortedConnected}
+								onDevicePress={handleDevicePress}
+								connectingDeviceMac={connectingDeviceMac}
+								disconnectingDeviceMac={disconnectingDeviceMac}
+								connectionStatus={connectionStatus}
 							/>
-						))
-					) : (
+						</>
+					)}
+
+					{/* Paired Devices */}
+					{sortedPaired.length > 0 && (
+						<>
+							<Divider label="Paired" labelPosition="left" />
+							<DeviceGroup
+								devices={sortedPaired}
+								onDevicePress={handleDevicePress}
+								connectingDeviceMac={connectingDeviceMac}
+								disconnectingDeviceMac={disconnectingDeviceMac}
+								connectionStatus={connectionStatus}
+							/>
+						</>
+					)}
+
+					{/* Discovered Devices */}
+					{sortedDiscovered.length > 0 && (
+						<>
+							<Divider label="Discovered" labelPosition="left" />
+							<DeviceGroup
+								devices={sortedDiscovered}
+								onDevicePress={handleDevicePress}
+								connectingDeviceMac={connectingDeviceMac}
+								disconnectingDeviceMac={disconnectingDeviceMac}
+								connectionStatus={connectionStatus}
+							/>
+						</>
+					)}
+
+					{/* Empty State */}
+					{!hasDevices && (
 						<Box py="xl" ta="center">
 							<Text c="dimmed" size="sm">
 								{isScanning ? 'Searching for devices...' : 'No devices found. Tap "Scan" to search.'}
@@ -203,6 +228,36 @@ export function BluetoothInterface() {
 					</Text>
 				</Box>
 			)}
+		</Stack>
+	);
+}
+
+/**
+ * Device Group - Renders a list of devices with proper border radius
+ */
+interface DeviceGroupProps {
+	devices: BluetoothDevice[];
+	onDevicePress: (device: BluetoothDevice) => void;
+	connectingDeviceMac: string | null;
+	disconnectingDeviceMac: string | null;
+	connectionStatus: string;
+}
+
+function DeviceGroup({ devices, onDevicePress, connectingDeviceMac, disconnectingDeviceMac, connectionStatus }: DeviceGroupProps) {
+	return (
+		<Stack gap={0}>
+			{devices.map((device, index) => (
+				<DeviceRow
+					key={device.mac}
+					device={device}
+					onPress={() => onDevicePress(device)}
+					isConnecting={connectingDeviceMac === device.mac}
+					isDisconnecting={disconnectingDeviceMac === device.mac}
+					connectionStatus={connectingDeviceMac === device.mac ? connectionStatus : null}
+					isFirst={index === 0}
+					isLast={index === devices.length - 1}
+				/>
+			))}
 		</Stack>
 	);
 }
@@ -266,23 +321,51 @@ interface DeviceRowProps {
 	onPress: () => void;
 	isConnecting: boolean;
 	isDisconnecting: boolean;
+	connectionStatus: string | null;
 	isFirst: boolean;
 	isLast: boolean;
 }
 
-function DeviceRow({ device, onPress, isConnecting, isDisconnecting, isFirst, isLast }: DeviceRowProps) {
+function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionStatus, isFirst, isLast }: DeviceRowProps) {
 	const isConnected = device.is_connected ?? false;
+	const isOnline = device.is_online ?? true; // Default to online if not specified
+	const isPaired = device.paired ?? false;
 	const isLoading = isConnecting || isDisconnecting;
+
+	// Determine the status text and color
+	let statusText = 'Not connected';
+	let buttonColor = 'blue';
+	
+	if (isConnecting) {
+		statusText = connectionStatus === 'pairing' ? 'Pairing...' 
+			: connectionStatus === 'trusting' ? 'Trusting...' 
+			: 'Connecting...';
+		buttonColor = 'blue';
+	} else if (isDisconnecting) {
+		statusText = 'Disconnecting...';
+		buttonColor = 'orange';
+	} else if (isConnected) {
+		statusText = 'Connected';
+		buttonColor = 'green';
+	} else if (isPaired && !isOnline) {
+		statusText = 'Offline';
+		buttonColor = 'gray';
+	} else if (isPaired) {
+		statusText = 'Paired';
+		buttonColor = 'blue';
+	}
+
+	// Muted style for offline paired devices
+	const isMuted = isPaired && !isOnline && !isConnected;
 
 	return (
 		<Button
 			p="xs"
 			justify="left"
-			color={isConnected ? "green" : "blue"}
-			c={isConnected ? "green" : "blue"}
+			color={buttonColor}
 			variant="light"
 			onClick={onPress}
-			disabled={isLoading}
+			disabled={isLoading || isMuted}
 			style={{
 				height: "unset",
 				borderRadius: isFirst && isLast
@@ -292,22 +375,23 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, isFirst, is
 						: isLast
 							? '0 0 8px 8px'
 							: '0',
-				cursor: isLoading ? 'wait' : 'pointer',
-				opacity: isLoading ? 0.6 : 1,
+				cursor: isLoading ? 'wait' : isMuted ? 'not-allowed' : 'pointer',
+				opacity: isMuted ? 0.5 : isLoading ? 0.7 : 1,
 				transition: 'background-color 150ms ease',
 			}}
 		>
-			<Group justify="space-between" wrap="nowrap">
-				<Group gap="md" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-					<Box style={{ minWidth: 0, flex: 1, justifyItems: "baseline" }}>
-						<Text fw={500} truncate>
-							{device.name}
-						</Text>
+			<Group justify="space-between" wrap="nowrap" w="100%">
+				<Box style={{ minWidth: 0, flex: 1 }}>
+					<Text fw={500} truncate c={isMuted ? 'dimmed' : undefined}>
+						{device.name}
+					</Text>
+					<Group gap="xs">
+						{isLoading && <Loader size={10} />}
 						<Text size="xs" c="dimmed">
-							{isConnected ? 'Connected' : 'Not connected'}
+							{statusText}
 						</Text>
-					</Box>
-				</Group>
+					</Group>
+				</Box>
 			</Group>
 		</Button>
 	);

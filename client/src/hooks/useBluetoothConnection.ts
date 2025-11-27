@@ -11,6 +11,8 @@ export type ConnectionStatus = 'idle' | 'pairing' | 'trusting' | 'connecting' | 
 
 export interface UseBluetoothConnectionReturn {
 	connectedDevice: BluetoothDevice | null;
+	connectingDeviceMac: string | null;
+	disconnectingDeviceMac: string | null;
 	isConnecting: boolean;
 	isDisconnecting: boolean;
 	connectionStatus: ConnectionStatus;
@@ -21,6 +23,8 @@ export interface UseBluetoothConnectionReturn {
 
 export function useBluetoothConnection(): UseBluetoothConnectionReturn {
 	const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
+	const [connectingDeviceMac, setConnectingDeviceMac] = useState<string | null>(null);
+	const [disconnectingDeviceMac, setDisconnectingDeviceMac] = useState<string | null>(null);
 	const [isConnecting, setIsConnecting] = useState(false);
 	const [isDisconnecting, setIsDisconnecting] = useState(false);
 	const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
@@ -28,6 +32,7 @@ export function useBluetoothConnection(): UseBluetoothConnectionReturn {
 
 	const connect = useCallback(async (deviceAddress: string, deviceName?: string) => {
 		setIsConnecting(true);
+		setConnectingDeviceMac(deviceAddress);
 		setError(null);
 		setConnectionStatus('connecting');
 
@@ -51,11 +56,13 @@ export function useBluetoothConnection(): UseBluetoothConnectionReturn {
 			throw err;
 		} finally {
 			setIsConnecting(false);
+			setConnectingDeviceMac(null);
 		}
 	}, []);
 
 	const disconnect = useCallback(async (deviceAddress: string) => {
 		setIsDisconnecting(true);
+		setDisconnectingDeviceMac(deviceAddress);
 		setError(null);
 		setConnectionStatus('disconnecting');
 
@@ -72,11 +79,14 @@ export function useBluetoothConnection(): UseBluetoothConnectionReturn {
 			throw err;
 		} finally {
 			setIsDisconnecting(false);
+			setDisconnectingDeviceMac(null);
 		}
 	}, []);
 
 	return {
 		connectedDevice,
+		connectingDeviceMac,
+		disconnectingDeviceMac,
 		isConnecting,
 		isDisconnecting,
 		connectionStatus,
