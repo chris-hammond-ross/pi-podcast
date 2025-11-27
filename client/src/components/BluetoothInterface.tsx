@@ -4,8 +4,8 @@
  * Devices are grouped by: Connected, Paired, Discovered
  */
 
-import { Stack, Group, Text, Alert, Button, Box, ActionIcon, Switch, Loader, Divider, LoadingOverlay } from '@mantine/core';
-import { AlertCircle, Bluetooth, AudioWaveform, Search, SearchX } from 'lucide-react';
+import { Stack, Group, Text, Alert, Button, Box, Switch, Loader, Divider, LoadingOverlay } from '@mantine/core';
+import { AlertCircle, Bluetooth, Search, SearchX } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket, useBluetoothPower } from '../hooks';
 import type { BluetoothDevice } from '../services';
 
@@ -30,7 +30,7 @@ export function BluetoothInterface() {
 		connect,
 		disconnect,
 	} = useBluetoothConnection();
-	
+
 	const {
 		isPowered,
 		isTogglingPower,
@@ -79,81 +79,66 @@ export function BluetoothInterface() {
 	};
 
 	// Plays a simple beep tone using Web Audio API
-	function playTone() {
-		const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-		const oscillator = audioContext.createOscillator();
-		const gainNode = audioContext.createGain();
+	// function playTone() {
+	// 	const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+	// 	const oscillator = audioContext.createOscillator();
+	// 	const gainNode = audioContext.createGain();
 
-		oscillator.connect(gainNode);
-		gainNode.connect(audioContext.destination);
+	// 	oscillator.connect(gainNode);
+	// 	gainNode.connect(audioContext.destination);
 
-		oscillator.frequency.value = 440;
-		oscillator.type = 'sine';
+	// 	oscillator.frequency.value = 440;
+	// 	oscillator.type = 'sine';
 
-		gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-		gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
-		gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+	// 	gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+	// 	gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+	// 	gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
 
-		oscillator.start(audioContext.currentTime);
-		oscillator.stop(audioContext.currentTime + 0.5);
+	// 	oscillator.start(audioContext.currentTime);
+	// 	oscillator.stop(audioContext.currentTime + 0.5);
 
-		oscillator.onended = () => {
-			audioContext.close();
-		};
-	}
+	// 	oscillator.onended = () => {
+	// 		audioContext.close();
+	// 	};
+	// }
 
 	const hasDevices = devices.length > 0;
 
 	return (
 		<Box pos="relative" mih={200}>
-			<LoadingOverlay 
-				visible={isLoading} 
-				zIndex={1000} 
+			<LoadingOverlay
+				visible={isLoading}
+				zIndex={1000}
 				overlayProps={{ radius: "sm", blur: 2 }}
 				loaderProps={{ size: 'md', type: 'dots' }}
 			/>
-			
+
 			<Stack gap="md">
 				{/* Bluetooth Power Control */}
 				<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" style={{ borderRadius: 8 }}>
-					<Group gap="sm">
-						<Bluetooth size={20} />
-						<Text size="sm" fw={500}>Bluetooth</Text>
+					<Group>
+						<Switch
+							checked={bluetoothPowered}
+							onChange={togglePower}
+							disabled={isTogglingPower || isLoading}
+							size="md"
+						/>
+						<Text size="sm" fw={500}>{bluetoothPowered ? "On" : "Off"}</Text>
 					</Group>
-					<Switch
-						checked={bluetoothPowered}
-						onChange={togglePower}
-						disabled={isTogglingPower || isLoading}
-						size="md"
-					/>
+					<Group>
+						{isScanning && <ScanningIndicator />}
+						<Button
+							size="xs"
+							variant={isScanning ? "light" : "filled"}
+							color={isScanning ? "red" : "blue"}
+							leftSection={isScanning ? <SearchX size={16} /> : <Search size={16} />}
+							onClick={handleScanToggle}
+							disabled={isLoading || !bluetoothPowered}
+						>
+							{isScanning ? 'Stop Scan' : 'Scan'}
+						</Button>
+					</Group>
 				</Group>
-
-				{/* Scanning Controls - Only show when Bluetooth is on */}
-				{bluetoothPowered && (
-					<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" style={{ borderRadius: 8 }}>
-						{isScanning ? <ScanningIndicator /> : <IdleIndicator />}
-						<Group gap="xs">
-							<ActionIcon
-								size="md"
-								variant="light"
-								onClick={playTone}
-								disabled={isLoading}
-							>
-								<AudioWaveform size={16} />
-							</ActionIcon>
-							<Button
-								size="xs"
-								variant={isScanning ? "light" : "filled"}
-								color={isScanning ? "red" : "blue"}
-								leftSection={isScanning ? <SearchX size={16} /> : <Search size={16} />}
-								onClick={handleScanToggle}
-								disabled={isLoading}
-							>
-								{isScanning ? 'Stop Scan' : 'Scan'}
-							</Button>
-						</Group>
-					</Group>
-				)}
 
 				{/* Error Alert */}
 				{error && (
@@ -292,27 +277,6 @@ function ScanningIndicator() {
 }
 
 /**
- * Idle Indicator - Static Bluetooth icon
- */
-function IdleIndicator() {
-	return (
-		<Box
-			bg="gray"
-			style={{
-				borderRadius: "50%",
-				height: "30px",
-				width: "30px",
-				display: "flex",
-				justifyContent: "center",
-				alignItems: "center",
-			}}
-		>
-			<Bluetooth size={18} color="white" />
-		</Box>
-	);
-}
-
-/**
  * Device Row Component - Single device in the list
  */
 interface DeviceRowProps {
@@ -334,11 +298,11 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionS
 	// Determine the status text and color
 	let statusText = 'Not connected';
 	let buttonColor = 'blue';
-	
+
 	if (isConnecting) {
-		statusText = connectionStatus === 'pairing' ? 'Pairing...' 
-			: connectionStatus === 'trusting' ? 'Trusting...' 
-			: 'Connecting...';
+		statusText = connectionStatus === 'pairing' ? 'Pairing...'
+			: connectionStatus === 'trusting' ? 'Trusting...'
+				: 'Connecting...';
 		buttonColor = 'blue';
 	} else if (isDisconnecting) {
 		statusText = 'Disconnecting...';
