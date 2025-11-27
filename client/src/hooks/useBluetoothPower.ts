@@ -1,8 +1,9 @@
 /**
  * Hook for managing Bluetooth power state
+ * Syncs with WebSocket updates when available
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { setBluetoothPower } from '../services';
 
 export interface UseBluetoothPowerReturn {
@@ -11,12 +12,18 @@ export interface UseBluetoothPowerReturn {
 	error: string | null;
 	togglePower: () => Promise<void>;
 	setPower: (state: boolean) => Promise<void>;
+	syncPower: (state: boolean) => void;
 }
 
 export function useBluetoothPower(): UseBluetoothPowerReturn {
-	const [isPowered, setIsPowered] = useState(true); // Assume on by default
+	const [isPowered, setIsPowered] = useState(false); // Start false until we know the real state
 	const [isTogglingPower, setIsTogglingPower] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	// Sync power state from external source (WebSocket)
+	const syncPower = useCallback((state: boolean) => {
+		setIsPowered(state);
+	}, []);
 
 	const setPower = useCallback(async (state: boolean) => {
 		setIsTogglingPower(true);
@@ -43,5 +50,6 @@ export function useBluetoothPower(): UseBluetoothPowerReturn {
 		error,
 		togglePower,
 		setPower,
+		syncPower,
 	};
 }

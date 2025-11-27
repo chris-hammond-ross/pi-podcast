@@ -392,8 +392,39 @@ function parseRSSIFromInfo(output) {
 	return rssiMatch ? parseInt(rssiMatch[1], 10) : -70;
 }
 
-// Send command to bluetoothctl
-function sendCommand(command) {
+// Command queue for serializing bluetoothctl commands
+const commandQueue = [];
+let isProcessingCommand = false;
+
+// Queue a command to be executed (ensures commands don't overlap)
+function queueCommand(command, timeout = 5000) {
+	return new Promise((resolve, reject) => {
+		commandQueue.push({ command, timeout, resolve, reject });
+		processCommandQueue();
+	});
+}
+
+// Process the command queue sequentially
+async function processCommandQueue() {
+	if (isProcessingCommand || commandQueue.length === 0) return;
+
+	isProcessingCommand = true;
+	const { command, timeout, resolve, reject } = commandQueue.shift();
+
+	try {
+		const result = await executeCommand(command, timeout);
+		resolve(result);
+	} catch (err) {
+		reject(err);
+	} finally {
+		isProcessingCommand = false;
+		// Process next command after a small delay
+		setTimeout(() => processCommandQueue(), 100);
+	}
+}
+
+// Execute a single command to bluetoothctl with proper completion detection
+function executeCommand(command, timeout = 5000) {
 	return new Promise((resolve, reject) => {
 		if (!isConnected || !bluetoothctl) {
 			reject(new Error('bluetoothctl not connected'));
@@ -403,17 +434,65 @@ function sendCommand(command) {
 		console.log('[command]', command);
 		outputBuffer = '';
 
+		const startTime = Date.now();
+		let checkInterval = null;
+		let timeoutId = null;
+
+		const cleanup = () => {
+			if (checkInterval) clearInterval(checkInterval);
+			if (timeoutId) clearTimeout(timeoutId);
+		};
+
+		// Check for command completion indicators
+		const completionPatterns = [
+			/Successful/i,
+			/Failed/i,
+			/not available/i,
+			/Connection successful/i,
+			/Failed to connect/i,
+			/Pairing successful/i,
+			/Failed to pair/i,
+			/trust succeeded/i,
+			/Changing .* succeeded/i,
+			/Device .* not available/i,
+			/No default controller available/i,
+			/org\.bluez\.Error/i,
+			/Already connected/i,
+			/not connected/i,
+		];
+
+		const isComplete = () => {
+			return completionPatterns.some(pattern => pattern.test(outputBuffer));
+		};
+
+		// Poll for completion
+		checkInterval = setInterval(() => {
+			if (isComplete()) {
+				cleanup();
+				// Give a tiny bit more time for any trailing output
+				setTimeout(() => resolve(outputBuffer), 50);
+			}
+		}, 50);
+
+		// Timeout fallback
+		timeoutId = setTimeout(() => {
+			cleanup();
+			console.log('[command] Timeout reached, returning buffer:', outputBuffer.substring(0, 100));
+			resolve(outputBuffer);
+		}, timeout);
+
 		try {
 			bluetoothctl.stdin.write(command + '\n');
-
-			// Give it time to execute and capture output
-			setTimeout(() => {
-				resolve(outputBuffer);
-			}, 500);
 		} catch (err) {
+			cleanup();
 			reject(err);
 		}
 	});
+}
+
+// Send command to bluetoothctl (now uses queue)
+function sendCommand(command, timeout = 5000) {
+	return queueCommand(command, timeout);
 }
 
 // API Endpoints
@@ -545,10 +624,59 @@ app.post('/api/trust', async (req, res) => {
 
 app.post('/api/connect', async (req, res) => {
 	try {
-		const { mac } = req.body;
+		const { mac, fullSequence = true } = req.body;
 		if (!mac) throw new Error('MAC address required');
 
-		const output = await sendCommand(`connect ${mac}`);
+		const results = {
+			pair: null,
+			trust: null,
+			connect: null
+		};
+
+		if (fullSequence) {
+			// Full connection sequence: pair -> trust -> connect
+			console.log('[connect] Starting full connection sequence for:', mac);
+
+			// Step 1: Pair (with longer timeout as pairing can take a while)
+			try {
+				results.pair = await sendCommand(`pair ${mac}`, 10000);
+				console.log('[connect] Pair result:', results.pair.substring(0, 100));
+
+				// Update paired status in database
+				try {
+					updateDevicePaired.run(1, mac);
+				} catch (dbErr) {
+					console.error('[database] Error updating paired status:', dbErr.message);
+				}
+			} catch (pairErr) {
+				console.log('[connect] Pair failed (may already be paired):', pairErr.message);
+			}
+
+			// Small delay between commands
+			await new Promise(resolve => setTimeout(resolve, 500));
+
+			// Step 2: Trust
+			try {
+				results.trust = await sendCommand(`trust ${mac}`, 5000);
+				console.log('[connect] Trust result:', results.trust.substring(0, 100));
+
+				// Update trusted status in database
+				try {
+					updateDeviceTrusted.run(1, mac);
+				} catch (dbErr) {
+					console.error('[database] Error updating trusted status:', dbErr.message);
+				}
+			} catch (trustErr) {
+				console.log('[connect] Trust failed:', trustErr.message);
+			}
+
+			// Small delay between commands
+			await new Promise(resolve => setTimeout(resolve, 500));
+		}
+
+		// Step 3: Connect (always executed)
+		results.connect = await sendCommand(`connect ${mac}`, 10000);
+		console.log('[connect] Connect result:', results.connect.substring(0, 100));
 
 		// Don't immediately set is_connected here - wait for [CHG] confirmation
 		// The parseConnectionChanges function will handle the actual state update
@@ -556,7 +684,8 @@ app.post('/api/connect', async (req, res) => {
 		res.json({
 			success: true,
 			command: `connect ${mac}`,
-			output
+			output: results.connect,
+			sequence: fullSequence ? results : undefined
 		});
 	} catch (err) {
 		res.status(500).json({ success: false, error: err.message });

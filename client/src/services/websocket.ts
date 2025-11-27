@@ -13,6 +13,7 @@ export type ServerMessageType =
   | 'device-removed'
   | 'devices-list'
   | 'system-status'
+  | 'bluetooth-power-changed'
   | 'scan-started'
   | 'scan-stopped'
   | 'output'
@@ -24,8 +25,11 @@ export interface ServerMessage {
 	devices?: BluetoothDevice[];
 	mac?: string;
 	bluetooth_connected?: boolean;
+	bluetooth_powered?: boolean;
+	powered?: boolean;
 	devices_count?: number;
 	connected_device?: BluetoothDevice | null;
+	is_scanning?: boolean;
 	data?: string;
 }
 

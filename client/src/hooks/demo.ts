@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { BluetoothDevice } from '../services';
 import type { UseScanBluetoothReturn } from './useScanBluetooth';
-import type { UseBluetoothConnectionReturn } from './useBluetoothConnection';
+import type { UseBluetoothConnectionReturn, ConnectionStatus } from './useBluetoothConnection';
 import type { UseBluetoothWebSocketReturn } from './useBluetoothWebSocket';
 
 /**
@@ -34,7 +34,7 @@ export function useScanBluetoothDemo(): UseScanBluetoothReturn {
 	const [isScanning, setIsScanning] = useState(false);
 	const [error] = useState<string | null>(null);
 
-	const scan = useCallback(async () => {
+	const startScan = useCallback(async () => {
 		setIsScanning(true);
 		setDevices([]);
 
@@ -49,11 +49,16 @@ export function useScanBluetoothDemo(): UseScanBluetoothReturn {
 		setIsScanning(false);
 	}, []);
 
+	const stopScan = useCallback(async () => {
+		setIsScanning(false);
+	}, []);
+
 	return {
 		devices,
 		isScanning,
 		error,
-		scan,
+		startScan,
+		stopScan,
 	};
 }
 
@@ -65,11 +70,13 @@ export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 	const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
 	const [isConnecting, setIsConnecting] = useState(false);
 	const [isDisconnecting, setIsDisconnecting] = useState(false);
+	const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
 	const [error, setError] = useState<string | null>(null);
 
 	const connect = useCallback(async (deviceAddress: string, deviceName?: string) => {
 		setIsConnecting(true);
 		setError(null);
+		setConnectionStatus('connecting');
 
 		// Simulate connection delay
 		await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000));
@@ -81,28 +88,33 @@ export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 				name: deviceName || 'Connected Device',
 				is_connected: true,
 			});
+			setConnectionStatus('connected');
 		} else {
 			setError('Connection failed (simulated error)');
+			setConnectionStatus('error');
 		}
 
 		setIsConnecting(false);
 	}, []);
 
-	const disconnect = useCallback(async () => {
+	const disconnect = useCallback(async (deviceAddress: string) => {
 		setIsDisconnecting(true);
 		setError(null);
+		setConnectionStatus('disconnecting');
 
 		// Simulate disconnection delay
 		await new Promise((resolve) => setTimeout(resolve, 800));
 
 		setConnectedDevice(null);
 		setIsDisconnecting(false);
+		setConnectionStatus('idle');
 	}, []);
 
 	return {
 		connectedDevice,
 		isConnecting,
 		isDisconnecting,
+		connectionStatus,
 		error,
 		connect,
 		disconnect,
@@ -117,10 +129,18 @@ export function useBluetoothWebSocketDemo(): UseBluetoothWebSocketReturn {
 	const [devices, setDevices] = useState<BluetoothDevice[]>([]);
 	const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
 	const [isScanning, setIsScanning] = useState(false);
+	const [isInitialized, setIsInitialized] = useState(false);
 
 	// Simulate initial device discovery on mount
 	useEffect(() => {
 		const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+		// Simulate initial connection delay
+		const initTimeout = setTimeout(() => {
+			setIsInitialized(true);
+			setIsScanning(true);
+		}, 500);
+		timeouts.push(initTimeout);
 
 		// Add devices progressively
 		DEMO_DEVICES.forEach((device, index) => {
@@ -131,12 +151,9 @@ export function useBluetoothWebSocketDemo(): UseBluetoothWebSocketReturn {
 				if (index === DEMO_DEVICES.length - 1) {
 					setIsScanning(false);
 				}
-			}, (index + 1) * 400);
+			}, 500 + (index + 1) * 400);
 			timeouts.push(timeout);
 		});
-
-		// Ensure scanning starts
-		setIsScanning(true);
 
 		return () => {
 			timeouts.forEach(clearTimeout);
@@ -163,9 +180,10 @@ export function useBluetoothWebSocketDemo(): UseBluetoothWebSocketReturn {
 		connectionError: null,
 		devices,
 		connectedDevice,
-		setConnectedDevice,
 		isScanning,
 		bluetoothConnected: true,
+		bluetoothPowered: true,
+		isInitialized,
 		error: null,
 	};
 }
