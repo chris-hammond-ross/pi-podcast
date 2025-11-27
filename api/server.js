@@ -94,6 +94,12 @@ function initializeBluetoothctl() {
 		const output = data.toString();
 		outputBuffer += output;
 
+		// Debug: log raw output (trim to avoid newline spam)
+		const trimmedOutput = output.trim();
+		if (trimmedOutput && !trimmedOutput.match(/^\[bluetooth\]#?$/)) {
+			console.log('[bluetoothctl]', trimmedOutput.substring(0, 200));
+		}
+
 		// Broadcast raw output to all connected clients
 		broadcastMessage({
 			type: 'output',
@@ -434,13 +440,20 @@ function executeCommand(command, timeout = 5000) {
 		console.log('[command]', command);
 		outputBuffer = '';
 
-		const startTime = Date.now();
 		let checkInterval = null;
 		let timeoutId = null;
+		let resolved = false;
 
 		const cleanup = () => {
 			if (checkInterval) clearInterval(checkInterval);
 			if (timeoutId) clearTimeout(timeoutId);
+		};
+
+		const doResolve = (buffer) => {
+			if (resolved) return;
+			resolved = true;
+			cleanup();
+			resolve(buffer);
 		};
 
 		// Check for command completion indicators
@@ -459,27 +472,44 @@ function executeCommand(command, timeout = 5000) {
 			/org\.bluez\.Error/i,
 			/Already connected/i,
 			/not connected/i,
+			/Discovery started/i,
+			/Discovery stopped/i,
+			/SetDiscoveryFilter success/i,
 		];
 
+		// For scan commands, also look for the prompt appearing after command echo
+		const isScanCommand = /^scan\s+(on|off|bredr|le)$/i.test(command);
+		const isPowerCommand = /^power\s+(on|off)$/i.test(command);
+
 		const isComplete = () => {
-			return completionPatterns.some(pattern => pattern.test(outputBuffer));
+			// Check for explicit completion patterns
+			if (completionPatterns.some(pattern => pattern.test(outputBuffer))) {
+				return true;
+			}
+
+			// For scan/power commands, just wait for the prompt to appear after the command
+			// These are "fire and forget" commands
+			if ((isScanCommand || isPowerCommand) && outputBuffer.includes('[bluetooth]#')) {
+				return true;
+			}
+
+			return false;
 		};
 
 		// Poll for completion
 		checkInterval = setInterval(() => {
 			if (isComplete()) {
-				cleanup();
 				// Give a tiny bit more time for any trailing output
-				setTimeout(() => resolve(outputBuffer), 50);
+				setTimeout(() => doResolve(outputBuffer), 50);
 			}
 		}, 50);
 
-		// Timeout fallback
+		// Timeout fallback - shorter for scan commands
+		const effectiveTimeout = (isScanCommand || isPowerCommand) ? 2000 : timeout;
 		timeoutId = setTimeout(() => {
-			cleanup();
-			console.log('[command] Timeout reached, returning buffer:', outputBuffer.substring(0, 100));
-			resolve(outputBuffer);
-		}, timeout);
+			console.log('[command] Timeout reached, returning buffer:', outputBuffer.substring(0, 200));
+			doResolve(outputBuffer);
+		}, effectiveTimeout);
 
 		try {
 			bluetoothctl.stdin.write(command + '\n');
