@@ -23,8 +23,8 @@ export interface UseBluetoothWebSocketReturn {
 	bluetoothConnected: boolean;
 	bluetoothPowered: boolean;
 
-	// Initialization state
-	isInitialized: boolean;
+	// Loading state - true until we receive initial system-status
+	isLoading: boolean;
 
 	// Error handling
 	error: string | null;
@@ -41,8 +41,8 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 	const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
 	const [isScanning, setIsScanning] = useState(false);
 	const [bluetoothConnected, setBluetoothConnected] = useState(false);
-	const [bluetoothPowered, setBluetoothPowered] = useState(false); // Start false until we get status
-	const [isInitialized, setIsInitialized] = useState(false);
+	const [bluetoothPowered, setBluetoothPowered] = useState(true); // Optimistic default
+	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const unsubscribeRef = useRef<(() => void) | null>(null);
 	const serviceRef = useRef(getWebSocketService());
@@ -71,7 +71,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 					setDevices((prev) =>
 						prev.map((d) =>
 							d.mac === connectedDev.mac
-								? { ...d, is_connected: true }
+								? { ...d, is_connected: true, is_online: true }
 								: d
 						)
 					);
@@ -127,10 +127,10 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 
 			case 'system-status':
 				setBluetoothConnected(message.bluetooth_connected ?? false);
-				setBluetoothPowered(message.bluetooth_powered ?? false);
+				setBluetoothPowered(message.bluetooth_powered ?? true);
 				setConnectedDevice(message.connected_device || null);
 				setIsScanning(message.is_scanning ?? false);
-				setIsInitialized(true);
+				setIsLoading(false); // We've received initial state
 				break;
 
 			case 'bluetooth-power-changed':
@@ -153,7 +153,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 
 			case 'output':
 				// Raw command output - can be logged or ignored
-				console.log('[BluetoothOutput]', message.data);
+				// console.log('[BluetoothOutput]', message.data);
 				break;
 
 			case 'pong':
@@ -173,6 +173,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 		const connect = async () => {
 			try {
 				setConnectionError(null);
+				setIsLoading(true);
 				await service.connect();
 				if (connecting) {
 					setIsConnected(true);
@@ -188,6 +189,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 					setConnectionError(message);
 					setIsConnected(false);
 					setError(message);
+					setIsLoading(false);
 				}
 			}
 		};
@@ -214,7 +216,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 		isScanning,
 		bluetoothConnected,
 		bluetoothPowered,
-		isInitialized,
+		isLoading,
 		error,
 	};
 }

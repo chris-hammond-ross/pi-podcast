@@ -55,6 +55,88 @@ let lastSeenTimestamps = new Map(); // Track when devices were last seen during 
 // How long before a device is considered offline (in ms)
 const DEVICE_OFFLINE_THRESHOLD = 30000; // 30 seconds
 
+// Load paired devices from database into currentDevices
+function loadPairedDevicesFromDatabase() {
+	try {
+		const pairedDevices = getAllPairedDevices.all();
+		console.log(`[database] Loading ${pairedDevices.length} paired devices from database`);
+		
+		pairedDevices.forEach(dbDevice => {
+			// Check if already in currentDevices
+			const existing = currentDevices.find(d => d.mac === dbDevice.mac_address);
+			if (!existing) {
+				const device = {
+					mac: dbDevice.mac_address,
+					name: dbDevice.name,
+					rssi: dbDevice.rssi || -70,
+					is_connected: false,
+					paired: !!dbDevice.paired,
+					trusted: !!dbDevice.trusted,
+					is_online: false // Will be updated when we check device info
+				};
+				currentDevices.push(device);
+				console.log('[database] Loaded paired device:', device.mac, device.name);
+			}
+		});
+	} catch (err) {
+		console.error('[database] Error loading paired devices:', err.message);
+	}
+}
+
+// Check the actual Bluetooth state by querying bluetoothctl
+async function refreshBluetoothState() {
+	try {
+		console.log('[init] Refreshing Bluetooth state...');
+		
+		// Get controller info to check power state
+		const showOutput = await sendCommand('show', 3000);
+		
+		// Parse power state
+		if (/Powered:\s*yes/i.test(showOutput)) {
+			bluetoothPowered = true;
+			console.log('[init] Bluetooth is powered on');
+		} else if (/Powered:\s*no/i.test(showOutput)) {
+			bluetoothPowered = false;
+			console.log('[init] Bluetooth is powered off');
+		}
+		
+		// Check each paired device's connection status
+		for (const device of currentDevices) {
+			if (device.paired) {
+				try {
+					const infoOutput = await sendCommand(`info ${device.mac}`, 2000);
+					
+					// Check if connected
+					if (/Connected:\s*yes/i.test(infoOutput)) {
+						device.is_connected = true;
+						device.is_online = true;
+						connectedDeviceMac = device.mac;
+						console.log('[init] Device is connected:', device.mac, device.name);
+					} else {
+						device.is_connected = false;
+						// Device exists in bluetoothctl, so it's "known" but we can't tell if it's online without scanning
+					}
+					
+					// Update paired/trusted from info output
+					if (/Paired:\s*yes/i.test(infoOutput)) {
+						device.paired = true;
+					}
+					if (/Trusted:\s*yes/i.test(infoOutput)) {
+						device.trusted = true;
+					}
+				} catch (err) {
+					// Device info failed - device might not be in bluetoothctl anymore
+					console.log('[init] Could not get info for device:', device.mac, err.message);
+				}
+			}
+		}
+		
+		console.log('[init] Bluetooth state refresh complete');
+	} catch (err) {
+		console.error('[init] Error refreshing Bluetooth state:', err.message);
+	}
+}
+
 // Helper function to broadcast WebSocket messages to all connected clients
 function broadcastMessage(message) {
 	wss.clients.forEach((client) => {
@@ -136,15 +218,32 @@ function initializeBluetoothctl() {
 	isConnected = true;
 	console.log('[server] bluetoothctl initialized');
 
-	// Notify all clients that bluetooth is ready
-	broadcastMessage({
-		type: 'system-status',
-		bluetooth_connected: true,
-		bluetooth_powered: bluetoothPowered,
-		devices_count: currentDevices.length,
-		connected_device: connectedDeviceMac ? currentDevices.find(d => d.mac === connectedDeviceMac) : null,
-		is_scanning: isScanning
-	});
+	// Load paired devices from database and refresh state after a short delay
+	// (give bluetoothctl time to fully initialize)
+	setTimeout(async () => {
+		loadPairedDevicesFromDatabase();
+		await refreshBluetoothState();
+		
+		// Now notify all clients with the complete state
+		broadcastMessage({
+			type: 'system-status',
+			bluetooth_connected: true,
+			bluetooth_powered: bluetoothPowered,
+			devices_count: currentDevices.length,
+			connected_device: connectedDeviceMac ? currentDevices.find(d => d.mac === connectedDeviceMac) : null,
+			is_scanning: isScanning
+		});
+		
+		// Send devices list
+		if (currentDevices.length > 0) {
+			broadcastMessage({
+				type: 'devices-list',
+				devices: currentDevices
+			});
+		}
+		
+		console.log('[server] Initial state broadcast complete');
+	}, 1000);
 }
 
 // Parse connection state changes from bluetoothctl output
