@@ -74,6 +74,12 @@ export class WebSocketService {
 	 * Connect to WebSocket server
 	 */
 	public connect(): Promise<void> {
+		// If already connected, resolve immediately
+		if (this.isConnected()) {
+			console.log('[WebSocketService] Already connected');
+			return Promise.resolve();
+		}
+
 		return new Promise((resolve, reject) => {
 			try {
 				console.log('[WebSocketService] Connecting to', this.url);

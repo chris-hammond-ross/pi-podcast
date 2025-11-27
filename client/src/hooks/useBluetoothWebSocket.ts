@@ -46,6 +46,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 	const [error, setError] = useState<string | null>(null);
 	const unsubscribeRef = useRef<(() => void) | null>(null);
 	const serviceRef = useRef(getWebSocketService());
+	const hasReceivedInitialState = useRef(false);
 
 	// Handle incoming messages
 	const handleMessage = useCallback((message: ServerMessage) => {
@@ -95,9 +96,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 			case 'device-removed':
 				if (message.mac) {
 					setDevices((prev) => prev.filter((d) => d.mac !== message.mac));
-					if (connectedDevice?.mac === message.mac) {
-						setConnectedDevice(null);
-					}
+					setConnectedDevice((prev) => prev?.mac === message.mac ? null : prev);
 				}
 				break;
 
@@ -110,9 +109,12 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 						)
 					);
 					// If the updated device was connected and is now offline, clear connected device
-					if (connectedDevice?.mac === updatedDev.mac && !updatedDev.is_connected) {
-						setConnectedDevice(null);
-					}
+					setConnectedDevice((prev) => {
+						if (prev?.mac === updatedDev.mac && !updatedDev.is_connected) {
+							return null;
+						}
+						return prev;
+					});
 				}
 				break;
 
@@ -130,7 +132,8 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 				setBluetoothPowered(message.bluetooth_powered ?? true);
 				setConnectedDevice(message.connected_device || null);
 				setIsScanning(message.is_scanning ?? false);
-				setIsLoading(false); // We've received initial state
+				hasReceivedInitialState.current = true;
+				setIsLoading(false);
 				break;
 
 			case 'bluetooth-power-changed':
@@ -152,8 +155,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 				break;
 
 			case 'output':
-				// Raw command output - can be logged or ignored
-				// console.log('[BluetoothOutput]', message.data);
+				// Raw command output - ignored
 				break;
 
 			case 'pong':
@@ -163,29 +165,48 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 			default:
 				console.warn('[useBluetoothWebSocket] Unknown message type:', message.type);
 		}
-	}, [connectedDevice]);
+	}, []);
 
 	// Connect to WebSocket on mount
 	useEffect(() => {
 		const service = serviceRef.current;
-		let connecting = true;
+		let mounted = true;
 
-		const connect = async () => {
+		const setup = async () => {
 			try {
 				setConnectionError(null);
-				setIsLoading(true);
-				await service.connect();
-				if (connecting) {
+				
+				// Subscribe to messages first
+				const unsubscribe = service.on(handleMessage);
+				unsubscribeRef.current = unsubscribe;
+
+				// Check if already connected
+				if (service.isConnected()) {
+					console.log('[useBluetoothWebSocket] Already connected, requesting status');
 					setIsConnected(true);
 					setError(null);
-
-					// Subscribe to messages
-					const unsubscribe = service.on(handleMessage);
-					unsubscribeRef.current = unsubscribe;
+					
+					// Request current status from server
+					service.send({ type: 'request-status' });
+					
+					// Set a timeout - if we don't get a response, stop loading anyway
+					setTimeout(() => {
+						if (mounted && !hasReceivedInitialState.current) {
+							console.log('[useBluetoothWebSocket] Timeout waiting for status, stopping loading');
+							setIsLoading(false);
+						}
+					}, 3000);
+				} else {
+					// Need to connect
+					await service.connect();
+					if (mounted) {
+						setIsConnected(true);
+						setError(null);
+					}
 				}
 			} catch (err) {
 				const message = err instanceof Error ? err.message : 'Failed to connect to WebSocket';
-				if (connecting) {
+				if (mounted) {
 					setConnectionError(message);
 					setIsConnected(false);
 					setError(message);
@@ -194,17 +215,15 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 			}
 		};
 
-		connect();
+		setup();
 
 		return () => {
-			connecting = false;
+			mounted = false;
 			// Unsubscribe from messages
 			if (unsubscribeRef.current) {
 				unsubscribeRef.current();
 				unsubscribeRef.current = null;
 			}
-			// Note: Don't disconnect service here - it may be used elsewhere
-			// The service will handle reconnection automatically
 		};
 	}, [handleMessage]);
 
