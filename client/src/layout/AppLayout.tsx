@@ -31,7 +31,7 @@ function AppLayout() {
 						align='center'
 						justify="space-between"
 						h="100%"
-						px={isMobile ? 8 : 16}
+						px={16}
 					>
 						<Group gap="xs">
 							{navItems.map(({ path, label, icon: Icon }) => (

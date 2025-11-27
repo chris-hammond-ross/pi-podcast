@@ -1,0 +1,9 @@
+.mantine-Tabs-list::before {
+	border: none;
+	height: 1px;
+	background-color: var(--tab-border-color);
+}
+
+.mantine-Tabs-tab {
+	border-bottom-width: 1px !important;
+}
