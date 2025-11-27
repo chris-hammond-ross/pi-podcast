@@ -4,7 +4,7 @@
  * Devices are grouped by: Connected, Paired, Discovered
  */
 
-import { Stack, Group, Text, Alert, Button, Box, ActionIcon, Switch, Loader, Center, Divider } from '@mantine/core';
+import { Stack, Group, Text, Alert, Button, Box, ActionIcon, Switch, Loader, Divider, LoadingOverlay } from '@mantine/core';
 import { AlertCircle, Bluetooth, AudioWaveform, Search, SearchX } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket, useBluetoothPower } from '../hooks';
 import type { BluetoothDevice } from '../services';
@@ -16,7 +16,7 @@ export function BluetoothInterface() {
 		connectionError: wsConnectionError,
 		isScanning: wsIsScanning,
 		bluetoothPowered: wsPowered,
-		isInitialized,
+		isLoading,
 	} = useBluetoothWebSocket();
 
 	const { devices: httpDevices, isScanning: httpIsScanning, error: scanError, startScan, stopScan } = useScanBluetooth();
@@ -39,12 +39,12 @@ export function BluetoothInterface() {
 	} = useBluetoothPower();
 
 	// Prefer WebSocket data when available, fall back to HTTP data
-	const devices = wsConnected && wsDevices.length > 0 ? wsDevices : httpDevices;
+	const devices = wsConnected ? wsDevices : httpDevices;
 	const isScanning = wsConnected ? wsIsScanning : httpIsScanning;
 	const bluetoothPowered = wsConnected ? wsPowered : isPowered;
 
-	// Combine errors
-	const error = scanError || wsConnectionError || connectionError || powerError;
+	// Combine errors (but not during loading)
+	const error = !isLoading ? (scanError || wsConnectionError || connectionError || powerError) : null;
 
 	// Group devices by status
 	const connectedDevices = devices.filter(d => d.is_connected);
@@ -102,133 +102,132 @@ export function BluetoothInterface() {
 		};
 	}
 
-	// Show loading state while waiting for initial WebSocket status
-	if (wsConnected && !isInitialized) {
-		return (
-			<Center py="xl">
-				<Stack align="center" gap="sm">
-					<Loader size="md" />
-					<Text size="sm" c="dimmed">Connecting to Bluetooth...</Text>
-				</Stack>
-			</Center>
-		);
-	}
-
 	const hasDevices = devices.length > 0;
 
 	return (
-		<Stack gap="md">
-			{/* Bluetooth Power Control */}
-			<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" style={{ borderRadius: 8 }}>
-				<Group gap="sm">
-					<Bluetooth size={20} />
-					<Text size="sm" fw={500}>Bluetooth</Text>
-				</Group>
-				<Switch
-					checked={bluetoothPowered}
-					onChange={togglePower}
-					disabled={isTogglingPower}
-					size="md"
-				/>
-			</Group>
-
-			{/* Scanning Controls - Only show when Bluetooth is on */}
-			{bluetoothPowered && (
+		<Box pos="relative" mih={200}>
+			<LoadingOverlay 
+				visible={isLoading} 
+				zIndex={1000} 
+				overlayProps={{ radius: "sm", blur: 2 }}
+				loaderProps={{ size: 'md', type: 'dots' }}
+			/>
+			
+			<Stack gap="md">
+				{/* Bluetooth Power Control */}
 				<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" style={{ borderRadius: 8 }}>
-					{isScanning ? <ScanningIndicator /> : <IdleIndicator />}
-					<Group gap="xs">
-						<ActionIcon
-							size="md"
-							variant="light"
-							onClick={playTone}
-						>
-							<AudioWaveform size={16} />
-						</ActionIcon>
-						<Button
-							size="xs"
-							variant={isScanning ? "light" : "filled"}
-							color={isScanning ? "red" : "blue"}
-							leftSection={isScanning ? <SearchX size={16} /> : <Search size={16} />}
-							onClick={handleScanToggle}
-						>
-							{isScanning ? 'Stop Scan' : 'Scan'}
-						</Button>
+					<Group gap="sm">
+						<Bluetooth size={20} />
+						<Text size="sm" fw={500}>Bluetooth</Text>
 					</Group>
+					<Switch
+						checked={bluetoothPowered}
+						onChange={togglePower}
+						disabled={isTogglingPower || isLoading}
+						size="md"
+					/>
 				</Group>
-			)}
 
-			{/* Error Alert */}
-			{error && (
-				<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
-					{error}
-				</Alert>
-			)}
+				{/* Scanning Controls - Only show when Bluetooth is on */}
+				{bluetoothPowered && (
+					<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" style={{ borderRadius: 8 }}>
+						{isScanning ? <ScanningIndicator /> : <IdleIndicator />}
+						<Group gap="xs">
+							<ActionIcon
+								size="md"
+								variant="light"
+								onClick={playTone}
+								disabled={isLoading}
+							>
+								<AudioWaveform size={16} />
+							</ActionIcon>
+							<Button
+								size="xs"
+								variant={isScanning ? "light" : "filled"}
+								color={isScanning ? "red" : "blue"}
+								leftSection={isScanning ? <SearchX size={16} /> : <Search size={16} />}
+								onClick={handleScanToggle}
+								disabled={isLoading}
+							>
+								{isScanning ? 'Stop Scan' : 'Scan'}
+							</Button>
+						</Group>
+					</Group>
+				)}
 
-			{/* Device Lists - Only show when Bluetooth is on */}
-			{bluetoothPowered && (
-				<Stack gap="md">
-					{/* Connected Devices */}
-					{sortedConnected.length > 0 && (
-						<>
-							<Divider label="Connected" labelPosition="left" />
-							<DeviceGroup
-								devices={sortedConnected}
-								onDevicePress={handleDevicePress}
-								connectingDeviceMac={connectingDeviceMac}
-								disconnectingDeviceMac={disconnectingDeviceMac}
-								connectionStatus={connectionStatus}
-							/>
-						</>
-					)}
+				{/* Error Alert */}
+				{error && (
+					<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
+						{error}
+					</Alert>
+				)}
 
-					{/* Paired Devices */}
-					{sortedPaired.length > 0 && (
-						<>
-							<Divider label="Paired" labelPosition="left" />
-							<DeviceGroup
-								devices={sortedPaired}
-								onDevicePress={handleDevicePress}
-								connectingDeviceMac={connectingDeviceMac}
-								disconnectingDeviceMac={disconnectingDeviceMac}
-								connectionStatus={connectionStatus}
-							/>
-						</>
-					)}
+				{/* Device Lists - Only show when Bluetooth is on */}
+				{bluetoothPowered && (
+					<Stack gap="md">
+						{/* Connected Devices */}
+						{sortedConnected.length > 0 && (
+							<>
+								<Divider label="Connected" labelPosition="left" />
+								<DeviceGroup
+									devices={sortedConnected}
+									onDevicePress={handleDevicePress}
+									connectingDeviceMac={connectingDeviceMac}
+									disconnectingDeviceMac={disconnectingDeviceMac}
+									connectionStatus={connectionStatus}
+								/>
+							</>
+						)}
 
-					{/* Discovered Devices */}
-					{sortedDiscovered.length > 0 && (
-						<>
-							<Divider label="Discovered" labelPosition="left" />
-							<DeviceGroup
-								devices={sortedDiscovered}
-								onDevicePress={handleDevicePress}
-								connectingDeviceMac={connectingDeviceMac}
-								disconnectingDeviceMac={disconnectingDeviceMac}
-								connectionStatus={connectionStatus}
-							/>
-						</>
-					)}
+						{/* Paired Devices */}
+						{sortedPaired.length > 0 && (
+							<>
+								<Divider label="Paired" labelPosition="left" />
+								<DeviceGroup
+									devices={sortedPaired}
+									onDevicePress={handleDevicePress}
+									connectingDeviceMac={connectingDeviceMac}
+									disconnectingDeviceMac={disconnectingDeviceMac}
+									connectionStatus={connectionStatus}
+								/>
+							</>
+						)}
 
-					{/* Empty State */}
-					{!hasDevices && (
-						<Box py="xl" ta="center">
-							<Text c="dimmed" size="sm">
-								{isScanning ? 'Searching for devices...' : 'No devices found. Tap "Scan" to search.'}
-							</Text>
-						</Box>
-					)}
-				</Stack>
-			)}
+						{/* Discovered Devices */}
+						{sortedDiscovered.length > 0 && (
+							<>
+								<Divider label="Discovered" labelPosition="left" />
+								<DeviceGroup
+									devices={sortedDiscovered}
+									onDevicePress={handleDevicePress}
+									connectingDeviceMac={connectingDeviceMac}
+									disconnectingDeviceMac={disconnectingDeviceMac}
+									connectionStatus={connectionStatus}
+								/>
+							</>
+						)}
 
-			{/* Bluetooth Off Message */}
-			{!bluetoothPowered && (
-				<Box py="xl" ta="center">
-					<Text c="dimmed" size="sm">
-						Bluetooth is turned off
-					</Text>
-				</Box>
-			)}
-		</Stack>
+						{/* Empty State - only show when not loading */}
+						{!hasDevices && !isLoading && (
+							<Box py="xl" ta="center">
+								<Text c="dimmed" size="sm">
+									{isScanning ? 'Searching for devices...' : 'No devices found. Tap "Scan" to search.'}
+								</Text>
+							</Box>
+						)}
+					</Stack>
+				)}
+
+				{/* Bluetooth Off Message */}
+				{!bluetoothPowered && !isLoading && (
+					<Box py="xl" ta="center">
+						<Text c="dimmed" size="sm">
+							Bluetooth is turned off
+						</Text>
+					</Box>
+				)}
+			</Stack>
+		</Box>
 	);
 }
 
