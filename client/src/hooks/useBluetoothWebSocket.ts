@@ -174,14 +174,16 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 			try {
 				setConnectionError(null);
 				setIsLoading(true);
+
+				// Subscribe to messages BEFORE connecting
+				const unsubscribe = service.on(handleMessage);
+				unsubscribeRef.current = unsubscribe;
+
 				await service.connect();
+
 				if (connecting) {
 					setIsConnected(true);
 					setError(null);
-
-					// Subscribe to messages
-					const unsubscribe = service.on(handleMessage);
-					unsubscribeRef.current = unsubscribe;
 				}
 			} catch (err) {
 				const message = err instanceof Error ? err.message : 'Failed to connect to WebSocket';
@@ -198,13 +200,10 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 
 		return () => {
 			connecting = false;
-			// Unsubscribe from messages
 			if (unsubscribeRef.current) {
 				unsubscribeRef.current();
 				unsubscribeRef.current = null;
 			}
-			// Note: Don't disconnect service here - it may be used elsewhere
-			// The service will handle reconnection automatically
 		};
 	}, [handleMessage]);
 
