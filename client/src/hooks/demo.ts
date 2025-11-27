@@ -14,15 +14,11 @@ import type { UseBluetoothWebSocketReturn } from './useBluetoothWebSocket';
  * Demo Bluetooth devices
  */
 const DEMO_DEVICES: BluetoothDevice[] = [
-	{ mac: '00:11:22:33:44:55', name: 'Living Room Speaker', rssi: -45, is_connected: false },
-	{ mac: '00:11:22:33:44:56', name: 'Sony WH-1000XM4', rssi: -52, is_connected: false },
-	{ mac: '00:11:22:33:44:57', name: 'JBL Flip 6', rssi: -61, is_connected: false },
-	{ mac: '00:11:22:33:44:58', name: 'Bose SoundLink', rssi: -58, is_connected: false },
-	{ mac: '00:11:22:33:44:59', name: 'Marshall Stanmore', rssi: -72, is_connected: false },
-	// These should be filtered out by the BluetoothInterface component
-	{ mac: '00:11:22:33:44:60', name: 'Gear S3 (189A) LE', rssi: -65, is_connected: false },
-	{ mac: '00:11:22:33:44:61', name: 'RSSI: 0xfffffffe3 (-29)', rssi: -29, is_connected: false },
-	{ mac: '00:11:22:33:44:62', name: 'Mi Band 7', rssi: -55, is_connected: false },
+	{ mac: '00:11:22:33:44:55', name: 'Living Room Speaker', rssi: -45, is_connected: false, paired: true, trusted: true, is_online: true },
+	{ mac: '00:11:22:33:44:56', name: 'Sony WH-1000XM4', rssi: -52, is_connected: false, paired: true, trusted: true, is_online: false },
+	{ mac: '00:11:22:33:44:57', name: 'JBL Flip 6', rssi: -61, is_connected: false, paired: false, trusted: false, is_online: true },
+	{ mac: '00:11:22:33:44:58', name: 'Bose SoundLink', rssi: -58, is_connected: false, paired: false, trusted: false, is_online: true },
+	{ mac: '00:11:22:33:44:59', name: 'Marshall Stanmore', rssi: -72, is_connected: false, paired: true, trusted: true, is_online: false },
 ];
 
 /**
@@ -68,6 +64,8 @@ export function useScanBluetoothDemo(): UseScanBluetoothReturn {
  */
 export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 	const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
+	const [connectingDeviceMac, setConnectingDeviceMac] = useState<string | null>(null);
+	const [disconnectingDeviceMac, setDisconnectingDeviceMac] = useState<string | null>(null);
 	const [isConnecting, setIsConnecting] = useState(false);
 	const [isDisconnecting, setIsDisconnecting] = useState(false);
 	const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
@@ -75,6 +73,7 @@ export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 
 	const connect = useCallback(async (deviceAddress: string, deviceName?: string) => {
 		setIsConnecting(true);
+		setConnectingDeviceMac(deviceAddress);
 		setError(null);
 		setConnectionStatus('connecting');
 
@@ -95,10 +94,12 @@ export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 		}
 
 		setIsConnecting(false);
+		setConnectingDeviceMac(null);
 	}, []);
 
 	const disconnect = useCallback(async (deviceAddress: string) => {
 		setIsDisconnecting(true);
+		setDisconnectingDeviceMac(deviceAddress);
 		setError(null);
 		setConnectionStatus('disconnecting');
 
@@ -107,11 +108,14 @@ export function useBluetoothConnectionDemo(): UseBluetoothConnectionReturn {
 
 		setConnectedDevice(null);
 		setIsDisconnecting(false);
+		setDisconnectingDeviceMac(null);
 		setConnectionStatus('idle');
 	}, []);
 
 	return {
 		connectedDevice,
+		connectingDeviceMac,
+		disconnectingDeviceMac,
 		isConnecting,
 		isDisconnecting,
 		connectionStatus,

@@ -101,6 +101,21 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 				}
 				break;
 
+			case 'device-updated':
+				if (message.device) {
+					const updatedDev = message.device;
+					setDevices((prev) =>
+						prev.map((d) =>
+							d.mac === updatedDev.mac ? { ...d, ...updatedDev } : d
+						)
+					);
+					// If the updated device was connected and is now offline, clear connected device
+					if (connectedDevice?.mac === updatedDev.mac && !updatedDev.is_connected) {
+						setConnectedDevice(null);
+					}
+				}
+				break;
+
 			case 'devices-list':
 				if (message.devices) {
 					setDevices(message.devices);
