@@ -13,6 +13,19 @@ function Settings() {
 						Appearance
 					</Tabs.Tab>
 				</Tabs.List>
+				{/*<div
+					style={{
+						position: "absolute",
+						left: "0",
+						marginTop: "-2px",
+						zIndex: "-1",
+						height: "2px",
+						width: "100vw",
+						backgroundColor: "var(--tab-border-color)"
+					}}
+				>
+					&nbsp;
+				</div>*/}
 			</Container>
 			<Container size="sm" py="md">
 				<Stack gap="xl">

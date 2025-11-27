@@ -4,8 +4,7 @@
  * Includes power on/off and manual scanning controls
  */
 
-import { useEffect } from 'react';
-import { Stack, Group, Text, Alert, Button, Box, ActionIcon, Switch } from '@mantine/core';
+import { Stack, Group, Text, Alert, Button, Box, ActionIcon, Switch, Loader, Center } from '@mantine/core';
 import { AlertCircle, Bluetooth, AudioWaveform, Search, SearchX } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket, useBluetoothPower } from '../hooks';
 import type { BluetoothDevice } from '../services';
@@ -17,12 +16,14 @@ export function BluetoothInterface() {
 		connectionError: wsConnectionError,
 		isScanning: wsIsScanning,
 		bluetoothPowered: wsPowered,
+		isInitialized,
 	} = useBluetoothWebSocket();
 
 	const { devices: httpDevices, isScanning: httpIsScanning, error: scanError, startScan, stopScan } = useScanBluetooth();
 	const {
 		isConnecting,
 		isDisconnecting,
+		connectionStatus,
 		error: connectionError,
 		connect,
 		disconnect,
@@ -94,6 +95,18 @@ export function BluetoothInterface() {
 		};
 	}
 
+	// Show loading state while waiting for initial WebSocket status
+	if (wsConnected && !isInitialized) {
+		return (
+			<Center py="xl">
+				<Stack align="center" gap="sm">
+					<Loader size="md" />
+					<Text size="sm" c="dimmed">Connecting to Bluetooth...</Text>
+				</Stack>
+			</Center>
+		);
+	}
+
 	return (
 		<Stack gap="md">
 			{/* Bluetooth Power Control */}
@@ -139,6 +152,21 @@ export function BluetoothInterface() {
 			{error && (
 				<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
 					{error}
+				</Alert>
+			)}
+
+			{/* Connection Status - Show when connecting */}
+			{isConnecting && (
+				<Alert color="blue" variant="light">
+					<Group gap="sm">
+						<Loader size="xs" />
+						<Text size="sm">
+							{connectionStatus === 'pairing' && 'Pairing with device...'}
+							{connectionStatus === 'trusting' && 'Trusting device...'}
+							{connectionStatus === 'connecting' && 'Connecting...'}
+							{connectionStatus === 'idle' && 'Preparing connection...'}
+						</Text>
+					</Group>
 				</Alert>
 			)}
 

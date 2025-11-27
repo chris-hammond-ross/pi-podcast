@@ -23,6 +23,9 @@ export interface UseBluetoothWebSocketReturn {
 	bluetoothConnected: boolean;
 	bluetoothPowered: boolean;
 
+	// Initialization state
+	isInitialized: boolean;
+
 	// Error handling
 	error: string | null;
 }
@@ -38,7 +41,8 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 	const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
 	const [isScanning, setIsScanning] = useState(false);
 	const [bluetoothConnected, setBluetoothConnected] = useState(false);
-	const [bluetoothPowered, setBluetoothPowered] = useState(true);
+	const [bluetoothPowered, setBluetoothPowered] = useState(false); // Start false until we get status
+	const [isInitialized, setIsInitialized] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const unsubscribeRef = useRef<(() => void) | null>(null);
 	const serviceRef = useRef(getWebSocketService());
@@ -54,7 +58,8 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 						if (!exists) {
 							return [...prev, newDevice];
 						}
-						return prev;
+						// Update existing device
+						return prev.map((d) => d.mac === newDevice.mac ? { ...d, ...newDevice } : d);
 					});
 				}
 				break;
@@ -107,13 +112,14 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 
 			case 'system-status':
 				setBluetoothConnected(message.bluetooth_connected ?? false);
-				setBluetoothPowered(message.bluetooth_powered ?? true);
+				setBluetoothPowered(message.bluetooth_powered ?? false);
 				setConnectedDevice(message.connected_device || null);
 				setIsScanning(message.is_scanning ?? false);
+				setIsInitialized(true);
 				break;
 
 			case 'bluetooth-power-changed':
-				setBluetoothPowered(message.powered ?? true);
+				setBluetoothPowered(message.powered ?? false);
 				setIsScanning(message.is_scanning ?? false);
 				if (!message.powered) {
 					// Clear devices when Bluetooth is turned off
@@ -193,6 +199,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 		isScanning,
 		bluetoothConnected,
 		bluetoothPowered,
+		isInitialized,
 		error,
 	};
 }

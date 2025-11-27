@@ -17,7 +17,7 @@ import {
 
 // Re-export types
 export type { UseScanBluetoothReturn } from './useScanBluetooth';
-export type { UseBluetoothConnectionReturn } from './useBluetoothConnection';
+export type { UseBluetoothConnectionReturn, ConnectionStatus } from './useBluetoothConnection';
 export type { UseBluetoothWebSocketReturn } from './useBluetoothWebSocket';
 export type { UseBluetoothPowerReturn } from './useBluetoothPower';
 
