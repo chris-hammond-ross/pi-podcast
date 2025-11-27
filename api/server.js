@@ -1023,9 +1023,28 @@ wss.on('connection', (ws) => {
 			const data = JSON.parse(message);
 			console.log('[websocket] Received:', data);
 
-			// Handle client messages (ping/pong, subscriptions, etc.)
+			// Handle client messages
 			if (data.type === 'ping') {
 				sendToClient(ws, { type: 'pong' });
+			} else if (data.type === 'request-status') {
+				// Client is requesting current status (e.g., after reconnection)
+				console.log('[websocket] Sending status on request');
+				sendToClient(ws, {
+					type: 'system-status',
+					bluetooth_connected: isConnected,
+					bluetooth_powered: bluetoothPowered,
+					devices_count: currentDevices.length,
+					connected_device: connectedDeviceMac ? currentDevices.find(d => d.mac === connectedDeviceMac) : null,
+					is_scanning: isScanning
+				});
+				
+				// Also send devices list
+				if (currentDevices.length > 0) {
+					sendToClient(ws, {
+						type: 'devices-list',
+						devices: currentDevices
+					});
+				}
 			}
 		} catch (err) {
 			console.error('[websocket] Parse error:', err.message);
