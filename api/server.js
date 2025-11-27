@@ -240,9 +240,10 @@ function parseDeviceOutput(output) {
 	// Remove ANSI codes
 	const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '').replace(/\[0;9[0-9]m/g, '').replace(/\[0m/g, '');
 
-	// Match device lines: Device XX:XX:XX:XX:XX:XX DeviceName
+	// Match device lines: [NEW] Device XX:XX:XX:XX:XX:XX DeviceName
+	// or: Device XX:XX:XX:XX:XX:XX DeviceName
 	// But NOT lines that are about connection status changes
-	const deviceMatches = cleanOutput.match(/(?:^|\n)(?:NEW\s+)?Device\s+([0-9A-Fa-f:]{17})\s+([^\n]+)/gm);
+	const deviceMatches = cleanOutput.match(/(?:^|\n)(?:\[NEW\]\s+)?Device\s+([0-9A-Fa-f:]{17})\s+([^\n]+)/gm);
 
 	if (deviceMatches) {
 		deviceMatches.forEach((line) => {
@@ -251,7 +252,12 @@ function parseDeviceOutput(output) {
 				return;
 			}
 
-			const match = line.match(/(?:NEW\s+)?Device\s+([0-9A-Fa-f:]{17})\s+(.+?)$/);
+			// Skip lines that are property changes (RSSI, TxPower, etc.)
+			if (/\[CHG\]/i.test(line)) {
+				return;
+			}
+
+			const match = line.match(/(?:\[NEW\]\s+)?Device\s+([0-9A-Fa-f:]{17})\s+(.+?)$/);
 			if (match) {
 				const mac = match[1];
 				let name = match[2].trim();
