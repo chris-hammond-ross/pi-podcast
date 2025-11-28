@@ -2,8 +2,18 @@ const { getDatabase } = require('../config/database');
 
 class Device {
 	constructor() {
-		this.db = getDatabase();
-		this.initializePreparedStatements();
+		this.db = null;
+		this.statements = null;
+	}
+
+	/**
+	 * Lazy-load database connection and initialize prepared statements
+	 */
+	ensureInitialized() {
+		if (!this.db) {
+			this.db = getDatabase();
+			this.initializePreparedStatements();
+		}
 	}
 
 	initializePreparedStatements() {
@@ -38,6 +48,7 @@ class Device {
 	 * @returns {Object|undefined} The device object or undefined
 	 */
 	getByMac(mac) {
+		this.ensureInitialized();
 		return this.statements.getByMac.get(mac);
 	}
 
@@ -46,6 +57,7 @@ class Device {
 	 * @returns {Array} Array of paired devices
 	 */
 	getAllPaired() {
+		this.ensureInitialized();
 		return this.statements.getAllPaired.all();
 	}
 
@@ -57,6 +69,7 @@ class Device {
 	 * @returns {Object} The result of the insert operation
 	 */
 	insert(mac, name, rssi = -70) {
+		this.ensureInitialized();
 		try {
 			return this.statements.insert.run(mac, name, rssi);
 		} catch (err) {
@@ -75,6 +88,7 @@ class Device {
 	 * @returns {Object} The result of the update operation
 	 */
 	update(mac, name, rssi) {
+		this.ensureInitialized();
 		return this.statements.update.run(name, rssi, mac);
 	}
 
@@ -85,6 +99,7 @@ class Device {
 	 * @returns {Object} The result of the update operation
 	 */
 	updatePaired(mac, paired) {
+		this.ensureInitialized();
 		return this.statements.updatePaired.run(paired ? 1 : 0, mac);
 	}
 
@@ -95,6 +110,7 @@ class Device {
 	 * @returns {Object} The result of the update operation
 	 */
 	updateTrusted(mac, trusted) {
+		this.ensureInitialized();
 		return this.statements.updateTrusted.run(trusted ? 1 : 0, mac);
 	}
 }
