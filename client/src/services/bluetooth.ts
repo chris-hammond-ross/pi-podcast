@@ -57,9 +57,9 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 /**
  * Initializes the Bluetooth controller
  */
-export async function initBluetooth(): Promise<{ success: boolean; message: string }> {
+export async function initBluetooth(): Promise<{ success: boolean; message: string; }> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/init`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/init`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -83,9 +83,9 @@ export async function initBluetooth(): Promise<{ success: boolean; message: stri
 /**
  * Toggles Bluetooth power on/off
  */
-export async function setBluetoothPower(state: boolean): Promise<{ success: boolean; command: string; output: string }> {
+export async function setBluetoothPower(state: boolean): Promise<{ success: boolean; command: string; output: string; }> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/power`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/power`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -112,7 +112,7 @@ export async function setBluetoothPower(state: boolean): Promise<{ success: bool
  */
 export async function setScan(state: boolean): Promise<ScanResponse> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/scan`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/scan`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -139,7 +139,7 @@ export async function setScan(state: boolean): Promise<ScanResponse> {
  */
 export async function getBluetoothDevices(): Promise<DevicesResponse> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/devices`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/devices`, {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',
@@ -163,9 +163,9 @@ export async function getBluetoothDevices(): Promise<DevicesResponse> {
 /**
  * Pairs with a Bluetooth device
  */
-export async function pairDevice(mac: string): Promise<{ success: boolean; command: string; output: string }> {
+export async function pairDevice(mac: string): Promise<{ success: boolean; command: string; output: string; }> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/pair`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/pair`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -190,9 +190,9 @@ export async function pairDevice(mac: string): Promise<{ success: boolean; comma
 /**
  * Trusts a Bluetooth device
  */
-export async function trustDevice(mac: string): Promise<{ success: boolean; command: string; output: string }> {
+export async function trustDevice(mac: string): Promise<{ success: boolean; command: string; output: string; }> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/trust`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/trust`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -219,7 +219,7 @@ export async function trustDevice(mac: string): Promise<{ success: boolean; comm
  */
 export async function connectDevice(mac: string): Promise<ConnectResponse> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/connect`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/connect`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -246,7 +246,7 @@ export async function connectDevice(mac: string): Promise<ConnectResponse> {
  */
 export async function disconnectDevice(mac: string): Promise<DisconnectResponse> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/disconnect`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/disconnect`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -271,14 +271,13 @@ export async function disconnectDevice(mac: string): Promise<DisconnectResponse>
 /**
  * Removes a paired Bluetooth device
  */
-export async function removeDevice(mac: string): Promise<{ success: boolean; command: string; output: string }> {
+export async function removeDevice(mac: string): Promise<{ success: boolean; command: string; output: string; }> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/remove`, {
-			method: 'POST',
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/device/${mac}`, {
+			method: 'DELETE',
 			headers: {
 				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ mac }),
+			}
 		});
 
 		if (!response.ok) {
@@ -300,12 +299,11 @@ export async function removeDevice(mac: string): Promise<{ success: boolean; com
  */
 export async function getDeviceInfo(mac: string): Promise<InfoResponse> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/info`, {
-			method: 'POST',
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/${mac}/info`, {
+			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ mac }),
+			}
 		});
 
 		if (!response.ok) {
@@ -325,9 +323,9 @@ export async function getDeviceInfo(mac: string): Promise<InfoResponse> {
 /**
  * Sends a raw command to bluetoothctl
  */
-export async function sendCommand(command: string): Promise<{ success: boolean; command: string; output: string }> {
+export async function sendCommand(command: string): Promise<{ success: boolean; command: string; output: string; }> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/command`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/command`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -355,7 +353,7 @@ export async function sendCommand(command: string): Promise<{ success: boolean; 
 export async function checkApiHealth(): Promise<boolean> {
 	try {
 		// Try to get devices as a health check since /health doesn't exist yet
-		const response = await fetch(`${API_BASE_URL}/api/devices`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/devices`, {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',
