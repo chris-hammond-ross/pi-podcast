@@ -43,8 +43,36 @@ function closeDatabase() {
 	}
 }
 
+/**
+ * Get health status of the database
+ * @returns {Object} Health status object
+ */
+function getHealth() {
+	try {
+		if (!db) {
+			return {
+				status: 'error',
+				error: 'Database not initialized'
+			};
+		}
+
+		// Run a simple query to verify the connection is working
+		db.prepare('SELECT 1').get();
+
+		return {
+			status: 'ok'
+		};
+	} catch (error) {
+		return {
+			status: 'error',
+			error: error.message
+		};
+	}
+}
+
 module.exports = {
 	initializeDatabase,
 	getDatabase,
-	closeDatabase
+	closeDatabase,
+	getHealth
 };

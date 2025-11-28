@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const bluetoothService = require('../services/bluetoothService');
+const { bluetoothService } = require('../services');
 
 /**
  * POST /api/bluetooth/init

@@ -97,6 +97,35 @@ class PodcastService {
 			throw new Error(`Failed to get podcast details: ${error.message}`);
 		}
 	}
+
+	/**
+	 * Get health status of the podcast service
+	 * @returns {Promise<Object>} Health status object
+	 */
+	async getHealth() {
+		try {
+			// Do a lightweight search to verify the iTunes API is reachable
+			const response = await axios.get(this.iTunesApiUrl, {
+				params: {
+					term: 'test',
+					entity: 'podcast',
+					limit: 1
+				},
+				timeout: 5000
+			});
+
+			return {
+				status: 'ok',
+				api: 'itunes'
+			};
+		} catch (error) {
+			return {
+				status: 'error',
+				api: 'itunes',
+				error: error.message
+			};
+		}
+	}
 }
 
 // Create singleton instance

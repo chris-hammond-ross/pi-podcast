@@ -3,7 +3,7 @@ import './App.css';
 import { MantineProvider } from '@mantine/core';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './layout';
-import { Podcasts, Playlists, Search, Settings } from './pages';
+import { Podcasts, Playlists, Search, Settings, Downloads } from './pages';
 
 function App() {
 	return (
@@ -15,6 +15,7 @@ function App() {
 						<Route path="podcasts" element={<Podcasts />} />
 						<Route path="playlists" element={<Playlists />} />
 						<Route path="search" element={<Search />} />
+						<Route path="downloads" element={<Downloads />} />
 						<Route path="settings" element={<Settings />} />
 					</Route>
 				</Routes>

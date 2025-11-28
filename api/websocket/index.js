@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const bluetoothService = require('../services/bluetoothService');
+const { bluetoothService } = require('../services');
 
 /**
  * Initialize WebSocket server and set up event handlers
