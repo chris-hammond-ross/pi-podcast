@@ -1,4 +1,5 @@
-import { Container, Title, Text } from '@mantine/core';
+import { Container, Title } from '@mantine/core';
+import { PodcastSearch } from '../components';
 
 function Search() {
 	return (
@@ -6,7 +7,9 @@ function Search() {
 			<Title order={1} mb="md">
 				Search
 			</Title>
-			<Text c="dimmed">Search for podcasts here.</Text>
+			<PodcastSearch
+				onResultsChange={(count) => console.log(`Found ${count} results`)}
+			/>
 		</Container>
 	);
 }

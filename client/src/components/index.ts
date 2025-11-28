@@ -3,3 +3,4 @@
  */
 
 export { BluetoothInterface } from './BluetoothInterface';
+export * from './PodcastSearch';
