@@ -7,7 +7,8 @@ const corsMiddleware = require('./middleware/cors');
 const errorHandler = require('./middleware/errorHandler');
 const routes = require('./routes');
 const { initializeWebSocket } = require('./websocket');
-const bluetoothService = require('./services/bluetoothService');
+const { bluetoothService } = require('./services');
+const { getHealth } = require('./utils/health');
 
 const app = express();
 const server = http.createServer(app);
@@ -24,9 +25,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api', routes);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-	const health = bluetoothService.getHealth();
-	res.json({ success: true, ...health });
+app.get('/health', async (req, res) => {
+	const deep = req.query.deep === 'true';
+	const health = await getHealth({ deep });
+	
+	// Set appropriate status code based on health
+	const statusCode = health.status === 'ok' ? 200 : 
+	                   health.status === 'degraded' ? 200 : 503;
+	
+	res.status(statusCode).json(health);
 });
 
 // Catch-all route for React Router (SPA support)

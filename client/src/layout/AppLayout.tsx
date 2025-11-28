@@ -1,5 +1,5 @@
-import { AppShell, Button, Group, Container, rem } from '@mantine/core';
-import { Mic, ListMusic, Search, Settings } from 'lucide-react';
+import { AppShell, Button, Group, Container, Indicator, rem } from '@mantine/core';
+import { Mic, ListMusic, Search, Settings, HardDriveDownload } from 'lucide-react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
 
@@ -12,7 +12,7 @@ function AppLayout() {
 	const navItems = [
 		{ path: '/podcasts', label: 'Podcasts', icon: Mic },
 		{ path: '/playlists', label: 'Playlists', icon: ListMusic },
-		{ path: '/search', label: 'Search', icon: Search },
+		{ path: '/search', label: 'Search', icon: Search }
 	];
 
 	return (
@@ -44,6 +44,15 @@ function AppLayout() {
 									{isMobile ? <Icon size={18} /> : label}
 								</Button>
 							))}
+							<Indicator color="teal" offset={2} disabled={true}>
+								<Button
+									variant={isActive('/downloads') ? 'filled' : 'light'}
+									leftSection={isMobile ? undefined : <HardDriveDownload size={18} />}
+									onClick={() => navigate('/downloads')}
+								>
+									{isMobile ? <HardDriveDownload size={18} /> : "Downloads"}
+								</Button>
+							</Indicator>
 						</Group>
 
 						<Button

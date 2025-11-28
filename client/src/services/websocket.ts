@@ -60,10 +60,20 @@ export class WebSocketService {
 	private isIntentionallyClosed: boolean = false;
 
 	constructor(config: WebSocketServiceConfig = {}) {
-		// Determine WebSocket URL based on current page location
-		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-		const host = window.location.host;
-		this.url = config.url || `${protocol}//${host}`;
+		// Use environment variable if set, otherwise derive from current page location
+		const wsUrl = import.meta.env.VITE_WS_URL;
+		
+		if (wsUrl) {
+			this.url = wsUrl;
+		} else {
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			const host = window.location.host;
+			this.url = `${protocol}//${host}`;
+		}
+		
+		if (config.url) {
+			this.url = config.url;
+		}
 		
 		this.reconnectInterval = config.reconnectInterval || 3000;
 		this.maxReconnectAttempts = config.maxReconnectAttempts || 5;
