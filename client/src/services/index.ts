@@ -3,9 +3,10 @@
  */
 
 export * from './bluetooth';
+export * from './podcasts';
 export * from './api';
-export { 
-	WebSocketService, 
+export {
+	WebSocketService,
 	getWebSocketService,
 	type ServerMessage,
 	type ServerMessageType,

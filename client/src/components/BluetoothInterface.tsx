@@ -23,8 +23,6 @@ export function BluetoothInterface() {
 	const {
 		connectingDeviceMac,
 		disconnectingDeviceMac,
-		isConnecting,
-		isDisconnecting,
 		connectionStatus,
 		error: connectionError,
 		connect,
