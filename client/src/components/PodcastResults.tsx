@@ -1,15 +1,21 @@
-import { SimpleGrid, Card, Image, Text, Badge, Stack } from '@mantine/core';
+import { SimpleGrid, Card, Image, Text, Stack } from '@mantine/core';
 import type { Podcast } from '../services';
 
 interface PodcastResultsProps {
 	podcasts: Podcast[];
+	onPodcastClick?: (podcast: Podcast) => void;
 }
 
 function PodcastResults({
-	podcasts = []
+	podcasts = [],
+	onPodcastClick
 }: PodcastResultsProps) {
-	const handleCardClick = (podcast: Podcast) => {
-		console.log(podcast);
+	const handleClick = (podcast: Podcast) => {
+		if (onPodcastClick) {
+			onPodcastClick(podcast);
+		} else {
+			console.log(podcast);
+		}
 	};
 
 	return (
@@ -18,7 +24,7 @@ function PodcastResults({
 				<Card
 					p="0"
 					key={podcast.id}
-					onClick={() => handleCardClick(podcast)}
+					onClick={() => handleClick(podcast)}
 					style={{ cursor: 'pointer' }}
 					className="hover:shadow-lg transition-shadow"
 				>
@@ -36,12 +42,6 @@ function PodcastResults({
 							<Text fw={600} size="xs" lineClamp={2}>
 								{podcast.name}
 							</Text>
-							{/*<Badge
-								size='xs'
-								variant="light"
-							>
-								{podcast.trackCount} episodes
-							</Badge>*/}
 						</Stack>
 
 					</Stack>
