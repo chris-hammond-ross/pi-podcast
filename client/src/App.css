@@ -11,3 +11,9 @@
 .podcast-details .mantine-Modal-body {
 	padding: 0;
 }
+
+.podcast-details .mantine-Modal-inner>section {
+	overflow: hidden;
+	max-height: calc(100svh - 2rem);
+	height: calc(100svh - 2rem);
+}
