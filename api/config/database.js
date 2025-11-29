@@ -4,61 +4,6 @@ const path = require('path');
 let db = null;
 
 /**
- * Migrate subscriptions table from old schema to new schema
- * @param {Database} database - The database instance
- */
-function migrateSubscriptionsTable(database) {
-	// Check if we have the old schema (feed_url column exists)
-	const tableInfo = database.prepare("PRAGMA table_info(subscriptions)").all();
-	const hasOldSchema = tableInfo.some(col => col.name === 'feed_url');
-	
-	if (!hasOldSchema) {
-		return; // Already migrated or fresh install
-	}
-
-	console.log('[database] Migrating subscriptions table to new schema...');
-
-	// Create new table with updated schema
-	database.exec(`
-		-- Create new subscriptions table with aligned schema
-		CREATE TABLE IF NOT EXISTS subscriptions_new (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			feedUrl TEXT NOT NULL UNIQUE,
-			name TEXT NOT NULL,
-			artist TEXT,
-			description TEXT,
-			artworkUrl TEXT,
-			artworkUrl100 TEXT,
-			artworkUrl600 TEXT,
-			genres TEXT,
-			primaryGenre TEXT,
-			trackCount INTEGER,
-			releaseDate TEXT,
-			country TEXT,
-			lastFetched INTEGER,
-			createdAt INTEGER DEFAULT (strftime('%s', 'now'))
-		);
-
-		-- Migrate data from old table to new table
-		INSERT INTO subscriptions_new (id, feedUrl, name, description, artworkUrl600, lastFetched, createdAt)
-		SELECT id, feed_url, title, description, image_url, last_fetched, created_at
-		FROM subscriptions;
-
-		-- Drop old table
-		DROP TABLE subscriptions;
-
-		-- Rename new table
-		ALTER TABLE subscriptions_new RENAME TO subscriptions;
-
-		-- Drop old index if exists and create new one
-		DROP INDEX IF EXISTS idx_subscriptions_feed_url;
-		CREATE INDEX IF NOT EXISTS idx_subscriptions_feedUrl ON subscriptions(feedUrl);
-	`);
-
-	console.log('[database] Migration complete');
-}
-
-/**
  * Create database tables if they don't exist
  * @param {Database} database - The database instance
  */
@@ -140,9 +85,6 @@ function initializeDatabase() {
 	db.pragma('journal_mode = WAL'); // Enable Write-Ahead Logging for better performance
 
 	console.log('[database] Connected to SQLite database at', dbPath);
-
-	// Run migrations for existing databases
-	migrateSubscriptionsTable(db);
 
 	// Ensure tables exist
 	createTables(db);
