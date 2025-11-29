@@ -2,12 +2,14 @@ import { AppShell, Button, Group, Container, Indicator, rem } from '@mantine/cor
 import { Mic, ListMusic, Search, Settings, HardDriveDownload } from 'lucide-react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
+import { useDownloadContext } from '../contexts';
 
 function AppLayout() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const isMobile = useMediaQuery('(max-width: 768px)');
 	const isActive = (path: string) => location.pathname === path;
+	const { isActive: isDownloading } = useDownloadContext();
 
 	const navItems = [
 		{ path: '/podcasts', label: 'Podcasts', icon: Mic },
@@ -44,7 +46,7 @@ function AppLayout() {
 									{isMobile ? <Icon size={18} /> : label}
 								</Button>
 							))}
-							<Indicator color="teal" offset={2} disabled={true}>
+							<Indicator color="teal" offset={2} disabled={!isDownloading} processing={isDownloading}>
 								<Button
 									variant={isActive('/downloads') ? 'filled' : 'light'}
 									leftSection={isMobile ? undefined : <HardDriveDownload size={18} />}

@@ -4,6 +4,7 @@
  * Subscription extends the Podcast type with additional fields:
  * - description (optional, from RSS feed)
  * - lastFetched, createdAt (subscription tracking)
+ * - auto_download, auto_download_limit (auto-download settings)
  */
 
 import type { Podcast } from './podcasts';
@@ -13,6 +14,8 @@ export interface Subscription extends Podcast {
 	description: string | null;
 	lastFetched: number;
 	createdAt: number;
+	auto_download: number;
+	auto_download_limit: number;
 }
 
 export interface Episode {
@@ -200,5 +203,42 @@ export async function unsubscribe(feedUrl: string): Promise<{ success: boolean; 
 			throw new Error(`Failed to unsubscribe: ${error.message}`);
 		}
 		throw new Error('Failed to unsubscribe: Unknown error');
+	}
+}
+
+/**
+ * Update subscription auto-download settings
+ * @param subscriptionId - The subscription ID
+ * @param autoDownload - Whether to auto-download new episodes
+ * @param autoDownloadLimit - Max episodes to auto-download (optional)
+ */
+export async function updateAutoDownload(
+	subscriptionId: number,
+	autoDownload: boolean,
+	autoDownloadLimit?: number
+): Promise<SubscriptionResponse> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/subscriptions/${subscriptionId}/auto-download`, {
+			method: 'PATCH',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				auto_download: autoDownload ? 1 : 0,
+				auto_download_limit: autoDownloadLimit
+			}),
+		});
+
+		if (!response.ok) {
+			const error = (await response.json()) as SubscriptionError;
+			throw new Error(error.error || 'Failed to update auto-download settings');
+		}
+
+		return await response.json();
+	} catch (error) {
+		if (error instanceof Error) {
+			throw new Error(`Failed to update auto-download: ${error.message}`);
+		}
+		throw new Error('Failed to update auto-download: Unknown error');
 	}
 }

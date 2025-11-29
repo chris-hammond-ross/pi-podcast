@@ -2,6 +2,32 @@
  * Application-wide constants
  */
 
+const path = require('path');
+
+/**
+ * Get default download directory based on platform/environment
+ * @returns {string} Download directory path
+ */
+function getDownloadDir() {
+	// Check for explicit environment variable first
+	if (process.env.DOWNLOAD_DIR) {
+		return process.env.DOWNLOAD_DIR;
+	}
+
+	// Development mode on Windows - use a local folder
+	if (process.env.NODE_ENV === 'development' && process.platform === 'win32') {
+		return path.join(__dirname, '..', 'downloads');
+	}
+
+	// Production on Linux (Raspberry Pi) - use system location
+	if (process.platform === 'linux') {
+		return '/var/lib/pi-podcast/episodes';
+	}
+
+	// Fallback to local directory
+	return path.join(__dirname, '..', 'downloads');
+}
+
 module.exports = {
 	// Server configuration
 	PORT: process.env.PORT || 80,
@@ -13,5 +39,15 @@ module.exports = {
 	BLUETOOTH_SCAN_TIMEOUT: 2000, // Timeout for scan on/off commands
 
 	// Command queue configuration
-	COMMAND_QUEUE_DELAY: 100 // Delay between processing queued commands
+	COMMAND_QUEUE_DELAY: 100, // Delay between processing queued commands
+
+	// Download configuration
+	DOWNLOAD_DIR: getDownloadDir(),
+	DOWNLOAD_DELAY_BETWEEN: 2000, // ms between downloads
+	DOWNLOAD_MAX_RETRIES: 3,
+	DOWNLOAD_RETRY_DELAY: 5000, // ms before retry
+	DOWNLOAD_CONNECTION_TIMEOUT: 30000, // 30 seconds
+	DOWNLOAD_TIMEOUT: 600000, // 10 minutes
+	DOWNLOAD_PROGRESS_INTERVAL: 1000, // ms between progress updates
+	DOWNLOAD_MIN_DISK_SPACE: 500 * 1024 * 1024 // 500MB
 };

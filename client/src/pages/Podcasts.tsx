@@ -1,16 +1,31 @@
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Container, Title, Text, SimpleGrid, Card, Stack, Skeleton, Alert } from '@mantine/core';
 import { AlertCircle } from 'lucide-react';
 import { useSubscriptions } from '../hooks';
-import { PodcastResults } from '../components';
-import type { Podcast } from '../services';
+import { PodcastResults, PodcastDetailModal } from '../components';
+import type { Subscription } from '../services';
 
 function Podcasts() {
-	const { subscriptions, isLoading, error } = useSubscriptions();
+	const { subscriptions, isLoading, error, refresh } = useSubscriptions();
+	const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
+	const [modalOpened, setModalOpened] = useState(false);
 
-	const handlePodcastClick = useCallback((podcast: Podcast) => {
-		console.log(podcast);
+	const handlePodcastClick = useCallback((podcast: Subscription) => {
+		setSelectedSubscription(podcast);
+		setModalOpened(true);
 	}, []);
+
+	const handleModalClose = useCallback(() => {
+		setModalOpened(false);
+		setSelectedSubscription(null);
+	}, []);
+
+	const handleSubscriptionUpdate = useCallback((updated: Subscription) => {
+		// Update the selected subscription with new data
+		setSelectedSubscription(updated);
+		// Refetch all subscriptions to sync the list
+		refresh();
+	}, [refresh]);
 
 	// Loading state
 	if (isLoading) {
@@ -67,6 +82,13 @@ function Podcasts() {
 			<PodcastResults
 				podcasts={subscriptions}
 				onPodcastClick={handlePodcastClick}
+			/>
+
+			<PodcastDetailModal
+				subscription={selectedSubscription}
+				opened={modalOpened}
+				onClose={handleModalClose}
+				onSubscriptionUpdate={handleSubscriptionUpdate}
 			/>
 		</Container>
 	);

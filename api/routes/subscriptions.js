@@ -210,4 +210,46 @@ router.get('/:id', (req, res) => {
 	}
 });
 
+/**
+ * PATCH /api/subscriptions/:id/auto-download
+ * Update auto-download settings for a subscription
+ * Body: { auto_download: 0|1, auto_download_limit?: number }
+ */
+router.patch('/:id/auto-download', (req, res) => {
+	try {
+		const { id } = req.params;
+		const { auto_download, auto_download_limit } = req.body;
+
+		if (auto_download === undefined) {
+			return res.status(400).json({
+				success: false,
+				error: 'auto_download is required'
+			});
+		}
+
+		const subscription = subscriptionService.updateAutoDownload(
+			parseInt(id),
+			!!auto_download,
+			auto_download_limit
+		);
+
+		if (!subscription) {
+			return res.status(404).json({
+				success: false,
+				error: 'Subscription not found'
+			});
+		}
+
+		res.json({
+			success: true,
+			subscription
+		});
+	} catch (err) {
+		res.status(500).json({
+			success: false,
+			error: err.message
+		});
+	}
+});
+
 module.exports = router;
