@@ -67,98 +67,108 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 	
 	const unsubscribeRef = useRef<(() => void) | null>(null);
 	const serviceRef = useRef(getWebSocketService());
+	const initializedRef = useRef(false);
 
 	const isActive = counts.pending > 0 || counts.downloading > 0;
 
-	// Handle WebSocket messages
-	const handleMessage = useCallback((message: ServerMessage) => {
-		switch (message.type) {
-			case 'download:queue-status':
-				setIsRunning(message.isRunning ?? false);
-				setIsPaused(message.isPaused ?? false);
-				if (message.queue) {
-					setCounts(message.queue.counts);
-					setActiveItems(message.queue.activeItems);
-				} else if (message.counts) {
-					setCounts(message.counts);
-				}
-				if (message.activeItems) {
-					setActiveItems(message.activeItems);
-				}
-				if (message.currentDownload) {
-					setCurrentDownload({
-						...message.currentDownload,
-						downloadedBytes: 0,
-						totalBytes: 0,
-						percent: 0
-					});
-				} else if (!message.currentDownload && currentDownload) {
-					// Clear current download if not in progress
-				}
-				setIsLoading(false);
-				break;
-
-			case 'download:processor-started':
-				setIsRunning(true);
-				setIsPaused(false);
-				break;
-
-			case 'download:processor-stopped':
-				setIsRunning(false);
-				setCurrentDownload(null);
-				break;
-
-			case 'download:processor-paused':
-				setIsPaused(true);
-				break;
-
-			case 'download:processor-resumed':
-				setIsPaused(false);
-				break;
-
-			case 'download:started':
-				setCurrentDownload({
-					queueId: message.queueId!,
-					episodeId: message.episodeId!,
-					title: message.title!,
-					subscriptionName: message.subscriptionName || '',
-					downloadedBytes: 0,
-					totalBytes: message.totalBytes || 0,
-					percent: 0
-				});
-				break;
-
-			case 'download:progress':
-				setCurrentDownload(prev => {
-					if (!prev || prev.queueId !== message.queueId) {
-						return prev;
-					}
-					return {
-						...prev,
-						downloadedBytes: message.downloadedBytes || 0,
-						totalBytes: message.totalBytes || prev.totalBytes,
-						percent: message.percent || 0
-					};
-				});
-				break;
-
-			case 'download:completed':
-			case 'download:failed':
-				if (currentDownload?.queueId === message.queueId) {
-					setCurrentDownload(null);
-				}
-				break;
-
-			case 'download:queue-empty':
-				setCurrentDownload(null);
-				break;
-		}
-	}, [currentDownload]);
-
-	// Connect to WebSocket and subscribe
+	// Connect to WebSocket and subscribe - only once on mount
 	useEffect(() => {
+		// Prevent double initialization in React strict mode
+		if (initializedRef.current) {
+			return;
+		}
+		initializedRef.current = true;
+
 		const service = serviceRef.current;
 		let mounted = true;
+
+		// Handle WebSocket messages
+		const handleMessage = (message: ServerMessage) => {
+			if (!mounted) return;
+
+			switch (message.type) {
+				case 'download:queue-status':
+					setIsRunning(message.isRunning ?? false);
+					setIsPaused(message.isPaused ?? false);
+					if (message.queue) {
+						setCounts(message.queue.counts);
+						setActiveItems(message.queue.activeItems);
+					} else if (message.counts) {
+						setCounts(message.counts);
+					}
+					if (message.activeItems) {
+						setActiveItems(message.activeItems);
+					}
+					if (message.currentDownload) {
+						setCurrentDownload(prev => ({
+							...message.currentDownload!,
+							downloadedBytes: prev?.downloadedBytes || 0,
+							totalBytes: prev?.totalBytes || 0,
+							percent: prev?.percent || 0
+						}));
+					}
+					setIsLoading(false);
+					break;
+
+				case 'download:processor-started':
+					setIsRunning(true);
+					setIsPaused(false);
+					break;
+
+				case 'download:processor-stopped':
+					setIsRunning(false);
+					setCurrentDownload(null);
+					break;
+
+				case 'download:processor-paused':
+					setIsPaused(true);
+					break;
+
+				case 'download:processor-resumed':
+					setIsPaused(false);
+					break;
+
+				case 'download:started':
+					setCurrentDownload({
+						queueId: message.queueId!,
+						episodeId: message.episodeId!,
+						title: message.title!,
+						subscriptionName: message.subscriptionName || '',
+						downloadedBytes: 0,
+						totalBytes: message.totalBytes || 0,
+						percent: 0
+					});
+					break;
+
+				case 'download:progress':
+					setCurrentDownload(prev => {
+						if (!prev || prev.queueId !== message.queueId) {
+							return prev;
+						}
+						return {
+							...prev,
+							downloadedBytes: message.downloadedBytes || 0,
+							totalBytes: message.totalBytes || prev.totalBytes,
+							percent: message.percent || 0
+						};
+					});
+					break;
+
+				case 'download:completed':
+				case 'download:failed':
+					setCurrentDownload(prev => {
+						if (prev?.queueId === message.queueId) {
+							return null;
+						}
+						return prev;
+					});
+					break;
+
+				case 'download:queue-empty':
+					// Don't clear currentDownload here - let completed/failed handle it
+					break;
+			}
+		};
 
 		const setup = async () => {
 			try {
@@ -176,9 +186,9 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 					service.send({ type: 'request-download-status' });
 				}
 
-				// Also fetch via API as backup
+				// Also fetch via API as backup after a delay
 				setTimeout(async () => {
-					if (mounted && isLoading) {
+					if (mounted) {
 						try {
 							const status = await downloadsApi.getDownloadStatus();
 							if (mounted) {
@@ -212,7 +222,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 				unsubscribeRef.current = null;
 			}
 		};
-	}, [handleMessage, isLoading]);
+	}, []); // Empty dependency array - only run once
 
 	// Actions
 	const start = useCallback(async () => {
