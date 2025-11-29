@@ -25,6 +25,7 @@ class DownloadProcessor extends EventEmitter {
 			downloadTimeout: options.downloadTimeout || constants.DOWNLOAD_TIMEOUT,
 			progressInterval: options.progressInterval || constants.DOWNLOAD_PROGRESS_INTERVAL,
 			minDiskSpace: options.minDiskSpace || constants.DOWNLOAD_MIN_DISK_SPACE,
+			queuePollInterval: options.queuePollInterval || 10000, // 10 seconds between empty queue checks
 			...options
 		};
 
@@ -35,6 +36,7 @@ class DownloadProcessor extends EventEmitter {
 		this.currentDownload = null;
 		this.abortController = null;
 		this.progressThrottleTime = 0;
+		this.pollTimeoutId = null;
 
 		// Ensure download directory exists
 		this._ensureDownloadDir();
@@ -78,6 +80,16 @@ class DownloadProcessor extends EventEmitter {
 	}
 
 	/**
+	 * Clear any pending poll timeout
+	 */
+	_clearPollTimeout() {
+		if (this.pollTimeoutId) {
+			clearTimeout(this.pollTimeoutId);
+			this.pollTimeoutId = null;
+		}
+	}
+
+	/**
 	 * Start processing the queue
 	 */
 	async start() {
@@ -107,6 +119,9 @@ class DownloadProcessor extends EventEmitter {
 
 		console.log('[download] Stopping download processor');
 		this.isRunning = false;
+		
+		// Clear any pending poll
+		this._clearPollTimeout();
 
 		// Abort current download if any
 		if (this.abortController) {
@@ -124,6 +139,7 @@ class DownloadProcessor extends EventEmitter {
 		
 		console.log('[download] Pausing download processor');
 		this.isPaused = true;
+		this._clearPollTimeout();
 		this.emit('processor:paused');
 	}
 
@@ -146,6 +162,10 @@ class DownloadProcessor extends EventEmitter {
 	 * Process next item in queue
 	 */
 	async _processNext() {
+		// Clear any existing poll timeout
+		this._clearPollTimeout();
+
+		// Check if we should continue
 		if (!this.isRunning || this.isPaused) {
 			return;
 		}
@@ -153,18 +173,26 @@ class DownloadProcessor extends EventEmitter {
 		const queueItem = downloadQueueService.getNextPending();
 		
 		if (!queueItem) {
+			// Queue is empty - emit once and schedule next poll
 			console.log('[download] Queue empty, waiting for items');
 			this.emit('queue:empty');
-			// Check again in a few seconds
-			setTimeout(() => this._processNext(), 5000);
+			
+			// Schedule next check (only if still running)
+			if (this.isRunning && !this.isPaused) {
+				this.pollTimeoutId = setTimeout(() => {
+					this._processNext();
+				}, this.options.queuePollInterval);
+			}
 			return;
 		}
 
 		await this._downloadItem(queueItem);
 
-		// Delay between downloads
+		// Schedule next download (only if still running)
 		if (this.isRunning && !this.isPaused) {
-			setTimeout(() => this._processNext(), this.options.delayBetweenDownloads);
+			this.pollTimeoutId = setTimeout(() => {
+				this._processNext();
+			}, this.options.delayBetweenDownloads);
 		}
 	}
 
