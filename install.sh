@@ -305,73 +305,12 @@ initialize_database() {
     print_header "Initializing SQLite database"
 
     # Create database file if it doesn't exist
+    # Schema is created by Node.js when the server starts
     if [ ! -f "$DB_FILE" ]; then
         touch "$DB_FILE"
         chown "$INSTALL_USER:$INSTALL_USER" "$DB_FILE"
         chmod 644 "$DB_FILE"
-
-        # Create database schema
-        sqlite3 "$DB_FILE" << 'EOF'
--- Podcast subscriptions table (aligned with iTunes Podcast schema)
-CREATE TABLE IF NOT EXISTS subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    feedUrl TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL,
-    artist TEXT,
-    description TEXT,
-    artworkUrl TEXT,
-    artworkUrl100 TEXT,
-    artworkUrl600 TEXT,
-    genres TEXT,
-    primaryGenre TEXT,
-    trackCount INTEGER,
-    releaseDate TEXT,
-    country TEXT,
-    lastFetched INTEGER,
-    createdAt INTEGER DEFAULT (strftime('%s', 'now'))
-);
-
--- Playlists table
-CREATE TABLE IF NOT EXISTS playlists (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    description TEXT,
-    created_at INTEGER DEFAULT (strftime('%s', 'now')),
-    updated_at INTEGER DEFAULT (strftime('%s', 'now'))
-);
-
--- Playlist episodes table (many-to-many relationship)
-CREATE TABLE IF NOT EXISTS playlist_episodes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    playlist_id INTEGER NOT NULL,
-    episode_url TEXT NOT NULL,
-    episode_title TEXT,
-    position INTEGER DEFAULT 0,
-    added_at INTEGER DEFAULT (strftime('%s', 'now')),
-    FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
-    UNIQUE(playlist_id, episode_url)
-);
-
--- Bluetooth devices table
-CREATE TABLE IF NOT EXISTS bluetooth_devices (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    mac_address TEXT NOT NULL UNIQUE,
-    name TEXT,
-    rssi INTEGER,
-    last_seen INTEGER DEFAULT (strftime('%s', 'now')),
-    paired INTEGER DEFAULT 0,
-    trusted INTEGER DEFAULT 0,
-    created_at INTEGER DEFAULT (strftime('%s', 'now'))
-);
-
--- Create indexes for better query performance
-CREATE INDEX IF NOT EXISTS idx_subscriptions_feedUrl ON subscriptions(feedUrl);
-CREATE INDEX IF NOT EXISTS idx_playlist_episodes_playlist_id ON playlist_episodes(playlist_id);
-CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_mac ON bluetooth_devices(mac_address);
-CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_last_seen ON bluetooth_devices(last_seen);
-EOF
-
-        print_success "Database initialized at $DB_FILE"
+        print_success "Database file created at $DB_FILE"
     else
         print_info "Database already exists at $DB_FILE"
     fi
