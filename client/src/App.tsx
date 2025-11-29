@@ -1,6 +1,8 @@
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
 import './App.css';
 import { MantineProvider } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './layout';
 import { Podcasts, Playlists, Search, Settings, Downloads } from './pages';
@@ -8,6 +10,7 @@ import { Podcasts, Playlists, Search, Settings, Downloads } from './pages';
 function App() {
 	return (
 		<MantineProvider defaultColorScheme="auto">
+			<Notifications />
 			<BrowserRouter>
 				<Routes>
 					<Route path="/" element={<AppLayout />}>
