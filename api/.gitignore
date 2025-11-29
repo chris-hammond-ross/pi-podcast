@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# SQLite temp files
+# SQLite files
+*.db
 *.db-wal
 *.db-shm
