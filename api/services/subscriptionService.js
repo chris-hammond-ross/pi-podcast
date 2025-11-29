@@ -5,16 +5,50 @@ const { parseStringPromise } = require('xml2js');
 /**
  * Subscription Service
  * Handles podcast subscription operations
+ * 
+ * Subscription schema is aligned with Podcast schema from iTunes API:
+ * - id, name, artist, feedUrl, artworkUrl, artworkUrl100, artworkUrl600
+ * - genres (JSON string), primaryGenre, trackCount, releaseDate, country
+ * - description (optional, from RSS feed)
+ * - lastFetched, createdAt (subscription-specific)
  */
 class SubscriptionService {
+	/**
+	 * Parse genres from JSON string or return empty array
+	 * @param {string|null} genresJson - JSON string of genres
+	 * @returns {string[]} Array of genres
+	 */
+	_parseGenres(genresJson) {
+		if (!genresJson) return [];
+		try {
+			return JSON.parse(genresJson);
+		} catch {
+			return [];
+		}
+	}
+
+	/**
+	 * Transform database row to subscription object
+	 * @param {Object} row - Database row
+	 * @returns {Object} Subscription object with parsed genres
+	 */
+	_transformRow(row) {
+		if (!row) return null;
+		return {
+			...row,
+			genres: this._parseGenres(row.genres)
+		};
+	}
+
 	/**
 	 * Get all subscriptions
 	 * @returns {Array} List of subscriptions
 	 */
 	getAllSubscriptions() {
 		const db = getDatabase();
-		const stmt = db.prepare('SELECT * FROM subscriptions ORDER BY created_at DESC');
-		return stmt.all();
+		const stmt = db.prepare('SELECT * FROM subscriptions ORDER BY createdAt DESC');
+		const rows = stmt.all();
+		return rows.map(row => this._transformRow(row));
 	}
 
 	/**
@@ -24,8 +58,8 @@ class SubscriptionService {
 	 */
 	getSubscriptionByFeedUrl(feedUrl) {
 		const db = getDatabase();
-		const stmt = db.prepare('SELECT * FROM subscriptions WHERE feed_url = ?');
-		return stmt.get(feedUrl);
+		const stmt = db.prepare('SELECT * FROM subscriptions WHERE feedUrl = ?');
+		return this._transformRow(stmt.get(feedUrl));
 	}
 
 	/**
@@ -36,7 +70,7 @@ class SubscriptionService {
 	getSubscriptionById(id) {
 		const db = getDatabase();
 		const stmt = db.prepare('SELECT * FROM subscriptions WHERE id = ?');
-		return stmt.get(id);
+		return this._transformRow(stmt.get(id));
 	}
 
 	/**
@@ -50,11 +84,19 @@ class SubscriptionService {
 
 	/**
 	 * Subscribe to a podcast
-	 * @param {Object} podcast - The podcast details
+	 * @param {Object} podcast - The podcast details (aligned with Podcast schema)
 	 * @param {string} podcast.feedUrl - The podcast feed URL
-	 * @param {string} podcast.title - The podcast title
+	 * @param {string} podcast.name - The podcast name
+	 * @param {string} [podcast.artist] - The podcast artist/author
 	 * @param {string} [podcast.description] - The podcast description
-	 * @param {string} [podcast.imageUrl] - The podcast image URL
+	 * @param {string} [podcast.artworkUrl] - The main artwork URL
+	 * @param {string} [podcast.artworkUrl100] - Small artwork URL
+	 * @param {string} [podcast.artworkUrl600] - Large artwork URL
+	 * @param {string[]} [podcast.genres] - Array of genre strings
+	 * @param {string} [podcast.primaryGenre] - Primary genre
+	 * @param {number} [podcast.trackCount] - Number of episodes
+	 * @param {string} [podcast.releaseDate] - Release date
+	 * @param {string} [podcast.country] - Country code
 	 * @returns {Object} The created subscription
 	 */
 	subscribe(podcast) {
@@ -66,29 +108,53 @@ class SubscriptionService {
 			throw new Error('Already subscribed to this podcast');
 		}
 
+		const now = Math.floor(Date.now() / 1000);
+		const genresJson = podcast.genres ? JSON.stringify(podcast.genres) : null;
+
 		const stmt = db.prepare(`
-			INSERT INTO subscriptions (feed_url, title, description, image_url, last_fetched)
-			VALUES (?, ?, ?, ?, ?)
+			INSERT INTO subscriptions (
+				feedUrl, name, artist, description, 
+				artworkUrl, artworkUrl100, artworkUrl600,
+				genres, primaryGenre, trackCount, releaseDate, country,
+				lastFetched, createdAt
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 
 		const result = stmt.run(
 			podcast.feedUrl,
-			podcast.title,
+			podcast.name,
+			podcast.artist || null,
 			podcast.description || null,
-			podcast.imageUrl || null,
-			Math.floor(Date.now() / 1000)
+			podcast.artworkUrl || podcast.artworkUrl600 || podcast.artworkUrl100 || null,
+			podcast.artworkUrl100 || null,
+			podcast.artworkUrl600 || null,
+			genresJson,
+			podcast.primaryGenre || null,
+			podcast.trackCount || null,
+			podcast.releaseDate || null,
+			podcast.country || null,
+			now,
+			now
 		);
 
-		console.log('[subscription] Subscribed to:', podcast.title);
+		console.log('[subscription] Subscribed to:', podcast.name);
 
 		return {
 			id: result.lastInsertRowid,
-			feed_url: podcast.feedUrl,
-			title: podcast.title,
-			description: podcast.description,
-			image_url: podcast.imageUrl,
-			last_fetched: Math.floor(Date.now() / 1000),
-			created_at: Math.floor(Date.now() / 1000)
+			feedUrl: podcast.feedUrl,
+			name: podcast.name,
+			artist: podcast.artist || null,
+			description: podcast.description || null,
+			artworkUrl: podcast.artworkUrl || podcast.artworkUrl600 || podcast.artworkUrl100 || null,
+			artworkUrl100: podcast.artworkUrl100 || null,
+			artworkUrl600: podcast.artworkUrl600 || null,
+			genres: podcast.genres || [],
+			primaryGenre: podcast.primaryGenre || null,
+			trackCount: podcast.trackCount || null,
+			releaseDate: podcast.releaseDate || null,
+			country: podcast.country || null,
+			lastFetched: now,
+			createdAt: now
 		};
 	}
 
@@ -99,7 +165,7 @@ class SubscriptionService {
 	 */
 	unsubscribe(feedUrl) {
 		const db = getDatabase();
-		const stmt = db.prepare('DELETE FROM subscriptions WHERE feed_url = ?');
+		const stmt = db.prepare('DELETE FROM subscriptions WHERE feedUrl = ?');
 		const result = stmt.run(feedUrl);
 		
 		console.log('[subscription] Unsubscribed from feed:', feedUrl);
@@ -175,8 +241,8 @@ class SubscriptionService {
 
 		const stmt = db.prepare(`
 			UPDATE subscriptions 
-			SET description = ?, last_fetched = ?
-			WHERE feed_url = ?
+			SET description = ?, lastFetched = ?
+			WHERE feedUrl = ?
 		`);
 
 		stmt.run(

@@ -37,6 +37,7 @@ function PodcastResults({
 							height="auto"
 							w="auto"
 							fit="contain"
+							fallbackSrc="https://placehold.co/300x300?text=No+Image"
 						/>
 						<Stack p="xs">
 							<Text fw={600} size="xs" lineClamp={2}>

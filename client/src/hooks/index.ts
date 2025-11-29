@@ -20,6 +20,7 @@ export type { UseScanBluetoothReturn } from './useScanBluetooth';
 export type { UseBluetoothConnectionReturn, ConnectionStatus } from './useBluetoothConnection';
 export type { UseBluetoothWebSocketReturn } from './useBluetoothWebSocket';
 export type { UseBluetoothPowerReturn } from './useBluetoothPower';
+export type { UseSubscriptionsReturn } from './useSubscriptions';
 
 // Check demo mode
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
@@ -37,4 +38,5 @@ export const useBluetoothWebSocket = isDemoMode ? useBluetoothWebSocketDemo : us
 // These don't need demo versions
 export { useBluetoothStatus } from './useBluetoothStatus';
 export { useApiHealth } from './useApiHealth';
+export { useSubscriptions } from './useSubscriptions';
 export const useBluetoothPower = useBluetoothPowerReal;

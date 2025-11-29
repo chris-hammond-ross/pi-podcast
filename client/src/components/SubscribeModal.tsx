@@ -72,11 +72,10 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 		setError(null);
 
 		try {
+			// Pass the full podcast object with description from feed
 			await subscribe({
-				feedUrl: podcast.feedUrl,
-				title: podcast.name,
-				description: feedData.description,
-				imageUrl: podcast.artworkUrl600
+				...podcast,
+				description: feedData.description
 			});
 
 			setIsSubscribed(true);
