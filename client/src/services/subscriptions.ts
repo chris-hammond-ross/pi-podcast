@@ -1,16 +1,18 @@
 /**
  * Subscription service for managing podcast subscriptions
+ * 
+ * Subscription extends the Podcast type with additional fields:
+ * - description (optional, from RSS feed)
+ * - lastFetched, createdAt (subscription tracking)
  */
 
-// Types for subscription responses
-export interface Subscription {
-	id: number;
-	feed_url: string;
-	title: string;
+import type { Podcast } from './podcasts';
+
+// Subscription extends Podcast with additional tracking fields
+export interface Subscription extends Podcast {
 	description: string | null;
-	image_url: string | null;
-	last_fetched: number;
-	created_at: number;
+	lastFetched: number;
+	createdAt: number;
 }
 
 export interface Episode {
@@ -147,14 +149,9 @@ export async function fetchFeed(feedUrl: string): Promise<FeedResponse> {
 
 /**
  * Subscribe to a podcast
- * @param podcast - The podcast details
+ * @param podcast - The podcast to subscribe to (uses Podcast type fields)
  */
-export async function subscribe(podcast: {
-	feedUrl: string;
-	title: string;
-	description?: string;
-	imageUrl?: string;
-}): Promise<SubscriptionResponse> {
+export async function subscribe(podcast: Podcast & { description?: string }): Promise<SubscriptionResponse> {
 	try {
 		const response = await fetch(`${API_BASE_URL}/api/subscriptions`, {
 			method: 'POST',

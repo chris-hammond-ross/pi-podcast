@@ -17,6 +17,7 @@ export interface Podcast {
 	trackCount: number;
 	releaseDate: string;
 	country: string;
+	description?: string | null;
 }
 
 export interface PodcastSearchResponse {

@@ -312,15 +312,23 @@ initialize_database() {
 
         # Create database schema
         sqlite3 "$DB_FILE" << 'EOF'
--- Podcast subscriptions table
+-- Podcast subscriptions table (aligned with iTunes Podcast schema)
 CREATE TABLE IF NOT EXISTS subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    feed_url TEXT NOT NULL UNIQUE,
-    title TEXT,
+    feedUrl TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    artist TEXT,
     description TEXT,
-    image_url TEXT,
-    last_fetched INTEGER,
-    created_at INTEGER DEFAULT (strftime('%s', 'now'))
+    artworkUrl TEXT,
+    artworkUrl100 TEXT,
+    artworkUrl600 TEXT,
+    genres TEXT,
+    primaryGenre TEXT,
+    trackCount INTEGER,
+    releaseDate TEXT,
+    country TEXT,
+    lastFetched INTEGER,
+    createdAt INTEGER DEFAULT (strftime('%s', 'now'))
 );
 
 -- Playlists table
@@ -357,6 +365,7 @@ CREATE TABLE IF NOT EXISTS bluetooth_devices (
 );
 
 -- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_subscriptions_feedUrl ON subscriptions(feedUrl);
 CREATE INDEX IF NOT EXISTS idx_playlist_episodes_playlist_id ON playlist_episodes(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_mac ON bluetooth_devices(mac_address);
 CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_last_seen ON bluetooth_devices(last_seen);

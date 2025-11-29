@@ -82,24 +82,47 @@ router.get('/feed', async (req, res) => {
 /**
  * POST /api/subscriptions
  * Subscribe to a podcast
- * Body: { feedUrl, title, description?, imageUrl? }
+ * Body: Podcast object with feedUrl, name, and optional fields:
+ *   artist, description, artworkUrl, artworkUrl100, artworkUrl600,
+ *   genres, primaryGenre, trackCount, releaseDate, country
  */
 router.post('/', (req, res) => {
 	try {
-		const { feedUrl, title, description, imageUrl } = req.body;
+		const { 
+			feedUrl, 
+			name,
+			artist,
+			description, 
+			artworkUrl,
+			artworkUrl100,
+			artworkUrl600,
+			genres,
+			primaryGenre,
+			trackCount,
+			releaseDate,
+			country
+		} = req.body;
 
-		if (!feedUrl || !title) {
+		if (!feedUrl || !name) {
 			return res.status(400).json({
 				success: false,
-				error: 'Feed URL and title are required'
+				error: 'Feed URL and name are required'
 			});
 		}
 
 		const subscription = subscriptionService.subscribe({
 			feedUrl,
-			title,
+			name,
+			artist,
 			description,
-			imageUrl
+			artworkUrl,
+			artworkUrl100,
+			artworkUrl600,
+			genres,
+			primaryGenre,
+			trackCount,
+			releaseDate,
+			country
 		});
 
 		res.status(201).json({
