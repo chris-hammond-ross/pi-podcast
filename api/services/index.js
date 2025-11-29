@@ -16,6 +16,11 @@ if (NO_BLUETOOTH) {
 	bluetoothService = require('./bluetoothService');
 }
 
+const podcastService = require('./podcastService');
+const subscriptionService = require('./subscriptionService');
+
 module.exports = {
-	bluetoothService
+	bluetoothService,
+	podcastService,
+	subscriptionService
 };

@@ -15,6 +15,7 @@ function App() {
 						<Route path="podcasts" element={<Podcasts />} />
 						<Route path="playlists" element={<Playlists />} />
 						<Route path="search" element={<Search />} />
+						<Route path="search/:podcastId" element={<Search />} />
 						<Route path="downloads" element={<Downloads />} />
 						<Route path="settings" element={<Settings />} />
 					</Route>

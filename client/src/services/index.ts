@@ -5,6 +5,7 @@
 export * from './bluetooth';
 export * from './podcasts';
 export * from './api';
+export * from './subscriptions';
 export {
 	WebSocketService,
 	getWebSocketService,

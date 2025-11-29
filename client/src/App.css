@@ -7,3 +7,7 @@
 .mantine-Tabs-tab {
 	border-bottom-width: 1px !important;
 }
+
+.podcast-details .mantine-Modal-body {
+	padding: 0;
+}
