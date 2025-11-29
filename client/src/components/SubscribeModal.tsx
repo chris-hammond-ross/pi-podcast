@@ -10,6 +10,7 @@ import {
 	Skeleton,
 	Alert
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { AlertCircle } from 'lucide-react';
 import type { Podcast, FeedData } from '../services';
 import { fetchFeed, checkSubscription, subscribe } from '../services';
@@ -92,6 +93,13 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 			}
 
 			onSubscribed?.(podcast);
+			notifications.show({
+				color: 'teal',
+				//title: 'Success',
+				message: <Text size='xs' c="dimmed" lineClamp={2}>
+					You subscribed to <Text span c="var(--mantine-color-text)">{podcast.name}</Text>
+				</Text>,
+			});
 			onClose();
 		} catch (err) {
 			console.error('Failed to subscribe:', err);
@@ -147,8 +155,6 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 								</Group>
 							)}
 						</Group>
-
-
 					</Stack>
 
 					{/* Description from RSS Feed */}
