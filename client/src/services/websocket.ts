@@ -1,5 +1,5 @@
 /**
- * WebSocket Service for real-time Bluetooth updates
+ * WebSocket Service for real-time updates
  * Manages WebSocket connection lifecycle and message handling
  */
 
@@ -7,6 +7,7 @@ import type { BluetoothDevice } from './bluetooth';
 
 // Message types from server
 export type ServerMessageType = 
+  // Bluetooth messages
   | 'device-found'
   | 'device-connected'
   | 'device-disconnected'
@@ -18,10 +19,79 @@ export type ServerMessageType =
   | 'scan-started'
   | 'scan-stopped'
   | 'output'
-  | 'pong';
+  | 'pong'
+  // Download messages
+  | 'download:processor-started'
+  | 'download:processor-stopped'
+  | 'download:processor-paused'
+  | 'download:processor-resumed'
+  | 'download:queue-empty'
+  | 'download:queue-status'
+  | 'download:started'
+  | 'download:progress'
+  | 'download:completed'
+  | 'download:failed'
+  | 'download:retry';
+
+// Download-related types
+export interface DownloadQueueItem {
+	id: number;
+	episode_id: number;
+	status: 'pending' | 'downloading' | 'completed' | 'failed' | 'cancelled';
+	progress: number;
+	error_message?: string;
+	retry_count: number;
+	priority: number;
+	created_at: number;
+	started_at?: number;
+	completed_at?: number;
+	episode_title?: string;
+	audio_url?: string;
+	audio_length?: number;
+	subscription_id?: number;
+	subscription_name?: string;
+}
+
+export interface DownloadQueueCounts {
+	total: number;
+	pending: number;
+	downloading: number;
+	completed: number;
+	failed: number;
+	cancelled: number;
+}
+
+export interface DownloadQueueStatus {
+	counts: DownloadQueueCounts;
+	activeItems: DownloadQueueItem[];
+	isActive: boolean;
+}
+
+export interface DownloadProgressData {
+	queueId: number;
+	episodeId: number;
+	title: string;
+	downloadedBytes: number;
+	totalBytes: number;
+	percent: number;
+}
+
+export interface DownloadEventData {
+	queueId: number;
+	episodeId: number;
+	title: string;
+	subscriptionName?: string;
+	totalBytes?: number;
+	filePath?: string;
+	fileSize?: number;
+	error?: string;
+	retryCount?: number;
+	maxRetries?: number;
+}
 
 export interface ServerMessage {
 	type: ServerMessageType;
+	// Bluetooth fields
 	device?: BluetoothDevice;
 	devices?: BluetoothDevice[];
 	mac?: string;
@@ -32,6 +102,32 @@ export interface ServerMessage {
 	connected_device?: BluetoothDevice | null;
 	is_scanning?: boolean;
 	data?: string;
+	// Download fields
+	isRunning?: boolean;
+	isPaused?: boolean;
+	currentDownload?: {
+		queueId: number;
+		episodeId: number;
+		title: string;
+		subscriptionName: string;
+	} | null;
+	queue?: DownloadQueueStatus;
+	counts?: DownloadQueueCounts;
+	activeItems?: DownloadQueueItem[];
+	isActive?: boolean;
+	// Download event fields
+	queueId?: number;
+	episodeId?: number;
+	title?: string;
+	subscriptionName?: string;
+	totalBytes?: number;
+	downloadedBytes?: number;
+	percent?: number;
+	filePath?: string;
+	fileSize?: number;
+	error?: string;
+	retryCount?: number;
+	maxRetries?: number;
 }
 
 export type MessageHandler = (message: ServerMessage) => void;

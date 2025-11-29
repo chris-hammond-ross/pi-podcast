@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const { bluetoothService } = require('../services');
+const { bluetoothService, downloadProcessor, downloadQueueService } = require('../services');
 
 /**
  * Initialize WebSocket server and set up event handlers
@@ -9,14 +9,20 @@ const { bluetoothService } = require('../services');
 function initializeWebSocket(server) {
 	const wss = new WebSocket.Server({ server });
 
-	// Set up broadcast callback for Bluetooth service
-	bluetoothService.setBroadcastCallback((message) => {
+	// Broadcast helper
+	const broadcast = (message) => {
 		wss.clients.forEach((client) => {
 			if (client.readyState === WebSocket.OPEN) {
 				client.send(JSON.stringify(message));
 			}
 		});
-	});
+	};
+
+	// Set up broadcast callback for Bluetooth service
+	bluetoothService.setBroadcastCallback(broadcast);
+
+	// Set up download processor event handlers
+	setupDownloadEvents(downloadProcessor, broadcast);
 
 	wss.on('connection', (ws) => {
 		console.log('[websocket] Client connected');
@@ -40,6 +46,9 @@ function initializeWebSocket(server) {
 				devices: bluetoothService.currentDevices
 			});
 		}
+
+		// Send current download status to new client
+		sendDownloadStatus(ws);
 
 		ws.on('message', (message) => {
 			try {
@@ -70,6 +79,12 @@ function initializeWebSocket(server) {
 							devices: bluetoothService.currentDevices
 						});
 					}
+
+					// Also send download status
+					sendDownloadStatus(ws);
+				} else if (data.type === 'request-download-status') {
+					// Client specifically requesting download status
+					sendDownloadStatus(ws);
 				}
 			} catch (err) {
 				console.error('[websocket] Parse error:', err.message);
@@ -86,6 +101,108 @@ function initializeWebSocket(server) {
 	});
 
 	return wss;
+}
+
+/**
+ * Set up download processor event handlers
+ * @param {DownloadProcessor} processor - The download processor instance
+ * @param {Function} broadcast - Broadcast function
+ */
+function setupDownloadEvents(processor, broadcast) {
+	processor.on('processor:started', () => {
+		broadcast({
+			type: 'download:processor-started'
+		});
+	});
+
+	processor.on('processor:stopped', () => {
+		broadcast({
+			type: 'download:processor-stopped'
+		});
+	});
+
+	processor.on('processor:paused', () => {
+		broadcast({
+			type: 'download:processor-paused'
+		});
+	});
+
+	processor.on('processor:resumed', () => {
+		broadcast({
+			type: 'download:processor-resumed'
+		});
+	});
+
+	processor.on('queue:empty', () => {
+		broadcast({
+			type: 'download:queue-empty'
+		});
+	});
+
+	processor.on('download:started', (data) => {
+		broadcast({
+			type: 'download:started',
+			...data
+		});
+		// Also send updated queue status
+		broadcastQueueStatus(broadcast);
+	});
+
+	processor.on('download:progress', (data) => {
+		broadcast({
+			type: 'download:progress',
+			...data
+		});
+	});
+
+	processor.on('download:completed', (data) => {
+		broadcast({
+			type: 'download:completed',
+			...data
+		});
+		// Also send updated queue status
+		broadcastQueueStatus(broadcast);
+	});
+
+	processor.on('download:failed', (data) => {
+		broadcast({
+			type: 'download:failed',
+			...data
+		});
+		// Also send updated queue status
+		broadcastQueueStatus(broadcast);
+	});
+
+	processor.on('download:retry', (data) => {
+		broadcast({
+			type: 'download:retry',
+			...data
+		});
+	});
+}
+
+/**
+ * Broadcast current queue status to all clients
+ * @param {Function} broadcast - Broadcast function
+ */
+function broadcastQueueStatus(broadcast) {
+	const status = downloadProcessor.getStatus();
+	broadcast({
+		type: 'download:queue-status',
+		...status
+	});
+}
+
+/**
+ * Send download status to a specific client
+ * @param {WebSocket} ws - The WebSocket client
+ */
+function sendDownloadStatus(ws) {
+	const status = downloadProcessor.getStatus();
+	sendToClient(ws, {
+		type: 'download:queue-status',
+		...status
+	});
 }
 
 /**

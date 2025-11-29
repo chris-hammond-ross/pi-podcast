@@ -11,6 +11,7 @@ const { parseStringPromise } = require('xml2js');
  * - genres (JSON string), primaryGenre, trackCount, releaseDate, country
  * - description (optional, from RSS feed)
  * - lastFetched, createdAt (subscription-specific)
+ * - auto_download, auto_download_limit (auto-download settings)
  */
 class SubscriptionService {
 	/**
@@ -47,6 +48,17 @@ class SubscriptionService {
 	getAllSubscriptions() {
 		const db = getDatabase();
 		const stmt = db.prepare('SELECT * FROM subscriptions ORDER BY createdAt DESC');
+		const rows = stmt.all();
+		return rows.map(row => this._transformRow(row));
+	}
+
+	/**
+	 * Get subscriptions with auto-download enabled
+	 * @returns {Array} List of subscriptions with auto_download = 1
+	 */
+	getAutoDownloadSubscriptions() {
+		const db = getDatabase();
+		const stmt = db.prepare('SELECT * FROM subscriptions WHERE auto_download = 1 ORDER BY createdAt DESC');
 		const rows = stmt.all();
 		return rows.map(row => this._transformRow(row));
 	}
@@ -154,7 +166,9 @@ class SubscriptionService {
 			releaseDate: podcast.releaseDate || null,
 			country: podcast.country || null,
 			lastFetched: now,
-			createdAt: now
+			createdAt: now,
+			auto_download: 0,
+			auto_download_limit: 5
 		};
 	}
 
@@ -171,6 +185,34 @@ class SubscriptionService {
 		console.log('[subscription] Unsubscribed from feed:', feedUrl);
 		
 		return result.changes > 0;
+	}
+
+	/**
+	 * Update auto-download settings for a subscription
+	 * @param {number} id - Subscription ID
+	 * @param {boolean} autoDownload - Enable/disable auto-download
+	 * @param {number} [autoDownloadLimit] - Max episodes to auto-download
+	 * @returns {Object} Updated subscription
+	 */
+	updateAutoDownload(id, autoDownload, autoDownloadLimit) {
+		const db = getDatabase();
+
+		let sql = 'UPDATE subscriptions SET auto_download = ?';
+		const params = [autoDownload ? 1 : 0];
+
+		if (autoDownloadLimit !== undefined) {
+			sql += ', auto_download_limit = ?';
+			params.push(autoDownloadLimit);
+		}
+
+		sql += ' WHERE id = ?';
+		params.push(id);
+
+		db.prepare(sql).run(...params);
+
+		console.log(`[subscription] Updated auto-download for subscription ${id}: ${autoDownload}`);
+
+		return this.getSubscriptionById(id);
 	}
 
 	/**

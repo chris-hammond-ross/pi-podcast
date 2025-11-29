@@ -8,6 +8,9 @@ let db = null;
  * @param {Database} database - The database instance
  */
 function createTables(database) {
+	// Run migrations for existing tables
+	runMigrations(database);
+
 	database.exec(`
 		-- Podcast subscriptions table (aligned with iTunes Podcast schema)
 		CREATE TABLE IF NOT EXISTS subscriptions (
@@ -61,14 +64,78 @@ function createTables(database) {
 			created_at INTEGER DEFAULT (strftime('%s', 'now'))
 		);
 
+		-- Episodes table (synced from RSS feeds)
+		CREATE TABLE IF NOT EXISTS episodes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			subscription_id INTEGER NOT NULL,
+			guid TEXT NOT NULL,
+			title TEXT,
+			description TEXT,
+			pub_date TEXT,
+			duration TEXT,
+			audio_url TEXT NOT NULL,
+			audio_type TEXT DEFAULT 'audio/mpeg',
+			audio_length INTEGER,
+			image_url TEXT,
+			file_path TEXT,
+			file_size INTEGER,
+			downloaded_at INTEGER,
+			created_at INTEGER DEFAULT (strftime('%s', 'now')),
+			FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
+			UNIQUE(subscription_id, guid)
+		);
+
+		-- Download queue table
+		CREATE TABLE IF NOT EXISTS download_queue (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			episode_id INTEGER NOT NULL,
+			status TEXT DEFAULT 'pending',
+			progress INTEGER DEFAULT 0,
+			error_message TEXT,
+			retry_count INTEGER DEFAULT 0,
+			priority INTEGER DEFAULT 0,
+			created_at INTEGER DEFAULT (strftime('%s', 'now')),
+			started_at INTEGER,
+			completed_at INTEGER,
+			FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
+		);
+
 		-- Create indexes for better query performance
 		CREATE INDEX IF NOT EXISTS idx_subscriptions_feedUrl ON subscriptions(feedUrl);
 		CREATE INDEX IF NOT EXISTS idx_playlist_episodes_playlist_id ON playlist_episodes(playlist_id);
 		CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_mac ON bluetooth_devices(mac_address);
 		CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_last_seen ON bluetooth_devices(last_seen);
+		CREATE INDEX IF NOT EXISTS idx_episodes_subscription_id ON episodes(subscription_id);
+		CREATE INDEX IF NOT EXISTS idx_episodes_guid ON episodes(guid);
+		CREATE INDEX IF NOT EXISTS idx_episodes_downloaded_at ON episodes(downloaded_at);
+		CREATE INDEX IF NOT EXISTS idx_download_queue_status ON download_queue(status);
+		CREATE INDEX IF NOT EXISTS idx_download_queue_episode_id ON download_queue(episode_id);
 	`);
 
 	console.log('[database] Tables verified/created');
+}
+
+/**
+ * Run migrations to add columns to existing tables
+ * @param {Database} database - The database instance
+ */
+function runMigrations(database) {
+	// Helper to check if column exists
+	const columnExists = (table, column) => {
+		const result = database.prepare(`PRAGMA table_info(${table})`).all();
+		return result.some(col => col.name === column);
+	};
+
+	// Add auto_download columns to subscriptions if they don't exist
+	if (!columnExists('subscriptions', 'auto_download')) {
+		database.exec('ALTER TABLE subscriptions ADD COLUMN auto_download INTEGER DEFAULT 0');
+		console.log('[database] Added auto_download column to subscriptions');
+	}
+
+	if (!columnExists('subscriptions', 'auto_download_limit')) {
+		database.exec('ALTER TABLE subscriptions ADD COLUMN auto_download_limit INTEGER DEFAULT 5');
+		console.log('[database] Added auto_download_limit column to subscriptions');
+	}
 }
 
 /**

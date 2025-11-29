@@ -7,7 +7,7 @@ const corsMiddleware = require('./middleware/cors');
 const errorHandler = require('./middleware/errorHandler');
 const routes = require('./routes');
 const { initializeWebSocket } = require('./websocket');
-const { bluetoothService } = require('./services');
+const { bluetoothService, downloadProcessor } = require('./services');
 const { getHealth } = require('./utils/health');
 
 const app = express();
@@ -53,11 +53,14 @@ server.listen(PORT, () => {
 	console.log(`[server] Listening on http://localhost:${PORT}`);
 	console.log('[server] Starting Bluetooth initialization...');
 	bluetoothService.initialize();
+	console.log('[server] Starting download processor...');
+	downloadProcessor.start();
 });
 
 // Cleanup on exit
 process.on('SIGINT', () => {
 	console.log('[server] Shutting down...');
+	downloadProcessor.stop();
 	bluetoothService.cleanup();
 	closeDatabase();
 	server.close(() => {
@@ -67,6 +70,7 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
 	console.log('[server] Shutting down...');
+	downloadProcessor.stop();
 	bluetoothService.cleanup();
 	closeDatabase();
 	server.close(() => {

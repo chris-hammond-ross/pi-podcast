@@ -4,8 +4,9 @@
 
 export * from './bluetooth';
 export * from './podcasts';
-export * from './api';
 export * from './subscriptions';
+export * from './downloads';
+export * from './episodes';
 export {
 	WebSocketService,
 	getWebSocketService,
@@ -13,5 +14,10 @@ export {
 	type ServerMessageType,
 	type MessageHandler,
 	type WebSocketServiceConfig,
-	type BluetoothDevice as WebSocketBluetoothDevice
+	type BluetoothDevice as WebSocketBluetoothDevice,
+	type DownloadQueueItem,
+	type DownloadQueueCounts,
+	type DownloadQueueStatus,
+	type DownloadProgressData,
+	type DownloadEventData
 } from './websocket';
