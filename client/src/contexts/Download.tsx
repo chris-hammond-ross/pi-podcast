@@ -99,13 +99,34 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 					if (message.activeItems) {
 						setActiveItems(message.activeItems);
 					}
+					// Only update currentDownload from queue-status if we don't have one
+					// or if the queueId changed. Don't overwrite progress data!
 					if (message.currentDownload) {
-						setCurrentDownload(prev => ({
-							...message.currentDownload!,
-							downloadedBytes: prev?.downloadedBytes || 0,
-							totalBytes: prev?.totalBytes || 0,
-							percent: prev?.percent || 0
-						}));
+						setCurrentDownload(prev => {
+							// If same download, keep progress data
+							if (prev && prev.queueId === message.currentDownload!.queueId) {
+								return prev;
+							}
+							// New download, initialize with zero progress
+							return {
+								queueId: message.currentDownload!.queueId,
+								episodeId: message.currentDownload!.episodeId,
+								title: message.currentDownload!.title,
+								subscriptionName: message.currentDownload!.subscriptionName || '',
+								downloadedBytes: 0,
+								totalBytes: 0,
+								percent: 0
+							};
+						});
+					} else {
+						// No current download in status - but only clear if we're not downloading
+						setCurrentDownload(prev => {
+							// Don't clear if we have an active download with progress
+							if (prev && prev.percent > 0 && prev.percent < 100) {
+								return prev;
+							}
+							return null;
+						});
 					}
 					setIsLoading(false);
 					break;
@@ -143,7 +164,16 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 				case 'download:progress':
 					setCurrentDownload(prev => {
 						if (!prev || prev.queueId !== message.queueId) {
-							return prev;
+							// Create new if we somehow missed the started event
+							return {
+								queueId: message.queueId!,
+								episodeId: message.episodeId!,
+								title: message.title!,
+								subscriptionName: '',
+								downloadedBytes: message.downloadedBytes || 0,
+								totalBytes: message.totalBytes || 0,
+								percent: message.percent || 0
+							};
 						}
 						return {
 							...prev,
@@ -155,6 +185,20 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 					break;
 
 				case 'download:completed':
+					setCurrentDownload(prev => {
+						if (prev?.queueId === message.queueId) {
+							return null;
+						}
+						return prev;
+					});
+					// Update counts to reflect completion
+					setCounts(prev => ({
+						...prev,
+						downloading: Math.max(0, prev.downloading - 1),
+						completed: prev.completed + 1
+					}));
+					break;
+
 				case 'download:failed':
 					setCurrentDownload(prev => {
 						if (prev?.queueId === message.queueId) {
@@ -162,10 +206,17 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 						}
 						return prev;
 					});
+					// Update counts to reflect failure
+					setCounts(prev => ({
+						...prev,
+						downloading: Math.max(0, prev.downloading - 1),
+						failed: prev.failed + 1
+					}));
 					break;
 
 				case 'download:queue-empty':
-					// Don't clear currentDownload here - let completed/failed handle it
+					// Queue is empty, clear current download
+					setCurrentDownload(null);
 					break;
 			}
 		};
