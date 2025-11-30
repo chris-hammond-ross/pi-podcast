@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
 	Modal,
 	Image,
@@ -17,7 +17,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMediaQuery } from '@mantine/hooks';
-import { AlertCircle, Download, CheckCircle, ArrowLeft, Ellipsis, X } from 'lucide-react';
+import { AlertCircle, Download, CheckCircle, ArrowLeft, Ellipsis, X, Clock, LoaderCircle } from 'lucide-react';
 import type { Subscription } from '../services';
 import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord } from '../services';
 import { useDownloadContext } from '../contexts';
@@ -67,7 +67,19 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 	// const [autoDownloadLimit, setAutoDownloadLimit] = useState<number>(5);
 
 	const isMobile = useMediaQuery('(max-width: 768px)');
-	const { addToQueue, addBatchToQueue } = useDownloadContext();
+	const { addToQueue, addBatchToQueue, currentDownload, activeItems } = useDownloadContext();
+
+	// Create a Set of episode IDs that are currently queued (pending)
+	const queuedEpisodeIds = useMemo(() => {
+		return new Set(
+			activeItems
+				.filter(item => item.status === 'pending')
+				.map(item => item.episode_id)
+		);
+	}, [activeItems]);
+
+	// Get the episode ID currently being downloaded
+	const downloadingEpisodeId = currentDownload?.episodeId ?? null;
 
 	const loadEpisodes = useCallback(async (subscriptionId: number) => {
 		// Start loading
@@ -202,6 +214,60 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 			setIsUpdatingAutoDownload(false);
 		}
 	};*/
+
+	// Render the appropriate status icon/button for an episode
+	const renderEpisodeStatus = (episode: EpisodeRecord) => {
+		// Already downloaded
+		if (episode.downloaded_at) {
+			return (
+				<ThemeIcon
+					variant="light"
+					color="green"
+					title="Downloaded"
+				>
+					<CheckCircle size={16} />
+				</ThemeIcon>
+			);
+		}
+
+		// Currently downloading
+		if (downloadingEpisodeId === episode.id) {
+			return (
+				<ThemeIcon
+					variant="light"
+					color="orange"
+					title="Downloading..."
+				>
+					<LoaderCircle size={16} className="spin" />
+				</ThemeIcon>
+			);
+		}
+
+		// Queued for download
+		if (queuedEpisodeIds.has(episode.id)) {
+			return (
+				<ThemeIcon
+					variant="light"
+					color="grape"
+					title="Queued for download"
+				>
+					<Clock size={16} />
+				</ThemeIcon>
+			);
+		}
+
+		// Not downloaded, not queued - show download button
+		return (
+			<ActionIcon
+				variant="light"
+				color="blue"
+				onClick={() => handleDownloadEpisode(episode)}
+				title="Download episode"
+			>
+				<Download size={16} />
+			</ActionIcon>
+		);
+	};
 
 	if (!subscription) return null;
 
@@ -377,22 +443,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 													)}
 												</Group>
 											</Stack>
-											{episode.downloaded_at ? (
-												<ThemeIcon
-													variant="light"
-													color="green">
-													<CheckCircle size={16} />
-												</ThemeIcon>
-											) : (
-												<ActionIcon
-													variant="light"
-													color="blue"
-													onClick={() => handleDownloadEpisode(episode)}
-													title="Download episode"
-												>
-													<Download size={16} />
-												</ActionIcon>
-											)}
+											{renderEpisodeStatus(episode)}
 										</Group>
 									</Card>
 								))}
