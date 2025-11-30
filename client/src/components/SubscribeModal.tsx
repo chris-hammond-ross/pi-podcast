@@ -127,14 +127,14 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 				content: {
 					display: 'flex',
 					flexDirection: 'column',
-					maxHeight: 'calc(100svh - 2rem)',  // or whatever max you want
+					maxHeight: 'calc(100svh - 2rem)',
 				},
 				body: {
 					display: 'flex',
 					flexDirection: 'column',
 					flex: 1,
 					overflow: 'hidden',
-					padding: 0,  // we'll handle padding in children
+					padding: 0,
 				}
 			}}
 		>
@@ -171,7 +171,7 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 					style={{
 						flex: 1,
 						overflow: 'hidden',
-						minHeight: 0  // important for flex children to shrink
+						minHeight: 0
 					}}
 				>
 					{/* Podcast Info */}
