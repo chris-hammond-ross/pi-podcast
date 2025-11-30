@@ -9,7 +9,7 @@ import { usePodcastSearch } from '../hooks/usePodcastSearch';
 import type { Podcast } from '../services';
 
 interface PodcastSearchProps {
-	onResultsChange?: (count: number, results: Podcast[]) => void;
+	onResultsChange?: (count: number, results: Podcast[], searchTerm: string) => void;
 	placeholder?: string;
 	debounceMs?: number;
 }
@@ -32,7 +32,7 @@ function PodcastSearch({
 	// Notify parent of results changes
 	useEffect(() => {
 		if (onResultsChange) {
-			onResultsChange(results.length, results);
+			onResultsChange(results.length, results, searchTerm);
 		}
 	}, [results.length, onResultsChange]);
 
