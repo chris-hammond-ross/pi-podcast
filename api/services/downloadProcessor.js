@@ -25,7 +25,8 @@ class DownloadProcessor extends EventEmitter {
 			downloadTimeout: options.downloadTimeout || constants.DOWNLOAD_TIMEOUT,
 			progressInterval: options.progressInterval || constants.DOWNLOAD_PROGRESS_INTERVAL,
 			minDiskSpace: options.minDiskSpace || constants.DOWNLOAD_MIN_DISK_SPACE,
-			queuePollInterval: options.queuePollInterval || 10000, // 10 seconds between empty queue checks
+			queuePollInterval: options.queuePollInterval || 10000,
+			maxRedirects: options.maxRedirects || 10,
 			...options
 		};
 
@@ -34,9 +35,9 @@ class DownloadProcessor extends EventEmitter {
 		this.isRunning = false;
 		this.isPaused = false;
 		this.currentDownload = null;
-		this.abortController = null;
-		this.progressThrottleTime = 0;
+		this.currentRequest = null;
 		this.pollTimeoutId = null;
+		this.progressThrottleTime = 0;
 
 		// Ensure download directory exists
 		this._ensureDownloadDir();
@@ -71,7 +72,6 @@ class DownloadProcessor extends EventEmitter {
 	 * @returns {string} Safe filename
 	 */
 	_getFileName(queueItem) {
-		// Use episode ID for uniqueness, sanitize title for readability
 		const safeTitle = (queueItem.episode_title || 'episode')
 			.replace(/[^a-z0-9]/gi, '_')
 			.replace(/_+/g, '_')
@@ -102,7 +102,6 @@ class DownloadProcessor extends EventEmitter {
 		this.isRunning = true;
 		this.isPaused = false;
 
-		// Recover any interrupted downloads from previous run
 		downloadQueueService.recoverInterrupted();
 
 		this.emit('processor:started');
@@ -120,19 +119,18 @@ class DownloadProcessor extends EventEmitter {
 		console.log('[download] Stopping download processor');
 		this.isRunning = false;
 		
-		// Clear any pending poll
 		this._clearPollTimeout();
 
-		// Abort current download if any
-		if (this.abortController) {
-			this.abortController.abort();
+		if (this.currentRequest) {
+			this.currentRequest.destroy();
+			this.currentRequest = null;
 		}
 
 		this.emit('processor:stopped');
 	}
 
 	/**
-	 * Pause processing (finish current, don't start new)
+	 * Pause processing
 	 */
 	pause() {
 		if (this.isPaused) return;
@@ -162,10 +160,8 @@ class DownloadProcessor extends EventEmitter {
 	 * Process next item in queue
 	 */
 	async _processNext() {
-		// Clear any existing poll timeout
 		this._clearPollTimeout();
 
-		// Check if we should continue
 		if (!this.isRunning || this.isPaused) {
 			return;
 		}
@@ -173,11 +169,9 @@ class DownloadProcessor extends EventEmitter {
 		const queueItem = downloadQueueService.getNextPending();
 		
 		if (!queueItem) {
-			// Queue is empty - emit once and schedule next poll
 			console.log('[download] Queue empty, waiting for items');
 			this.emit('queue:empty');
 			
-			// Schedule next check (only if still running)
 			if (this.isRunning && !this.isPaused) {
 				this.pollTimeoutId = setTimeout(() => {
 					this._processNext();
@@ -188,7 +182,6 @@ class DownloadProcessor extends EventEmitter {
 
 		await this._downloadItem(queueItem);
 
-		// Schedule next download (only if still running)
 		if (this.isRunning && !this.isPaused) {
 			this.pollTimeoutId = setTimeout(() => {
 				this._processNext();
@@ -202,11 +195,9 @@ class DownloadProcessor extends EventEmitter {
 	 */
 	async _downloadItem(queueItem) {
 		this.currentDownload = queueItem;
-		this.abortController = new AbortController();
 
 		console.log(`[download] Starting download: ${queueItem.episode_title}`);
 		
-		// Update status to downloading
 		downloadQueueService.updateStatus(queueItem.id, 'downloading');
 		
 		this.emit('download:started', {
@@ -223,21 +214,23 @@ class DownloadProcessor extends EventEmitter {
 			const tempPath = path.join(subscriptionDir, `${fileName}.tmp`);
 			const finalPath = path.join(subscriptionDir, fileName);
 
-			// Download the file
 			const fileSize = await this._downloadFile(
 				queueItem.audio_url,
 				tempPath,
 				queueItem
 			);
 
-			// Rename temp to final
+			// Verify file exists before renaming
+			if (!fs.existsSync(tempPath)) {
+				throw new Error('Downloaded file not found');
+			}
+
 			fs.renameSync(tempPath, finalPath);
 
-			// Mark as completed
 			downloadQueueService.updateStatus(queueItem.id, 'completed');
 			episodeService.markAsDownloaded(queueItem.episode_id, finalPath, fileSize);
 
-			console.log(`[download] Completed: ${queueItem.episode_title}`);
+			console.log(`[download] Completed: ${queueItem.episode_title} (${fileSize} bytes)`);
 
 			this.emit('download:completed', {
 				queueId: queueItem.id,
@@ -251,8 +244,70 @@ class DownloadProcessor extends EventEmitter {
 			await this._handleDownloadError(queueItem, err);
 		} finally {
 			this.currentDownload = null;
-			this.abortController = null;
+			this.currentRequest = null;
 		}
+	}
+
+	/**
+	 * Follow redirects and get final URL
+	 * @param {string} url - Starting URL
+	 * @param {number} redirectCount - Current redirect count
+	 * @returns {Promise<{response: http.IncomingMessage, request: http.ClientRequest}>}
+	 */
+	_followRedirects(url, redirectCount = 0) {
+		return new Promise((resolve, reject) => {
+			if (redirectCount > this.options.maxRedirects) {
+				reject(new Error('Too many redirects'));
+				return;
+			}
+
+			const protocol = url.startsWith('https') ? https : http;
+			
+			const request = protocol.get(url, {
+				headers: {
+					'User-Agent': 'PiPodcast/1.0'
+				}
+			}, (response) => {
+				// Handle redirects
+				if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+					let redirectUrl = response.headers.location;
+					
+					// Handle relative redirects
+					if (redirectUrl.startsWith('/')) {
+						const urlObj = new URL(url);
+						redirectUrl = `${urlObj.protocol}//${urlObj.host}${redirectUrl}`;
+					}
+					
+					console.log(`[download] Following redirect (${redirectCount + 1}): ${redirectUrl}`);
+					
+					// Destroy this request before following redirect
+					request.destroy();
+					
+					this._followRedirects(redirectUrl, redirectCount + 1)
+						.then(resolve)
+						.catch(reject);
+					return;
+				}
+
+				if (response.statusCode !== 200) {
+					request.destroy();
+					reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+					return;
+				}
+
+				resolve({ response, request });
+			});
+
+			request.on('error', (err) => {
+				reject(err);
+			});
+
+			// Connection timeout only - not download timeout
+			request.setTimeout(this.options.connectionTimeout, () => {
+				request.destroy();
+				reject(new Error('Connection timeout'));
+			});
+		});
 	}
 
 	/**
@@ -262,102 +317,88 @@ class DownloadProcessor extends EventEmitter {
 	 * @param {Object} queueItem - Queue item for progress updates
 	 * @returns {Promise<number>} File size in bytes
 	 */
-	_downloadFile(url, destPath, queueItem) {
+	async _downloadFile(url, destPath, queueItem) {
+		// First, follow all redirects to get the final response
+		const { response, request } = await this._followRedirects(url);
+		
+		// Store request reference for cancellation
+		this.currentRequest = request;
+
 		return new Promise((resolve, reject) => {
-			const protocol = url.startsWith('https') ? https : http;
-			
-			const request = protocol.get(url, {
-				timeout: this.options.connectionTimeout,
-				headers: {
-					'User-Agent': 'PiPodcast/1.0'
-				}
-			}, (response) => {
-				// Handle redirects
-				if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-					console.log(`[download] Following redirect to: ${response.headers.location}`);
-					this._downloadFile(response.headers.location, destPath, queueItem)
-						.then(resolve)
-						.catch(reject);
-					return;
-				}
+			const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
+			let downloadedBytes = 0;
+			let finished = false;
 
-				if (response.statusCode !== 200) {
-					reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
-					return;
-				}
+			const fileStream = fs.createWriteStream(destPath);
 
-				const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
-				let downloadedBytes = 0;
-
-				const fileStream = fs.createWriteStream(destPath);
-
-				// Set download timeout
-				const downloadTimer = setTimeout(() => {
+			// Download timeout - starts after redirects are resolved
+			const downloadTimer = setTimeout(() => {
+				if (!finished) {
+					finished = true;
 					request.destroy();
 					fileStream.destroy();
 					reject(new Error('Download timeout'));
-				}, this.options.downloadTimeout);
-
-				// Handle abort
-				if (this.abortController) {
-					this.abortController.signal.addEventListener('abort', () => {
-						clearTimeout(downloadTimer);
-						request.destroy();
-						fileStream.destroy();
-						// Clean up temp file
-						if (fs.existsSync(destPath)) {
-							fs.unlinkSync(destPath);
-						}
-						reject(new Error('Download aborted'));
-					});
 				}
+			}, this.options.downloadTimeout);
 
-				response.on('data', (chunk) => {
-					downloadedBytes += chunk.length;
-					this._emitProgress(queueItem, downloadedBytes, totalBytes);
-				});
+			const cleanup = (err) => {
+				if (finished) return;
+				finished = true;
+				clearTimeout(downloadTimer);
+				request.destroy();
+				fileStream.destroy();
+				if (fs.existsSync(destPath)) {
+					try { fs.unlinkSync(destPath); } catch {}
+				}
+				reject(err);
+			};
 
-				response.pipe(fileStream);
+			response.on('data', (chunk) => {
+				downloadedBytes += chunk.length;
+				this._emitProgress(queueItem, downloadedBytes, totalBytes);
+			});
 
-				fileStream.on('finish', () => {
-					clearTimeout(downloadTimer);
-					fileStream.close();
+			response.on('error', (err) => {
+				cleanup(err);
+			});
+
+			response.pipe(fileStream);
+
+			fileStream.on('finish', () => {
+				if (finished) return;
+				finished = true;
+				clearTimeout(downloadTimer);
+				fileStream.close(() => {
+					// Emit final 100% progress
+					this._emitProgress(queueItem, downloadedBytes, totalBytes || downloadedBytes, true);
 					resolve(downloadedBytes);
 				});
-
-				fileStream.on('error', (err) => {
-					clearTimeout(downloadTimer);
-					fileStream.destroy();
-					// Clean up temp file
-					if (fs.existsSync(destPath)) {
-						fs.unlinkSync(destPath);
-					}
-					reject(err);
-				});
 			});
 
-			request.on('error', (err) => {
-				reject(err);
+			fileStream.on('error', (err) => {
+				cleanup(err);
 			});
 
-			request.on('timeout', () => {
-				request.destroy();
-				reject(new Error('Connection timeout'));
+			// Handle manual cancellation
+			request.on('close', () => {
+				if (!finished && !fileStream.writableFinished) {
+					cleanup(new Error('Download aborted'));
+				}
 			});
 		});
 	}
 
 	/**
-	 * Emit progress update (throttled)
+	 * Emit progress update (throttled unless forced)
 	 * @param {Object} queueItem - Queue item
 	 * @param {number} downloadedBytes - Bytes downloaded
 	 * @param {number} totalBytes - Total bytes
+	 * @param {boolean} force - Force emit regardless of throttle
 	 */
-	_emitProgress(queueItem, downloadedBytes, totalBytes) {
+	_emitProgress(queueItem, downloadedBytes, totalBytes, force = false) {
 		const now = Date.now();
 		
-		// Throttle progress updates
-		if (now - this.progressThrottleTime < this.options.progressInterval) {
+		if (!force && now - this.progressThrottleTime < this.options.progressInterval) {
 			return;
 		}
 		this.progressThrottleTime = now;
@@ -383,7 +424,6 @@ class DownloadProcessor extends EventEmitter {
 		const errorMessage = err.message || 'Unknown error';
 		console.error(`[download] Error downloading ${queueItem.episode_title}: ${errorMessage}`);
 
-		// Check if we should retry
 		if (err.message !== 'Download aborted' && queueItem.retry_count < this.options.maxRetries) {
 			const retryCount = downloadQueueService.incrementRetry(queueItem.id);
 			console.log(`[download] Retrying (${retryCount}/${this.options.maxRetries}): ${queueItem.episode_title}`);
@@ -399,10 +439,8 @@ class DownloadProcessor extends EventEmitter {
 				error: errorMessage
 			});
 
-			// Wait before retry
 			await new Promise(resolve => setTimeout(resolve, this.options.retryDelay));
 		} else {
-			// Mark as failed
 			downloadQueueService.updateStatus(queueItem.id, 'failed', errorMessage);
 
 			this.emit('download:failed', {
@@ -418,10 +456,10 @@ class DownloadProcessor extends EventEmitter {
 	 * Cancel current download
 	 */
 	cancelCurrent() {
-		if (this.currentDownload && this.abortController) {
+		if (this.currentDownload && this.currentRequest) {
 			console.log(`[download] Cancelling current download: ${this.currentDownload.episode_title}`);
 			downloadQueueService.updateStatus(this.currentDownload.id, 'cancelled');
-			this.abortController.abort();
+			this.currentRequest.destroy();
 		}
 	}
 
