@@ -12,11 +12,12 @@ import {
 	Card,
 	ActionIcon,
 	ScrollArea,
-	Loader
+	Loader,
+	ThemeIcon
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMediaQuery } from '@mantine/hooks';
-import { AlertCircle, Download, CheckCircle, ArrowLeft, Settings, X } from 'lucide-react';
+import { AlertCircle, Download, CheckCircle, ArrowLeft, Ellipsis, X } from 'lucide-react';
 import type { Subscription } from '../services';
 import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord } from '../services';
 import { useDownloadContext } from '../contexts';
@@ -318,7 +319,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 							title="Settings Menu"
 							style={{ flex: '0 0 auto' }}
 						>
-							<Settings size={16} />
+							<Ellipsis size={16} />
 						</ActionIcon>
 					</Group>
 
@@ -377,14 +378,11 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 												</Group>
 											</Stack>
 											{episode.downloaded_at ? (
-												<Badge
-													color="green"
+												<ThemeIcon
 													variant="light"
-													size="sm"
-													leftSection={<CheckCircle size={12} />}
-												>
-													Downloaded
-												</Badge>
+													color="green">
+													<CheckCircle size={16} />
+												</ThemeIcon>
 											) : (
 												<ActionIcon
 													variant="light"
