@@ -33,3 +33,17 @@
 [data-mantine-color-scheme='dark'] .podcast-description {
 	background-color: var(--mantine-color-dark-6);
 }
+
+/* Spin animation for download in progress icon */
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.spin {
+	animation: spin 1s linear infinite;
+}
