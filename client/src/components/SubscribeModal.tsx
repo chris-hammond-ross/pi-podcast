@@ -8,10 +8,12 @@ import {
 	Button,
 	Group,
 	Skeleton,
-	Alert
+	Alert,
+	ScrollArea,
+	ActionIcon
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 import type { Podcast, FeedData } from '../services';
 import { fetchFeed, checkSubscription, subscribe } from '../services';
 
@@ -121,8 +123,38 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 			overlayProps={{
 				blur: 5,
 			}}
+			styles={{
+				content: {
+					display: 'flex',
+					flexDirection: 'column',
+					maxHeight: 'calc(100svh - 2rem)',  // or whatever max you want
+				},
+				body: {
+					display: 'flex',
+					flexDirection: 'column',
+					flex: 1,
+					overflow: 'hidden',
+					padding: 0,  // we'll handle padding in children
+				}
+			}}
 		>
-			<Stack gap="0">
+			<Stack gap="0" style={{ flex: 1, overflow: 'hidden' }}>
+				<ActionIcon
+					radius="xl"
+					size="lg"
+					variant="white"
+					c='var(--mantine-color-default-border)'
+					onClick={onClose}
+					title="Close"
+					style={{
+						position: 'absolute',
+						right: '1rem',
+						top: '1rem',
+						borderColor: 'var(--mantine-color-default-border)'
+					}}
+				>
+					<X size={18} />
+				</ActionIcon>
 				{/* Podcast Image */}
 				<Image
 					src={podcast.artworkUrl600}
@@ -134,7 +166,14 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 					fit="contain"
 				/>
 
-				<Stack p="md">
+				<Stack
+					p="md"
+					style={{
+						flex: 1,
+						overflow: 'hidden',
+						minHeight: 0  // important for flex children to shrink
+					}}
+				>
 					{/* Podcast Info */}
 					<Stack gap="xs">
 						<Text fw={600} size="lg">
@@ -158,24 +197,49 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 
 					{/* Description from RSS Feed */}
 					{isLoading ? (
-						<Stack gap="xs">
-							<Skeleton height={12} radius="xl" />
-							<Skeleton height={12} radius="xl" />
-							<Skeleton height={12} radius="xl" width="70%" />
-						</Stack>
+						<ScrollArea
+							style={{ flex: 1 }}
+							scrollbars="y"
+							scrollbarSize={4}
+						>
+							<Stack gap="xs">
+								{[...Array(2).keys()].map(i => (
+									<Stack gap="xs" key={i}>
+										<Skeleton height={12} radius="xl" />
+										<Skeleton height={12} radius="xl" />
+										<Skeleton height={12} radius="xl" width="70%" />
+									</Stack>
+								))}
+							</Stack>
+						</ScrollArea>
 					) : error ? (
 						<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
 							{error}
 						</Alert>
 					) : feedData?.description ? (
-						<Text size="sm" lineClamp={5} style={{ whiteSpace: 'pre-wrap' }}>
-							{feedData.description.replace(/<[^>]*>/g, '')}
-						</Text>
+						<ScrollArea
+							style={{ flex: 1 }}
+							scrollbars="y"
+							scrollbarSize={4}
+						>
+							<Text
+								className="podcast-description"
+								p="sm"
+								size="sm"
+								bdrs="var(--paper-radius)"
+								style={{
+									whiteSpace: 'pre-wrap'
+								}}
+							>
+								{feedData.description.replace(/<[^>]*>/g, '')}
+							</Text>
+						</ScrollArea>
 					) : null}
 
 					{/* Subscribe Button */}
 					<Button
 						fullWidth
+						variant='light'
 						size="md"
 						disabled={isSubscribed || isLoading}
 						loading={isSubscribing}

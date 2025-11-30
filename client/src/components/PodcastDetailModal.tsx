@@ -11,13 +11,14 @@ import {
 	Alert,
 	Card,
 	ActionIcon,
-	ScrollArea
+	ScrollArea,
+	Loader
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-//import { useMediaQuery } from '@mantine/hooks';
-import { AlertCircle, Download, CheckCircle, ArrowLeft, Settings } from 'lucide-react';
+import { useMediaQuery } from '@mantine/hooks';
+import { AlertCircle, Download, CheckCircle, ArrowLeft, Settings, X } from 'lucide-react';
 import type { Subscription } from '../services';
-import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord, type EpisodeCounts } from '../services';
+import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord } from '../services';
 import { useDownloadContext } from '../contexts';
 
 interface PodcastDetailModalProps {
@@ -57,19 +58,18 @@ function formatDuration(duration: string | null): string {
 
 function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModalProps) {
 	const [episodes, setEpisodes] = useState<EpisodeRecord[]>([]);
-	const [counts, setCounts] = useState<EpisodeCounts | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
-	const [isSyncing, setIsSyncing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	// Auto-download state
-	const [autoDownload, setAutoDownload] = useState(false);
-	const [autoDownloadLimit, setAutoDownloadLimit] = useState<number>(5);
+	// const [autoDownload, setAutoDownload] = useState(false);
+	// const [autoDownloadLimit, setAutoDownloadLimit] = useState<number>(5);
 
-	//const isMobile = useMediaQuery('(max-width: 768px)');
+	const isMobile = useMediaQuery('(max-width: 768px)');
 	const { addToQueue, addBatchToQueue } = useDownloadContext();
 
 	const loadEpisodes = useCallback(async (subscriptionId: number) => {
+		// Start loading
 		setIsLoading(true);
 		setError(null);
 
@@ -79,11 +79,8 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 				getEpisodeCounts(subscriptionId)
 			]);
 			setEpisodes(episodesRes.episodes);
-			setCounts(countsRes.counts);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to load episodes');
-		} finally {
-			setIsLoading(false);
 		}
 	}, []);
 
@@ -92,8 +89,8 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 		if (opened && subscription?.id) {
 			handleSync();
 			loadEpisodes(subscription.id);
-			setAutoDownload(!!subscription.auto_download);
-			setAutoDownloadLimit(subscription.auto_download_limit || 5000);
+			// setAutoDownload(!!subscription.auto_download);
+			// setAutoDownloadLimit(subscription.auto_download_limit || 5000);
 		}
 	}, [opened, subscription?.id, subscription?.auto_download, subscription?.auto_download_limit, loadEpisodes]);
 
@@ -101,9 +98,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 	useEffect(() => {
 		if (!opened) {
 			setEpisodes([]);
-			setCounts(null);
 			setIsLoading(false);
-			setIsSyncing(false);
 			setError(null);
 		}
 	}, [opened]);
@@ -115,7 +110,6 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 	const handleSync = async () => {
 		if (!subscription?.id) return;
 
-		setIsSyncing(true);
 		try {
 			const result = await syncEpisodes(subscription.id);
 			if (result.added > 0) {
@@ -133,7 +127,8 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 				message: err instanceof Error ? err.message : 'Failed to sync'
 			});
 		} finally {
-			setIsSyncing(false);
+			// Finish loading
+			setIsLoading(false);
 		}
 	};
 
@@ -164,6 +159,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 		});
 	};
 
+	// TODO: keep commented out functions until I figure out what to do
 	/*const handleAutoDownloadChange = async (enabled: boolean) => {
 		if (!subscription?.id) return;
 
@@ -223,32 +219,50 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 				content: {
 					display: 'flex',
 					flexDirection: 'column',
-					maxHeight: 'calc(100svh - 2rem)',  // or whatever max you want
+					maxHeight: 'calc(100svh - 2rem)',
 				},
 				body: {
 					display: 'flex',
 					flexDirection: 'column',
 					flex: 1,
 					overflow: 'hidden',
-					padding: 0,  // we'll handle padding in children
+					padding: 0,
 				}
 			}}
 		>
 			<Stack gap="0" style={{ flex: 1, overflow: 'hidden' }}>
 				{/* Artwork */}
-				{!isLoading && (
-					<Badge
-						variant="filled"
-						color="teal"
-						style={{
-							position: 'absolute',
-							right: '1rem',
-							top: '1rem'
-						}}
-					>
-						{episodes.length} episodes
-					</Badge>
-				)}
+				<Badge
+					variant="filled"
+					color="teal"
+					style={{
+						position: 'absolute',
+						left: isMobile ? '1rem' : '1.6rem',
+						top: isMobile ? '1rem' : '1.6rem'
+					}}
+				>
+					{isLoading ? (
+						<Loader size="xs" color="white" type="dots" />
+					) : (
+						<>{episodes.length} episodes</>
+					)}
+				</Badge>
+				<ActionIcon
+					radius="xl"
+					size="lg"
+					variant="white"
+					c='var(--mantine-color-default-border)'
+					onClick={onClose}
+					title="Close"
+					style={{
+						position: 'absolute',
+						right: '1rem',
+						top: '1rem',
+						borderColor: 'var(--mantine-color-default-border)'
+					}}
+				>
+					<X size={18} />
+				</ActionIcon>
 				<Image
 					src={subscription.artworkUrl600 || subscription.artworkUrl}
 					alt={subscription.name}
@@ -266,7 +280,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 					style={{
 						flex: 1,
 						overflow: 'hidden',
-						minHeight: 0  // important for flex children to shrink
+						minHeight: 0
 					}}
 				>
 					<Group wrap="nowrap" gap="sm">
@@ -291,7 +305,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 							onClick={onClose}
 							style={{
 								flex: '1 1 0',
-								minWidth: 0         // allow shrinking below content size
+								minWidth: 0
 							}}
 						>
 							Back
@@ -302,7 +316,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 							color="blue"
 							//onClick={() => handleDownloadEpisode(episode)}
 							title="Settings Menu"
-							style={{ flex: '0 0 auto' }}  // don't grow or shrink
+							style={{ flex: '0 0 auto' }}
 						>
 							<Settings size={16} />
 						</ActionIcon>
@@ -317,11 +331,17 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 					)}
 
 					{isLoading ? (
-						<Stack gap="xs">
-							{[1, 2, 3].map(i => (
-								<Skeleton key={i} height={60} radius="sm" />
-							))}
-						</Stack>
+						<ScrollArea
+							style={{ flex: 1 }}
+							scrollbars="y"
+							scrollbarSize={4}
+						>
+							<Stack gap="xs">
+								{[...Array(20).keys()].map(i => (
+									<Skeleton key={i} height={60} radius="sm" />
+								))}
+							</Stack>
+						</ScrollArea>
 					) : episodes.length === 0 ? (
 						<Text c="dimmed" ta="center" py="md">
 							No episodes found. Try syncing to fetch episodes.
@@ -334,7 +354,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 						>
 							<Stack gap="xs">
 								{sortedEpisodes.map((episode) => (
-									<Card key={episode.id} withBorder p="sm">
+									<Card key={episode.id} p="sm">
 										<Group justify="space-between" align="flex-start" wrap="nowrap">
 											<Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
 												<Text size="sm" fw={500} lineClamp={2}>
