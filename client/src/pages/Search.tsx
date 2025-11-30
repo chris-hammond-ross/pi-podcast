@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Container, Stack } from '@mantine/core';
+import { Container, Stack, Card, Divider } from '@mantine/core';
 import { PodcastSearch, PodcastResults, SubscribeModal } from '../components';
 import type { Podcast } from '../services';
 import { getPodcastById } from '../services';
@@ -9,9 +9,10 @@ function Search() {
 	const [searchResults, setSearchResults] = useState<Podcast[]>([]);
 	const [resultCount, setResultCount] = useState<number>(0);
 	const [selectedPodcast, setSelectedPodcast] = useState<Podcast | null>(null);
+	const [searchTerm, setSearchTerm] = useState<string>('');
 	const [modalOpened, setModalOpened] = useState(false);
 
-	const { podcastId } = useParams<{ podcastId: string }>();
+	const { podcastId } = useParams<{ podcastId: string; }>();
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 
@@ -21,7 +22,7 @@ function Search() {
 			const id = parseInt(podcastId);
 			// First check if the podcast is in the current search results
 			const podcastFromResults = searchResults.find(p => p.id === id);
-			
+
 			if (podcastFromResults) {
 				setSelectedPodcast(podcastFromResults);
 				setModalOpened(true);
@@ -64,19 +65,52 @@ function Search() {
 	console.log(resultCount);
 
 	return (
-		<Container size="sm" py="md">
-			<Stack gap="md">
+		<Container
+			size="sm"
+			py="md"
+			style={{
+				height: 'var(--main-content-height)',
+				display: 'flex',
+				flexDirection: 'column'
+			}}
+		>
+			<Stack
+				gap="md"
+				style={{
+					flex: 1,
+					display: 'flex',
+					flexDirection: 'column'
+				}}
+			>
 				<PodcastSearch
-					onResultsChange={(count: number, results: Podcast[]) => {
+					onResultsChange={(count: number, results: Podcast[], searchTerm: string) => {
 						setSearchResults(results);
 						setResultCount(count);
+						setSearchTerm(searchTerm);
 					}}
 				/>
-				{/*<Badge color="blue">{resultCount}</Badge>*/}
-				<PodcastResults
-					podcasts={searchResults}
-					onPodcastClick={handlePodcastClick}
-				/>
+				{searchResults.length > 0 ? (
+					<PodcastResults
+						podcasts={searchResults}
+						onPodcastClick={handlePodcastClick}
+					/>
+				) : (
+					<Card
+						withBorder
+						style={{
+							flex: 1,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center'
+						}}
+					>
+						{searchTerm === '' ? (
+							<Divider label="Please enter a search term" />
+						) : (
+							<Divider label="No Results" />
+						)}
+					</Card>
+				)}
 			</Stack>
 
 			<SubscribeModal

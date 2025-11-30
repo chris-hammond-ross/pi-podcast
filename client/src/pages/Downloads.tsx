@@ -17,7 +17,6 @@ import {
 	Pause,
 	Square,
 	X,
-	RotateCcw,
 	Trash2,
 	AlertCircle
 } from 'lucide-react';
@@ -47,8 +46,7 @@ function Downloads() {
 		cancelCurrent,
 		removeFromQueue,
 		cancelAll,
-		clearFinished,
-		retryDownload
+		clearFinished
 	} = useDownloadContext();
 
 	if (isLoading) {
