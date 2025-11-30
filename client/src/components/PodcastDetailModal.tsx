@@ -232,7 +232,6 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 			}}
 		>
 			<Stack gap="0" style={{ flex: 1, overflow: 'hidden' }}>
-				{/* Artwork */}
 				<Badge
 					variant="filled"
 					color="teal"
@@ -264,6 +263,7 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 				>
 					<X size={18} />
 				</ActionIcon>
+				{/* Artwork */}
 				<Image
 					src={subscription.artworkUrl600 || subscription.artworkUrl}
 					alt={subscription.name}
