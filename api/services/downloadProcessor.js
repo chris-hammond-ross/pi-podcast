@@ -36,6 +36,7 @@ class DownloadProcessor extends EventEmitter {
 		this.isPaused = false;
 		this.currentDownload = null;
 		this.currentRequest = null;
+		this.cancelRequested = false;
 		this.pollTimeoutId = null;
 		this.progressThrottleTime = 0;
 
@@ -122,6 +123,7 @@ class DownloadProcessor extends EventEmitter {
 		this._clearPollTimeout();
 
 		if (this.currentRequest) {
+			this.cancelRequested = true;
 			this.currentRequest.destroy();
 			this.currentRequest = null;
 		}
@@ -195,6 +197,7 @@ class DownloadProcessor extends EventEmitter {
 	 */
 	async _downloadItem(queueItem) {
 		this.currentDownload = queueItem;
+		this.cancelRequested = false;
 
 		console.log(`[download] Starting download: ${queueItem.episode_title}`);
 		
@@ -245,6 +248,7 @@ class DownloadProcessor extends EventEmitter {
 		} finally {
 			this.currentDownload = null;
 			this.currentRequest = null;
+			this.cancelRequested = false;
 		}
 	}
 
@@ -280,7 +284,8 @@ class DownloadProcessor extends EventEmitter {
 					
 					console.log(`[download] Following redirect (${redirectCount + 1}): ${redirectUrl}`);
 					
-					// Destroy this request before following redirect
+					// Consume and destroy this response before following redirect
+					response.resume();
 					request.destroy();
 					
 					this._followRedirects(redirectUrl, redirectCount + 1)
@@ -290,6 +295,7 @@ class DownloadProcessor extends EventEmitter {
 				}
 
 				if (response.statusCode !== 200) {
+					response.resume();
 					request.destroy();
 					reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
 					return;
@@ -327,31 +333,34 @@ class DownloadProcessor extends EventEmitter {
 		return new Promise((resolve, reject) => {
 			const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
 			let downloadedBytes = 0;
-			let finished = false;
+			let settled = false;
 
 			const fileStream = fs.createWriteStream(destPath);
 
+			const settle = (error, result) => {
+				if (settled) return;
+				settled = true;
+				clearTimeout(downloadTimer);
+				
+				if (error) {
+					fileStream.destroy();
+					// Only delete file on error, not on success
+					if (fs.existsSync(destPath)) {
+						try { fs.unlinkSync(destPath); } catch {}
+					}
+					reject(error);
+				} else {
+					resolve(result);
+				}
+			};
+
 			// Download timeout - starts after redirects are resolved
 			const downloadTimer = setTimeout(() => {
-				if (!finished) {
-					finished = true;
-					request.destroy();
-					fileStream.destroy();
-					reject(new Error('Download timeout'));
-				}
-			}, this.options.downloadTimeout);
-
-			const cleanup = (err) => {
-				if (finished) return;
-				finished = true;
-				clearTimeout(downloadTimer);
+				console.log('[download] Download timeout triggered');
 				request.destroy();
 				fileStream.destroy();
-				if (fs.existsSync(destPath)) {
-					try { fs.unlinkSync(destPath); } catch {}
-				}
-				reject(err);
-			};
+				settle(new Error('Download timeout'));
+			}, this.options.downloadTimeout);
 
 			response.on('data', (chunk) => {
 				downloadedBytes += chunk.length;
@@ -359,31 +368,34 @@ class DownloadProcessor extends EventEmitter {
 			});
 
 			response.on('error', (err) => {
-				cleanup(err);
+				console.log('[download] Response error:', err.message);
+				settle(err);
+			});
+
+			response.on('aborted', () => {
+				console.log('[download] Response aborted');
+				if (this.cancelRequested) {
+					settle(new Error('Download aborted'));
+				} else {
+					settle(new Error('Connection aborted by server'));
+				}
 			});
 
 			response.pipe(fileStream);
 
 			fileStream.on('finish', () => {
-				if (finished) return;
-				finished = true;
+				console.log(`[download] File stream finished, ${downloadedBytes} bytes written`);
 				clearTimeout(downloadTimer);
 				fileStream.close(() => {
 					// Emit final 100% progress
 					this._emitProgress(queueItem, downloadedBytes, totalBytes || downloadedBytes, true);
-					resolve(downloadedBytes);
+					settle(null, downloadedBytes);
 				});
 			});
 
 			fileStream.on('error', (err) => {
-				cleanup(err);
-			});
-
-			// Handle manual cancellation
-			request.on('close', () => {
-				if (!finished && !fileStream.writableFinished) {
-					cleanup(new Error('Download aborted'));
-				}
+				console.log('[download] File stream error:', err.message);
+				settle(err);
 			});
 		});
 	}
@@ -459,6 +471,7 @@ class DownloadProcessor extends EventEmitter {
 		if (this.currentDownload && this.currentRequest) {
 			console.log(`[download] Cancelling current download: ${this.currentDownload.episode_title}`);
 			downloadQueueService.updateStatus(this.currentDownload.id, 'cancelled');
+			this.cancelRequested = true;
 			this.currentRequest.destroy();
 		}
 	}
