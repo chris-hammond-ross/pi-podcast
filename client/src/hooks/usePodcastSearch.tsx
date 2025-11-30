@@ -23,7 +23,7 @@ export function usePodcastSearch(): UsePodcastSearchReturn {
 	const [resultCount, setResultCount] = useState(0);
 	const [hasSearched, setHasSearched] = useState(false);
 
-	const search = useCallback(async (searchTerm: string, limit: number = 20) => {
+	const search = useCallback(async (searchTerm: string, limit: number = 100) => {
 		if (!searchTerm || searchTerm.trim().length === 0) {
 			setError('Search term is required');
 			return;

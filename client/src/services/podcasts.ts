@@ -44,7 +44,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
  * @param searchTerm - The search term
  * @param limit - Maximum number of results (default: 20)
  */
-export async function searchPodcasts(searchTerm: string, limit: number = 20): Promise<PodcastSearchResponse> {
+export async function searchPodcasts(searchTerm: string, limit: number = 100): Promise<PodcastSearchResponse> {
 	try {
 		const params = new URLSearchParams({
 			term: searchTerm,
