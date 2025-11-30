@@ -275,6 +275,19 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 		};
 	}, []); // Empty dependency array - only run once
 
+	// Helper to refresh status from API
+	const fetchAndUpdateStatus = useCallback(async () => {
+		try {
+			const status = await downloadsApi.getDownloadStatus();
+			setIsRunning(status.isRunning);
+			setIsPaused(status.isPaused);
+			setCounts(status.queue.counts);
+			setActiveItems(status.queue.activeItems);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Failed to refresh');
+		}
+	}, []);
+
 	// Actions
 	const start = useCallback(async () => {
 		try {
@@ -319,78 +332,86 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 	const addToQueue = useCallback(async (episodeId: number, priority = 0) => {
 		try {
 			await downloadsApi.addToQueue(episodeId, priority);
+			// Refresh status to get updated activeItems
+			await fetchAndUpdateStatus();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to add to queue');
 		}
-	}, []);
+	}, [fetchAndUpdateStatus]);
 
 	const addBatchToQueue = useCallback(async (episodeIds: number[], priority = 0) => {
 		try {
 			await downloadsApi.addBatchToQueue(episodeIds, priority);
+			// Refresh status to get updated activeItems
+			await fetchAndUpdateStatus();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to add to queue');
 		}
-	}, []);
+	}, [fetchAndUpdateStatus]);
 
 	const queueSubscription = useCallback(async (subscriptionId: number, priority = 0) => {
 		try {
 			await downloadsApi.queueSubscription(subscriptionId, priority);
+			// Refresh status to get updated activeItems
+			await fetchAndUpdateStatus();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to queue subscription');
 		}
-	}, []);
+	}, [fetchAndUpdateStatus]);
 
 	const syncAndQueue = useCallback(async (subscriptionId: number, priority = 0) => {
 		try {
 			await downloadsApi.syncAndQueueSubscription(subscriptionId, priority);
+			// Refresh status to get updated activeItems
+			await fetchAndUpdateStatus();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to sync and queue');
 		}
-	}, []);
+	}, [fetchAndUpdateStatus]);
 
 	const removeFromQueue = useCallback(async (queueId: number) => {
 		try {
 			await downloadsApi.removeFromQueue(queueId);
+			// Refresh status to get updated activeItems
+			await fetchAndUpdateStatus();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to remove from queue');
 		}
-	}, []);
+	}, [fetchAndUpdateStatus]);
 
 	const cancelAll = useCallback(async () => {
 		try {
 			await downloadsApi.cancelAllPending();
+			// Refresh status to get updated activeItems
+			await fetchAndUpdateStatus();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to cancel all');
 		}
-	}, []);
+	}, [fetchAndUpdateStatus]);
 
 	const clearFinished = useCallback(async () => {
 		try {
 			await downloadsApi.clearFinishedQueue();
+			// Refresh status to get updated counts
+			await fetchAndUpdateStatus();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to clear finished');
 		}
-	}, []);
+	}, [fetchAndUpdateStatus]);
 
 	const retryDownload = useCallback(async (queueId: number) => {
 		try {
 			await downloadsApi.retryDownload(queueId);
+			// Refresh status to get updated activeItems
+			await fetchAndUpdateStatus();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to retry');
 		}
-	}, []);
+	}, [fetchAndUpdateStatus]);
 
 	const refreshStatus = useCallback(async () => {
-		try {
-			const status = await downloadsApi.getDownloadStatus();
-			setIsRunning(status.isRunning);
-			setIsPaused(status.isPaused);
-			setCounts(status.queue.counts);
-			setActiveItems(status.queue.activeItems);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Failed to refresh');
-		}
-	}, []);
+		await fetchAndUpdateStatus();
+	}, [fetchAndUpdateStatus]);
 
 	const value: DownloadContextValue = {
 		isRunning,
