@@ -17,3 +17,19 @@
 	max-height: calc(100svh - 2rem);
 	height: calc(100svh - 2rem);
 }
+
+.mantine-Card-root {
+	background-color: var(--mantine-color-gray-1);
+}
+
+[data-mantine-color-scheme='dark'] .mantine-Card-root {
+	background-color: var(--mantine-color-dark-6);
+}
+
+.podcast-description {
+	background-color: var(--mantine-color-gray-1);
+}
+
+[data-mantine-color-scheme='dark'] .podcast-description {
+	background-color: var(--mantine-color-dark-6);
+}
