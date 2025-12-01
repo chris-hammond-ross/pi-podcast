@@ -15,7 +15,7 @@ const constants = require('../config/constants');
 class DownloadProcessor extends EventEmitter {
 	constructor(options = {}) {
 		super();
-		
+
 		this.options = {
 			downloadDir: options.downloadDir || constants.DOWNLOAD_DIR,
 			delayBetweenDownloads: options.delayBetweenDownloads || constants.DOWNLOAD_DELAY_BETWEEN,
@@ -119,7 +119,7 @@ class DownloadProcessor extends EventEmitter {
 
 		console.log('[download] Stopping download processor');
 		this.isRunning = false;
-		
+
 		this._clearPollTimeout();
 
 		if (this.currentRequest) {
@@ -136,7 +136,7 @@ class DownloadProcessor extends EventEmitter {
 	 */
 	pause() {
 		if (this.isPaused) return;
-		
+
 		console.log('[download] Pausing download processor');
 		this.isPaused = true;
 		this._clearPollTimeout();
@@ -148,11 +148,11 @@ class DownloadProcessor extends EventEmitter {
 	 */
 	resume() {
 		if (!this.isPaused) return;
-		
+
 		console.log('[download] Resuming download processor');
 		this.isPaused = false;
 		this.emit('processor:resumed');
-		
+
 		if (this.isRunning && !this.currentDownload) {
 			this._processNext();
 		}
@@ -169,11 +169,11 @@ class DownloadProcessor extends EventEmitter {
 		}
 
 		const queueItem = downloadQueueService.getNextPending();
-		
+
 		if (!queueItem) {
 			console.log('[download] Queue empty, waiting for items');
 			this.emit('queue:empty');
-			
+
 			if (this.isRunning && !this.isPaused) {
 				this.pollTimeoutId = setTimeout(() => {
 					this._processNext();
@@ -200,9 +200,9 @@ class DownloadProcessor extends EventEmitter {
 		this.cancelRequested = false;
 
 		console.log(`[download] Starting download: ${queueItem.episode_title}`);
-		
+
 		downloadQueueService.updateStatus(queueItem.id, 'downloading');
-		
+
 		this.emit('download:started', {
 			queueId: queueItem.id,
 			episodeId: queueItem.episode_id,
@@ -266,28 +266,33 @@ class DownloadProcessor extends EventEmitter {
 			}
 
 			const protocol = url.startsWith('https') ? https : http;
-			
+
 			const request = protocol.get(url, {
 				headers: {
-					'User-Agent': 'PiPodcast/1.0'
+					'User-Agent': 'Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+					'Accept': '*/*',
+					'Accept-Encoding': 'identity',  // Important: don't request compressed for audio
+					'Connection': 'keep-alive'
 				}
 			}, (response) => {
+				// Add logging here to see what's actually happening
+				console.log(`[download] Response from ${new URL(url).hostname}: ${response.statusCode}`);
 				// Handle redirects
 				if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
 					let redirectUrl = response.headers.location;
-					
+
 					// Handle relative redirects
 					if (redirectUrl.startsWith('/')) {
 						const urlObj = new URL(url);
 						redirectUrl = `${urlObj.protocol}//${urlObj.host}${redirectUrl}`;
 					}
-					
+
 					console.log(`[download] Following redirect (${redirectCount + 1}): ${redirectUrl}`);
-					
+
 					// Consume and destroy this response before following redirect
 					response.resume();
 					request.destroy();
-					
+
 					this._followRedirects(redirectUrl, redirectCount + 1)
 						.then(resolve)
 						.catch(reject);
@@ -326,7 +331,7 @@ class DownloadProcessor extends EventEmitter {
 	async _downloadFile(url, destPath, queueItem) {
 		// First, follow all redirects to get the final response
 		const { response, request } = await this._followRedirects(url);
-		
+
 		// Store request reference for cancellation
 		this.currentRequest = request;
 
@@ -341,7 +346,7 @@ class DownloadProcessor extends EventEmitter {
 				if (settled) return;
 				settled = true;
 				clearTimeout(downloadTimer);
-				
+
 				if (error) {
 					fileStream.destroy();
 					// Only delete file on error, not on success
@@ -409,7 +414,7 @@ class DownloadProcessor extends EventEmitter {
 	 */
 	_emitProgress(queueItem, downloadedBytes, totalBytes, force = false) {
 		const now = Date.now();
-		
+
 		if (!force && now - this.progressThrottleTime < this.options.progressInterval) {
 			return;
 		}
@@ -433,15 +438,16 @@ class DownloadProcessor extends EventEmitter {
 	 * @param {Error} err - Error that occurred
 	 */
 	async _handleDownloadError(queueItem, err) {
-		const errorMessage = err.message || 'Unknown error';
+		const errorMessage = err.message || err.toString() || 'Unknown error';
 		console.error(`[download] Error downloading ${queueItem.episode_title}: ${errorMessage}`);
+		console.error(`[download] Error stack:`, err.stack);
 
 		if (err.message !== 'Download aborted' && queueItem.retry_count < this.options.maxRetries) {
 			const retryCount = downloadQueueService.incrementRetry(queueItem.id);
 			console.log(`[download] Retrying (${retryCount}/${this.options.maxRetries}): ${queueItem.episode_title}`);
-			
+
 			downloadQueueService.resetToPending(queueItem.id);
-			
+
 			this.emit('download:retry', {
 				queueId: queueItem.id,
 				episodeId: queueItem.episode_id,
@@ -482,7 +488,7 @@ class DownloadProcessor extends EventEmitter {
 	 */
 	getStatus() {
 		const queueStatus = downloadQueueService.getQueueStatus();
-		
+
 		return {
 			isRunning: this.isRunning,
 			isPaused: this.isPaused,
