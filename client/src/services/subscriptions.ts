@@ -95,6 +95,33 @@ export async function getSubscriptions(): Promise<SubscriptionsResponse> {
 }
 
 /**
+ * Get a subscription by ID
+ * @param id - The subscription ID
+ */
+export async function getSubscriptionById(id: number): Promise<SubscriptionResponse> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/subscriptions/${id}`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+		});
+
+		if (!response.ok) {
+			const error = (await response.json()) as SubscriptionError;
+			throw new Error(error.error || 'Failed to get subscription');
+		}
+
+		return await response.json();
+	} catch (error) {
+		if (error instanceof Error) {
+			throw new Error(`Failed to get subscription: ${error.message}`);
+		}
+		throw new Error('Failed to get subscription: Unknown error');
+	}
+}
+
+/**
  * Check if a podcast is subscribed
  * @param feedUrl - The podcast feed URL
  */
