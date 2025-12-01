@@ -72,7 +72,7 @@ function Downloads() {
 		cancelAll
 	} = useDownloadContext();
 
-	const { tab, episodeId } = useParams<{ tab: string; episodeId: string }>();
+	const { tab, episodeId } = useParams<{ tab: string; episodeId: string; }>();
 	const navigate = useNavigate();
 	const location = useLocation();
 
@@ -171,8 +171,22 @@ function Downloads() {
 	}, [navigate]);
 
 	const handleEpisodeClick = useCallback((item: DownloadQueueItem) => {
-		isNavigatingRef.current = true;
-		navigate(`/downloads/completed/${item.episode_id}`, { replace: false });
+		// Open modal directly, then navigate to update URL
+		setIsLoadingEpisode(true);
+		getEpisode(item.episode_id)
+			.then(response => {
+				setSelectedEpisode(response.episode);
+				setSubscriptionName(item.subscription_name || '');
+				setEpisodeModalOpened(true);
+				isNavigatingRef.current = true;
+				navigate(`/downloads/completed/${item.episode_id}`, { replace: false });
+			})
+			.catch(err => {
+				console.error('Failed to load episode:', err);
+			})
+			.finally(() => {
+				setIsLoadingEpisode(false);
+			});
 	}, [navigate]);
 
 	const handleEpisodeClose = useCallback(() => {
