@@ -12,8 +12,8 @@ function Settings() {
 			}}
 		>
 			<Container size="sm">
-				<Tabs.List>
-					<Tabs.Tab value="bluetooth">
+				<Tabs.List justify='flex-start'>
+					<Tabs.Tab size="xl" value="bluetooth">
 						Bluetooth
 					</Tabs.Tab>
 					<Tabs.Tab value="appearance">
