@@ -151,3 +151,23 @@ export async function getEpisode(episodeId: number): Promise<{ success: boolean;
 
 	return response.json();
 }
+
+/**
+ * Delete a downloaded episode file and clear download info
+ */
+export async function deleteEpisodeDownload(episodeId: number): Promise<{ success: boolean; message: string }> {
+	const response = await fetch(
+		`${API_BASE_URL}/api/episodes/${episodeId}/download`,
+		{
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json' }
+		}
+	);
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to delete download');
+	}
+
+	return response.json();
+}
