@@ -74,3 +74,11 @@
 .spin {
 	animation: spin 1s linear infinite;
 }
+
+/* Mobile */
+@media (max-width: 767px) {
+	.mantine-Tabs-tab {
+		font-size: var(--mantine-font-size-xs);
+		padding-top: var(--mantine-spacing-md);
+	}
+}

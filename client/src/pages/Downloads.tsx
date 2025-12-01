@@ -239,15 +239,15 @@ function Downloads() {
 				}}
 			>
 				<Container size="sm">
-					<Tabs.List>
+					<Tabs.List justify='flex-start'>
 						<Tabs.Tab value="downloading">
-							Downloading {hasCurrentDownload ? '(1)' : ''}
+							Current {hasCurrentDownload ? '(1)' : ''}
 						</Tabs.Tab>
 						<Tabs.Tab value="pending">
 							Pending {pendingItems.length > 0 ? `(${pendingItems.length})` : ''}
 						</Tabs.Tab>
 						<Tabs.Tab value="completed">
-							Completed {completedItems.length > 0 ? `(${completedItems.length})` : ''}
+							Done {completedItems.length > 0 ? `(${completedItems.length})` : ''}
 						</Tabs.Tab>
 					</Tabs.List>
 					<div
@@ -282,7 +282,7 @@ function Downloads() {
 							<Tabs.Panel value="downloading">
 								<Stack gap="md">
 									{/* Controls - only shown in Downloading tab */}
-									<Group gap="xs">
+									<Group gap="xs" grow>
 										{!isRunning ? (
 											<Button
 												leftSection={<Play size={16} />}
@@ -320,7 +320,7 @@ function Downloads() {
 											variant="light"
 											color="red"
 											size="sm"
-											disabled={!isRunning}
+											disabled={!isRunning || !hasCurrentDownload}
 										>
 											Stop
 										</Button>
