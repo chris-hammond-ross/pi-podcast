@@ -1,6 +1,9 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 const episodeService = require('../services/episodeService');
+const { DOWNLOADS_DIR } = require('../config/constants');
 
 /**
  * GET /api/episodes/subscription/:subscriptionId
@@ -103,6 +106,56 @@ router.get('/:id', (req, res) => {
 		res.json({
 			success: true,
 			episode
+		});
+	} catch (err) {
+		res.status(500).json({
+			success: false,
+			error: err.message
+		});
+	}
+});
+
+/**
+ * DELETE /api/episodes/:id/download
+ * Delete the downloaded file for an episode and clear download info
+ */
+router.delete('/:id/download', (req, res) => {
+	try {
+		const { id } = req.params;
+		const episode = episodeService.getEpisodeById(parseInt(id));
+
+		if (!episode) {
+			return res.status(404).json({
+				success: false,
+				error: 'Episode not found'
+			});
+		}
+
+		if (!episode.downloaded_at || !episode.file_path) {
+			return res.status(400).json({
+				success: false,
+				error: 'Episode is not downloaded'
+			});
+		}
+
+		// Try to delete the file
+		const filePath = path.join(DOWNLOADS_DIR, episode.file_path);
+		try {
+			if (fs.existsSync(filePath)) {
+				fs.unlinkSync(filePath);
+				console.log(`[episode] Deleted file: ${filePath}`);
+			}
+		} catch (fileErr) {
+			console.error(`[episode] Failed to delete file: ${fileErr.message}`);
+			// Continue anyway to clear the database record
+		}
+
+		// Clear download info from database
+		episodeService.clearDownload(parseInt(id));
+
+		res.json({
+			success: true,
+			message: 'Download deleted successfully'
 		});
 	} catch (err) {
 		res.status(500).json({

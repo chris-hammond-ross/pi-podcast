@@ -13,29 +13,49 @@ function Podcasts() {
 	const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
 	const [modalOpened, setModalOpened] = useState(false);
 	const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
+	const [currentEpisodeId, setCurrentEpisodeId] = useState<number | null>(null);
 	const isMobile = useMediaQuery('(max-width: 768px)');
 
-	const { subscriptionId } = useParams<{ subscriptionId: string; }>();
+	const { subscriptionId, episodeId } = useParams<{ subscriptionId: string; episodeId: string }>();
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	// Track if we're navigating programmatically to avoid closing modal on our own navigation
+	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
 
-	// Handle URL-based subscription selection (e.g., /podcasts/123)
+	// Handle URL changes
 	useEffect(() => {
+		// If we triggered this navigation, skip processing
+		if (isNavigatingRef.current) {
+			isNavigatingRef.current = false;
+			return;
+		}
+
 		if (subscriptionId) {
 			const id = parseInt(subscriptionId);
+			const newEpisodeId = episodeId ? parseInt(episodeId) : null;
 
-			// First check if the subscription is in the current list
+			// Update episode ID state
+			setCurrentEpisodeId(newEpisodeId);
+
+			// Check if subscription is already loaded
+			if (selectedSubscription?.id === id) {
+				// Subscription already loaded, just ensure modal is open
+				if (!modalOpened) {
+					setModalOpened(true);
+				}
+				return;
+			}
+
+			// Check if subscription is in the list
 			const subscriptionFromList = subscriptions.find(s => s.id === id);
 
 			if (subscriptionFromList) {
 				setSelectedSubscription(subscriptionFromList);
 				setModalOpened(true);
 				setIsLoadingSubscription(false);
-			} else if (!selectedSubscription || selectedSubscription.id !== id) {
-				// Only fetch if we don't already have this subscription loaded
+			} else {
+				// Fetch subscription
 				setIsLoadingSubscription(true);
 				getSubscriptionById(id)
 					.then(response => {
@@ -44,7 +64,6 @@ function Podcasts() {
 					})
 					.catch(err => {
 						console.error('Failed to load subscription:', err);
-						// Navigate back to podcasts if subscription not found
 						navigate('/podcasts', { replace: true });
 					})
 					.finally(() => {
@@ -52,39 +71,49 @@ function Podcasts() {
 					});
 			}
 		} else {
-			// No subscriptionId in URL - close modal if open (handles back navigation)
-			if (modalOpened && !isNavigatingRef.current) {
-				setModalOpened(false);
-				setSelectedSubscription(null);
-			}
+			// No subscriptionId in URL - close everything
+			setModalOpened(false);
+			setSelectedSubscription(null);
+			setCurrentEpisodeId(null);
 		}
-
-		// Reset the navigation flag
-		isNavigatingRef.current = false;
-	}, [subscriptionId, location.pathname, subscriptions]);
+	}, [subscriptionId, episodeId, location.pathname, subscriptions]);
 
 	const handlePodcastClick = useCallback((podcast: Subscription) => {
 		setSelectedSubscription(podcast);
+		setCurrentEpisodeId(null);
 		setModalOpened(true);
 		isNavigatingRef.current = true;
-		// Update URL without full navigation
 		navigate(`/podcasts/${podcast.id}`, { replace: false });
 	}, [navigate]);
 
 	const handleModalClose = useCallback(() => {
 		setModalOpened(false);
 		setSelectedSubscription(null);
+		setCurrentEpisodeId(null);
 		isNavigatingRef.current = true;
-		// Navigate back to podcasts
 		navigate('/podcasts', { replace: false });
 	}, [navigate]);
 
 	const handleSubscriptionUpdate = useCallback((updated: Subscription) => {
-		// Update the selected subscription with new data
 		setSelectedSubscription(updated);
-		// Refetch all subscriptions to sync the list
 		refresh();
 	}, [refresh]);
+
+	const handleEpisodeOpen = useCallback((epId: number) => {
+		if (selectedSubscription) {
+			setCurrentEpisodeId(epId);
+			isNavigatingRef.current = true;
+			navigate(`/podcasts/${selectedSubscription.id}/episode/${epId}`, { replace: false });
+		}
+	}, [navigate, selectedSubscription]);
+
+	const handleEpisodeClose = useCallback(() => {
+		if (selectedSubscription) {
+			setCurrentEpisodeId(null);
+			isNavigatingRef.current = true;
+			navigate(`/podcasts/${selectedSubscription.id}`, { replace: false });
+		}
+	}, [navigate, selectedSubscription]);
 
 	// Loading state
 	if (isLoading) {
@@ -164,6 +193,9 @@ function Podcasts() {
 				opened={modalOpened}
 				onClose={handleModalClose}
 				onSubscriptionUpdate={handleSubscriptionUpdate}
+				initialEpisodeId={currentEpisodeId}
+				onEpisodeOpen={handleEpisodeOpen}
+				onEpisodeClose={handleEpisodeClose}
 			/>
 		</Container>
 	);
