@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
 	Modal,
-	Image,
 	Text,
 	Stack,
 	Badge,
@@ -298,48 +297,49 @@ function PodcastDetailModal({ subscription, opened, onClose }: PodcastDetailModa
 			}}
 		>
 			<Stack gap="0" style={{ flex: 1, overflow: 'hidden' }}>
-				<Badge
-					variant="filled"
-					color="teal"
+				{/* Artwork - Episode Count - Close Button */}
+				<Group
+					className='bg-cover-image'
+					px="md"
+					pt="md"
+					pb="xl"
+					justify='space-between'
 					style={{
-						position: 'absolute',
-						left: isMobile ? '1rem' : '1.6rem',
-						top: isMobile ? '1rem' : '1.6rem'
+						backgroundImage: `url(${subscription.artworkUrl600 || subscription.artworkUrl || 'https://placehold.co/300x300?text=No+Image'})`,
+						position: 'relative'
 					}}
 				>
-					{isLoading ? (
-						<Loader size="xs" color="white" type="dots" />
-					) : (
-						<>{episodes.length} episodes</>
-					)}
-				</Badge>
-				<ActionIcon
-					radius="xl"
-					size="lg"
-					variant="white"
-					c='var(--mantine-color-default-border)'
-					onClick={onClose}
-					title="Close"
-					style={{
-						position: 'absolute',
-						right: '1rem',
-						top: '1rem',
-						borderColor: 'var(--mantine-color-default-border)'
-					}}
-				>
-					<X size={18} />
-				</ActionIcon>
-				{/* Artwork */}
-				<Image
-					src={subscription.artworkUrl600 || subscription.artworkUrl}
-					alt={subscription.name}
-					mah="100%"
-					maw="100%"
-					height="auto"
-					w="auto"
-					fit="contain"
-					fallbackSrc="https://placehold.co/300x300?text=No+Image"
-				/>
+					<div className="bg-blury-overlay"></div>
+					<Badge
+						variant="filled"
+						color="teal"
+						style={{
+							position: 'relative',
+							zIndex: 1
+						}}
+					>
+						{isLoading ? (
+							<Loader size="xs" color="white" type="dots" />
+						) : (
+							<>{episodes.length} episodes</>
+						)}
+					</Badge>
+					<ActionIcon
+						radius="xl"
+						size="lg"
+						variant="white"
+						c='var(--mantine-color-default-border)'
+						onClick={onClose}
+						title="Close"
+						style={{
+							position: 'relative',
+							zIndex: 1,
+							borderColor: 'var(--mantine-color-default-border)'
+						}}
+					>
+						<X size={18} />
+					</ActionIcon>
+				</Group>
 
 				{/* Actions */}
 				<Stack
