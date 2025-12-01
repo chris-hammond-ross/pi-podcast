@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Container, Title, Text, SimpleGrid, Card, Stack, Skeleton, Alert } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { AlertCircle } from 'lucide-react';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal } from '../components';
@@ -9,6 +10,7 @@ function Podcasts() {
 	const { subscriptions, isLoading, error, refresh } = useSubscriptions();
 	const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
 	const [modalOpened, setModalOpened] = useState(false);
+	const isMobile = useMediaQuery('(max-width: 768px)');
 
 	const handlePodcastClick = useCallback((podcast: Subscription) => {
 		setSelectedSubscription(podcast);
@@ -31,13 +33,10 @@ function Podcasts() {
 	if (isLoading) {
 		return (
 			<Container size="sm" py="md">
-				<Title order={1} mb="md">
-					Podcasts
-				</Title>
 				<SimpleGrid cols={{ base: 3, sm: 3 }} spacing="sm">
-					{[1, 2, 3].map((i) => (
+					{[...Array(36).keys()].map(i => (
 						<Card key={i} p="0">
-							<Skeleton height={120} />
+							<Skeleton height={isMobile ? 80 : 190} />
 							<Stack p="xs" gap="xs">
 								<Skeleton height={12} width="80%" />
 								<Skeleton height={10} width="60%" />
