@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
 	Container,
-	Title,
 	Text,
 	Stack,
 	Group,
@@ -12,7 +11,8 @@ import {
 	Loader,
 	Alert,
 	Tabs,
-	Divider
+	Divider,
+	ScrollArea
 } from '@mantine/core';
 import {
 	Play,
@@ -111,7 +111,14 @@ function Downloads() {
 	);
 
 	return (
-		<Tabs defaultValue="downloading">
+		<Tabs
+			defaultValue="downloading"
+			style={{
+				display: 'flex',
+				flexDirection: 'column',
+				height: 'var(--main-content-height)'
+			}}
+		>
 			<Container size="sm">
 				<Tabs.List>
 					<Tabs.Tab value="downloading">
@@ -139,239 +146,245 @@ function Downloads() {
 				</div>
 			</Container>
 
-			<Container size="sm" py="md">
-				<Stack gap="md">
-					{error && (
-						<Alert icon={<AlertCircle size={16} />} color="red" withCloseButton={false}>
-							{error}
-						</Alert>
-					)}
+			<ScrollArea
+				style={{ flex: 1 }}
+				scrollbars="y"
+				scrollbarSize={4}
+			>
+				<Container size="sm" py="md">
+					<Stack gap="md">
+						{error && (
+							<Alert icon={<AlertCircle size={16} />} color="red" withCloseButton={false}>
+								{error}
+							</Alert>
+						)}
 
-					{/* Downloading Tab */}
-					<Tabs.Panel value="downloading">
-						<Stack gap="md">
-							{/* Controls - only shown in Downloading tab */}
-							<Group gap="xs">
-								{!isRunning ? (
+						{/* Downloading Tab */}
+						<Tabs.Panel value="downloading">
+							<Stack gap="md">
+								{/* Controls - only shown in Downloading tab */}
+								<Group gap="xs">
+									{!isRunning ? (
+										<Button
+											leftSection={<Play size={16} />}
+											onClick={start}
+											variant="filled"
+											size="sm"
+											disabled={!hasCurrentDownload && pendingItems.length === 0}
+										>
+											Start
+										</Button>
+									) : isPaused ? (
+										<Button
+											leftSection={<Play size={16} />}
+											onClick={resume}
+											variant="filled"
+											size="sm"
+											disabled={!hasCurrentDownload}
+										>
+											Resume
+										</Button>
+									) : (
+										<Button
+											leftSection={<Pause size={16} />}
+											onClick={pause}
+											variant="light"
+											size="sm"
+											disabled={!hasCurrentDownload}
+										>
+											Pause
+										</Button>
+									)}
 									<Button
-										leftSection={<Play size={16} />}
-										onClick={start}
-										variant="filled"
-										size="sm"
-										disabled={!hasCurrentDownload && pendingItems.length === 0}
-									>
-										Start
-									</Button>
-								) : isPaused ? (
-									<Button
-										leftSection={<Play size={16} />}
-										onClick={resume}
-										variant="filled"
-										size="sm"
-										disabled={!hasCurrentDownload}
-									>
-										Resume
-									</Button>
-								) : (
-									<Button
-										leftSection={<Pause size={16} />}
-										onClick={pause}
+										leftSection={<Square size={16} />}
+										onClick={stop}
 										variant="light"
+										color="red"
 										size="sm"
-										disabled={!hasCurrentDownload}
+										disabled={!isRunning}
 									>
-										Pause
+										Stop
 									</Button>
-								)}
-								<Button
-									leftSection={<Square size={16} />}
-									onClick={stop}
-									variant="light"
-									color="red"
-									size="sm"
-									disabled={!isRunning}
-								>
-									Stop
-								</Button>
-							</Group>
+								</Group>
 
-							{/* Current download */}
-							{currentDownload ? (
-								<Card withBorder p="md">
-									<Stack gap="xs">
-										<Group justify="space-between" align="flex-start">
-											<div style={{ flex: 1, minWidth: 0 }}>
-												<Text fw={500} truncate>
-													{currentDownload.title}
+								{/* Current download */}
+								{currentDownload ? (
+									<Card withBorder p="md">
+										<Stack gap="xs">
+											<Group justify="space-between" align="flex-start">
+												<div style={{ flex: 1, minWidth: 0 }}>
+													<Text fw={500} truncate>
+														{currentDownload.title}
+													</Text>
+													<Text size="sm" c="dimmed" truncate>
+														{currentDownload.subscriptionName}
+													</Text>
+												</div>
+												<ActionIcon
+													variant="subtle"
+													color="red"
+													onClick={cancelCurrent}
+													title="Cancel download"
+												>
+													<X size={16} />
+												</ActionIcon>
+											</Group>
+											<Progress
+												value={currentDownload.percent}
+												size="lg"
+												radius="sm"
+												animated={!isPaused}
+											/>
+											<Group justify="space-between">
+												<Text size="xs" c="dimmed">
+													{formatBytes(currentDownload.downloadedBytes)} / {formatBytes(currentDownload.totalBytes)}
 												</Text>
-												<Text size="sm" c="dimmed" truncate>
-													{currentDownload.subscriptionName}
+												<Text size="xs" c="dimmed">
+													{currentDownload.percent}%
 												</Text>
-											</div>
-											<ActionIcon
+											</Group>
+										</Stack>
+									</Card>
+								) : (
+									<Text c="dimmed" ta="center" py="xl">
+										No episode currently downloading.
+									</Text>
+								)}
+							</Stack>
+						</Tabs.Panel>
+
+						{/* Pending Tab */}
+						<Tabs.Panel value="pending">
+							<Stack gap="md">
+								{pendingItems.length > 0 ? (
+									<>
+										<Group justify="flex-end">
+											<Button
 												variant="subtle"
 												color="red"
-												onClick={cancelCurrent}
-												title="Cancel download"
+												size="xs"
+												onClick={cancelAll}
 											>
-												<X size={16} />
-											</ActionIcon>
+												Cancel all
+											</Button>
 										</Group>
-										<Progress
-											value={currentDownload.percent}
-											size="lg"
-											radius="sm"
-											animated={!isPaused}
-										/>
-										<Group justify="space-between">
-											<Text size="xs" c="dimmed">
-												{formatBytes(currentDownload.downloadedBytes)} / {formatBytes(currentDownload.totalBytes)}
-											</Text>
-											<Text size="xs" c="dimmed">
-												{currentDownload.percent}%
-											</Text>
-										</Group>
-									</Stack>
-								</Card>
-							) : (
-								<Text c="dimmed" ta="center" py="xl">
-									No episode currently downloading.
-								</Text>
-							)}
-						</Stack>
-					</Tabs.Panel>
+										<Stack gap="xs">
+											{pendingItems.map((item) => (
+												<Card key={item.id} withBorder p="sm">
+													<Group justify="space-between" align="center" wrap="nowrap">
+														<div style={{ flex: 1, minWidth: 0 }}>
+															<Text size="sm" truncate>
+																{item.episode_title}
+															</Text>
+															<Text size="xs" c="dimmed" truncate>
+																{item.subscription_name}
+															</Text>
+														</div>
+														<ActionIcon
+															variant="subtle"
+															color="red"
+															onClick={() => removeFromQueue(item.id)}
+															title="Remove from queue"
+														>
+															<X size={14} />
+														</ActionIcon>
+													</Group>
+												</Card>
+											))}
+										</Stack>
+									</>
+								) : (
+									<Text c="dimmed" ta="center" py="xl">
+										No episodes pending download.
+									</Text>
+								)}
+							</Stack>
+						</Tabs.Panel>
 
-					{/* Pending Tab */}
-					<Tabs.Panel value="pending">
-						<Stack gap="md">
-							{pendingItems.length > 0 ? (
-								<>
-									<Group justify="flex-end">
+						{/* Completed Tab */}
+						<Tabs.Panel value="completed">
+							<Stack gap="md">
+								{completedLoading ? (
+									<Group justify="center" py="xl">
+										<Loader size="md" />
+									</Group>
+								) : completedError ? (
+									<Alert
+										icon={<AlertCircle size={16} />}
+										color="red"
+										withCloseButton={false}
+										title="Error loading completed downloads"
+									>
+										{completedError}
 										<Button
 											variant="subtle"
-											color="red"
 											size="xs"
-											onClick={cancelAll}
+											leftSection={<RefreshCw size={14} />}
+											onClick={fetchCompletedItems}
+											mt="xs"
 										>
-											Cancel all
+											Retry
 										</Button>
-									</Group>
+									</Alert>
+								) : completedItems.length > 0 ? (
 									<Stack gap="xs">
-										{pendingItems.map((item) => (
-											<Card key={item.id} withBorder p="sm">
-												<Group justify="space-between" align="center" wrap="nowrap">
-													<div style={{ flex: 1, minWidth: 0 }}>
-														<Text size="sm" truncate>
-															{item.episode_title}
-														</Text>
-														<Text size="xs" c="dimmed" truncate>
-															{item.subscription_name}
-														</Text>
-													</div>
-													<ActionIcon
-														variant="subtle"
-														color="red"
-														onClick={() => removeFromQueue(item.id)}
-														title="Remove from queue"
-													>
-														<X size={14} />
-													</ActionIcon>
-												</Group>
-											</Card>
-										))}
+										{/* Recent section */}
+										{recentCompletedItems.length > 0 && (
+											<>
+												<Divider label="Recent" />
+												{recentCompletedItems.map((item) => (
+													<Card key={item.id} withBorder p="sm">
+														<Group justify="space-between" align="center" wrap="nowrap">
+															<div style={{ flex: 1, minWidth: 0 }}>
+																<Text size="sm" truncate>
+																	{item.episode_title}
+																</Text>
+																<Text size="xs" c="dimmed" truncate>
+																	{item.subscription_name}
+																	{item.completed_at && ` • ${formatDate(item.completed_at)}`}
+																</Text>
+															</div>
+														</Group>
+													</Card>
+												))}
+											</>
+										)}
+
+										{/* Older section */}
+										{olderCompletedItems.length > 0 && (
+											<>
+												<Divider
+													label="Older"
+													mt={recentCompletedItems.length > 0 ? 'md' : undefined}
+												/>
+												{olderCompletedItems.map((item) => (
+													<Card key={item.id} withBorder p="sm">
+														<Group justify="space-between" align="center" wrap="nowrap">
+															<div style={{ flex: 1, minWidth: 0 }}>
+																<Text size="sm" truncate>
+																	{item.episode_title}
+																</Text>
+																<Text size="xs" c="dimmed" truncate>
+																	{item.subscription_name}
+																	{item.completed_at && ` • ${formatDate(item.completed_at)}`}
+																</Text>
+															</div>
+														</Group>
+													</Card>
+												))}
+											</>
+										)}
 									</Stack>
-								</>
-							) : (
-								<Text c="dimmed" ta="center" py="xl">
-									No episodes pending download.
-								</Text>
-							)}
-						</Stack>
-					</Tabs.Panel>
-
-					{/* Completed Tab */}
-					<Tabs.Panel value="completed">
-						<Stack gap="md">
-							{completedLoading ? (
-								<Group justify="center" py="xl">
-									<Loader size="md" />
-								</Group>
-							) : completedError ? (
-								<Alert
-									icon={<AlertCircle size={16} />}
-									color="red"
-									withCloseButton={false}
-									title="Error loading completed downloads"
-								>
-									{completedError}
-									<Button
-										variant="subtle"
-										size="xs"
-										leftSection={<RefreshCw size={14} />}
-										onClick={fetchCompletedItems}
-										mt="xs"
-									>
-										Retry
-									</Button>
-								</Alert>
-							) : completedItems.length > 0 ? (
-								<Stack gap="xs">
-									{/* Recent section */}
-									{recentCompletedItems.length > 0 && (
-										<>
-											<Divider label="Recent" />
-											{recentCompletedItems.map((item) => (
-												<Card key={item.id} withBorder p="sm">
-													<Group justify="space-between" align="center" wrap="nowrap">
-														<div style={{ flex: 1, minWidth: 0 }}>
-															<Text size="sm" truncate>
-																{item.episode_title}
-															</Text>
-															<Text size="xs" c="dimmed" truncate>
-																{item.subscription_name}
-																{item.completed_at && ` • ${formatDate(item.completed_at)}`}
-															</Text>
-														</div>
-													</Group>
-												</Card>
-											))}
-										</>
-									)}
-
-									{/* Older section */}
-									{olderCompletedItems.length > 0 && (
-										<>
-											<Divider
-												label="Older"
-												mt={recentCompletedItems.length > 0 ? 'md' : undefined}
-											/>
-											{olderCompletedItems.map((item) => (
-												<Card key={item.id} withBorder p="sm">
-													<Group justify="space-between" align="center" wrap="nowrap">
-														<div style={{ flex: 1, minWidth: 0 }}>
-															<Text size="sm" truncate>
-																{item.episode_title}
-															</Text>
-															<Text size="xs" c="dimmed" truncate>
-																{item.subscription_name}
-																{item.completed_at && ` • ${formatDate(item.completed_at)}`}
-															</Text>
-														</div>
-													</Group>
-												</Card>
-											))}
-										</>
-									)}
-								</Stack>
-							) : (
-								<Text c="dimmed" ta="center" py="xl">
-									No completed downloads yet.
-								</Text>
-							)}
-						</Stack>
-					</Tabs.Panel>
-				</Stack>
-			</Container>
+								) : (
+									<Text c="dimmed" ta="center" py="xl">
+										No completed downloads yet.
+									</Text>
+								)}
+							</Stack>
+						</Tabs.Panel>
+					</Stack>
+				</Container>
+			</ScrollArea>
 		</Tabs>
 	);
 }

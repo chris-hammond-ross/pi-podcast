@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Container, Stack, Card, Text } from '@mantine/core';
+import { Container, Stack, Card, Text, ScrollArea } from '@mantine/core';
 import { PodcastSearch, PodcastResults, SubscribeModal } from '../components';
 import type { Podcast } from '../services';
 import { getPodcastById } from '../services';
@@ -71,7 +71,8 @@ function Search() {
 			style={{
 				height: 'var(--main-content-height)',
 				display: 'flex',
-				flexDirection: 'column'
+				flexDirection: 'column',
+				overflow: 'hidden'
 			}}
 		>
 			<Stack
@@ -79,7 +80,8 @@ function Search() {
 				style={{
 					flex: 1,
 					display: 'flex',
-					flexDirection: 'column'
+					flexDirection: 'column',
+					overflow: 'hidden'
 				}}
 			>
 				<PodcastSearch
@@ -90,10 +92,16 @@ function Search() {
 					}}
 				/>
 				{searchResults.length > 0 ? (
-					<PodcastResults
-						podcasts={searchResults}
-						onPodcastClick={handlePodcastClick}
-					/>
+					<ScrollArea
+						style={{ flex: 1 }}
+						scrollbars="y"
+						scrollbarSize={4}
+					>
+						<PodcastResults
+							podcasts={searchResults}
+							onPodcastClick={handlePodcastClick}
+						/>
+					</ScrollArea>
 				) : (
 					<Card
 						withBorder
