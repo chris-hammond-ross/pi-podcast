@@ -268,6 +268,7 @@ class DownloadProcessor extends EventEmitter {
 			const protocol = url.startsWith('https') ? https : http;
 
 			const request = protocol.get(url, {
+				family: 4,
 				headers: {
 					'User-Agent': 'Mozilla/5.0 (X11; Linux armv7l) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 					'Accept': '*/*',
