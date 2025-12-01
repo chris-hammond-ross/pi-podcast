@@ -238,7 +238,7 @@ function Downloads() {
 					height: 'var(--main-content-height)'
 				}}
 			>
-				<Container size="sm">
+				<Container size="sm" style={{ width: '100%' }}>
 					<Tabs.List justify='flex-start'>
 						<Tabs.Tab value="downloading">
 							Current {hasCurrentDownload ? '(1)' : ''}
