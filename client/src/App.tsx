@@ -18,6 +18,7 @@ function App() {
 						<Route path="/" element={<AppLayout />}>
 							<Route index element={<Navigate to="/podcasts" replace />} />
 							<Route path="podcasts" element={<Podcasts />} />
+							<Route path="podcasts/:subscriptionId" element={<Podcasts />} />
 							<Route path="playlists" element={<Playlists />} />
 							<Route path="search" element={<Search />} />
 							<Route path="search/:podcastId" element={<Search />} />

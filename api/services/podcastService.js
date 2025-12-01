@@ -6,7 +6,8 @@ const axios = require('axios');
  */
 class PodcastService {
 	constructor() {
-		this.iTunesApiUrl = 'https://itunes.apple.com/search';
+		this.iTunesSearchUrl = 'https://itunes.apple.com/search';
+		this.iTunesLookupUrl = 'https://itunes.apple.com/lookup';
 	}
 
 	/**
@@ -23,7 +24,7 @@ class PodcastService {
 
 			console.log('[podcast] Searching iTunes for:', searchTerm);
 
-			const response = await axios.get(this.iTunesApiUrl, {
+			const response = await axios.get(this.iTunesSearchUrl, {
 				params: {
 					term: searchTerm,
 					entity: 'podcast',
@@ -65,7 +66,7 @@ class PodcastService {
 		try {
 			console.log('[podcast] Fetching podcast details for ID:', podcastId);
 
-			const response = await axios.get(this.iTunesApiUrl, {
+			const response = await axios.get(this.iTunesLookupUrl, {
 				params: {
 					id: podcastId,
 					entity: 'podcast'
@@ -105,7 +106,7 @@ class PodcastService {
 	async getHealth() {
 		try {
 			// Do a lightweight search to verify the iTunes API is reachable
-			const response = await axios.get(this.iTunesApiUrl, {
+			const response = await axios.get(this.iTunesSearchUrl, {
 				params: {
 					term: 'test',
 					entity: 'podcast',

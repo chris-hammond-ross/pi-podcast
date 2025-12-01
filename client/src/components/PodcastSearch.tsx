@@ -2,7 +2,8 @@
  * Podcast Search Component
  * Provides a search input with debounced search functionality
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { TextInput, Loader } from '@mantine/core';
 import { Search, X } from 'lucide-react';
 import { usePodcastSearch } from '../hooks/usePodcastSearch';
@@ -18,26 +19,52 @@ function PodcastSearch({
 	onResultsChange,
 	placeholder = 'Search for podcasts...'
 }: PodcastSearchProps) {
-	const [searchTerm, setSearchTerm] = useState('');
+	const [searchParams, setSearchParams] = useSearchParams();
+	const initialQuery = searchParams.get('q') || '';
+	
+	const [searchTerm, setSearchTerm] = useState(initialQuery);
+	const [submittedTerm, setSubmittedTerm] = useState(initialQuery);
 	const { results, isSearching, error, search, clearResults } = usePodcastSearch();
+	
+	// Use ref to store callback to avoid stale closures
+	const onResultsChangeRef = useRef(onResultsChange);
+	onResultsChangeRef.current = onResultsChange;
+	
+	// Track if we've done the initial search
+	const hasInitialSearched = useRef(false);
+
+	// Perform initial search if there's a query in the URL
+	useEffect(() => {
+		if (initialQuery && !hasInitialSearched.current) {
+			hasInitialSearched.current = true;
+			search(initialQuery);
+		}
+	}, [initialQuery, search]);
 
 	const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
 		if (event.key === 'Enter') {
 			if (searchTerm.trim().length > 0) {
-				search(searchTerm);
+				const trimmedTerm = searchTerm.trim();
+				setSubmittedTerm(trimmedTerm);
+				// Update URL with search query
+				setSearchParams({ q: trimmedTerm }, { replace: true });
+				search(trimmedTerm);
 			}
 		}
 	};
 
 	// Notify parent of results changes
 	useEffect(() => {
-		if (onResultsChange) {
-			onResultsChange(results.length, results, searchTerm);
+		if (onResultsChangeRef.current) {
+			onResultsChangeRef.current(results.length, results, submittedTerm);
 		}
-	}, [results.length, onResultsChange]);
+	}, [results, submittedTerm]);
 
 	const handleClear = () => {
 		setSearchTerm('');
+		setSubmittedTerm('');
+		// Remove query from URL
+		setSearchParams({}, { replace: true });
 		clearResults();
 	};
 
