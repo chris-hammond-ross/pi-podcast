@@ -151,7 +151,7 @@ export function BluetoothInterface() {
 						{/* Connected Devices */}
 						{sortedConnected.length > 0 && (
 							<>
-								<Divider label="Connected" labelPosition="left" />
+								<Divider label="Connected" />
 								<DeviceGroup
 									devices={sortedConnected}
 									onDevicePress={handleDevicePress}
@@ -165,7 +165,7 @@ export function BluetoothInterface() {
 						{/* Paired Devices */}
 						{sortedPaired.length > 0 && (
 							<>
-								<Divider label="Paired" labelPosition="left" />
+								<Divider label="Paired" />
 								<DeviceGroup
 									devices={sortedPaired}
 									onDevicePress={handleDevicePress}
@@ -179,7 +179,7 @@ export function BluetoothInterface() {
 						{/* Discovered Devices */}
 						{sortedDiscovered.length > 0 && (
 							<>
-								<Divider label="Discovered" labelPosition="left" />
+								<Divider label="Discovered" />
 								<DeviceGroup
 									devices={sortedDiscovered}
 									onDevicePress={handleDevicePress}

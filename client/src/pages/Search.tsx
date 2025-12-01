@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Container, Stack, Card, Divider } from '@mantine/core';
+import { Container, Stack, Card, Text } from '@mantine/core';
 import { PodcastSearch, PodcastResults, SubscribeModal } from '../components';
 import type { Podcast } from '../services';
 import { getPodcastById } from '../services';
@@ -105,9 +105,9 @@ function Search() {
 						}}
 					>
 						{searchTerm === '' ? (
-							<Divider label="Please enter a search term" />
+							<Text c="dimmed">Please enter a search term</Text>
 						) : (
-							<Divider label="No Results" />
+							<Text c="dimmed">No Results</Text>
 						)}
 					</Card>
 				)}
