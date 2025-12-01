@@ -113,9 +113,6 @@ function Downloads() {
 	return (
 		<Tabs defaultValue="downloading">
 			<Container size="sm">
-				<Group justify="space-between" align="center" py="md">
-					<Title order={1}>Downloads</Title>
-				</Group>
 				<Tabs.List>
 					<Tabs.Tab value="downloading">
 						Downloading {hasCurrentDownload ? '(1)' : ''}
@@ -322,7 +319,7 @@ function Downloads() {
 									{/* Recent section */}
 									{recentCompletedItems.length > 0 && (
 										<>
-											<Divider label="Recent" labelPosition="left" />
+											<Divider label="Recent" />
 											{recentCompletedItems.map((item) => (
 												<Card key={item.id} withBorder p="sm">
 													<Group justify="space-between" align="center" wrap="nowrap">
@@ -346,7 +343,6 @@ function Downloads() {
 										<>
 											<Divider
 												label="Older"
-												labelPosition="left"
 												mt={recentCompletedItems.length > 0 ? 'md' : undefined}
 											/>
 											{olderCompletedItems.map((item) => (

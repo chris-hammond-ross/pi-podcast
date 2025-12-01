@@ -22,6 +22,10 @@
 	background-color: var(--mantine-color-gray-1);
 }
 
+.mantine-Tabs-list {
+	flex-wrap: nowrap;
+}
+
 [data-mantine-color-scheme='dark'] .mantine-Card-root {
 	background-color: var(--mantine-color-dark-6);
 }
@@ -39,6 +43,7 @@
 	from {
 		transform: rotate(0deg);
 	}
+
 	to {
 		transform: rotate(360deg);
 	}
