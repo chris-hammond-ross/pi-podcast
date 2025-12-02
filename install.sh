@@ -223,6 +223,19 @@ configure_pulseaudio_system() {
     pkill -9 pulseaudio 2>/dev/null || true
     sleep 1
 
+    # Create PulseAudio runtime directory with correct permissions
+    # This is critical - PulseAudio system mode needs this directory
+    mkdir -p /run/pulse
+    chown pulse:pulse /run/pulse
+    chmod 755 /run/pulse
+
+    # Create state directory for PulseAudio
+    mkdir -p /var/lib/pulse
+    chown pulse:pulse /var/lib/pulse
+    chmod 755 /var/lib/pulse
+
+    print_success "Created PulseAudio runtime directories"
+
     # Create PulseAudio system configuration directory
     mkdir -p /etc/pulse
 
@@ -265,45 +278,60 @@ EOF
     print_success "Created PulseAudio system configuration"
 
     # Create systemd service for PulseAudio in system mode
-    cat > "$PULSEAUDIO_SERVICE_FILE" << EOF
+    # Run as root but drop to pulse user via PulseAudio's own mechanism
+    cat > "$PULSEAUDIO_SERVICE_FILE" << 'EOF'
 [Unit]
 Description=PulseAudio System-Wide Server
-After=bluetooth.service
+After=bluetooth.service sound.target
 Wants=bluetooth.service
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/pulseaudio --system --disallow-exit --disallow-module-loading=0 --log-target=journal
+ExecStartPre=/bin/mkdir -p /run/pulse
+ExecStartPre=/bin/chown pulse:pulse /run/pulse
+ExecStart=/usr/bin/pulseaudio --system --realtime --disallow-exit --disallow-module-loading=0 --log-target=journal
 Restart=on-failure
 RestartSec=5
-
-# Allow access to audio devices
-User=pulse
-Group=pulse
-SupplementaryGroups=audio bluetooth
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
+    print_success "Created PulseAudio systemd service"
+
     # Add pi-podcast user to pulse-access group for PulseAudio access
     if getent group pulse-access &>/dev/null; then
         usermod -aG pulse-access "$SERVICE_USER"
         print_success "Added $SERVICE_USER to pulse-access group"
+    else
+        # Create pulse-access group if it doesn't exist
+        groupadd --system pulse-access
+        usermod -aG pulse-access "$SERVICE_USER"
+        print_success "Created pulse-access group and added $SERVICE_USER"
     fi
+
+    # Also add pulse user to audio and bluetooth groups
+    usermod -aG audio,bluetooth pulse 2>/dev/null || true
+    print_success "Added pulse user to audio and bluetooth groups"
 
     # Reload systemd and enable the service
     systemctl daemon-reload
     systemctl enable pulseaudio-system
-    systemctl restart pulseaudio-system
-    sleep 2
 
-    # Verify PulseAudio is running
-    if systemctl is-active --quiet pulseaudio-system; then
-        print_success "PulseAudio system service started"
+    # Start PulseAudio system service
+    if systemctl start pulseaudio-system; then
+        sleep 2
+        if systemctl is-active --quiet pulseaudio-system; then
+            print_success "PulseAudio system service started"
+        else
+            print_error "PulseAudio system service failed to stay running"
+            print_info "Check logs with: journalctl -u pulseaudio-system -n 50"
+            exit 1
+        fi
     else
         print_error "Failed to start PulseAudio system service"
-        print_info "Check logs with: journalctl -u pulseaudio-system"
+        print_info "Check logs with: journalctl -u pulseaudio-system -n 50"
+        exit 1
     fi
 }
 
