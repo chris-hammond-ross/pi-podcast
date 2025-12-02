@@ -108,6 +108,7 @@ function createTables(database) {
 		CREATE INDEX IF NOT EXISTS idx_episodes_subscription_id ON episodes(subscription_id);
 		CREATE INDEX IF NOT EXISTS idx_episodes_guid ON episodes(guid);
 		CREATE INDEX IF NOT EXISTS idx_episodes_downloaded_at ON episodes(downloaded_at);
+		CREATE INDEX IF NOT EXISTS idx_episodes_last_played_at ON episodes(last_played_at);
 		CREATE INDEX IF NOT EXISTS idx_download_queue_status ON download_queue(status);
 		CREATE INDEX IF NOT EXISTS idx_download_queue_episode_id ON download_queue(episode_id);
 	`);
@@ -126,6 +127,8 @@ function runMigrations(database) {
 		return result.some(col => col.name === column);
 	};
 
+	// === Subscription migrations ===
+
 	// Add auto_download columns to subscriptions if they don't exist
 	if (!columnExists('subscriptions', 'auto_download')) {
 		database.exec('ALTER TABLE subscriptions ADD COLUMN auto_download INTEGER DEFAULT 0');
@@ -135,6 +138,26 @@ function runMigrations(database) {
 	if (!columnExists('subscriptions', 'auto_download_limit')) {
 		database.exec('ALTER TABLE subscriptions ADD COLUMN auto_download_limit INTEGER DEFAULT 5');
 		console.log('[database] Added auto_download_limit column to subscriptions');
+	}
+
+	// === Episode playback migrations ===
+
+	// Add playback_position column for resume functionality
+	if (!columnExists('episodes', 'playback_position')) {
+		database.exec('ALTER TABLE episodes ADD COLUMN playback_position INTEGER DEFAULT 0');
+		console.log('[database] Added playback_position column to episodes');
+	}
+
+	// Add playback_completed flag to track finished episodes
+	if (!columnExists('episodes', 'playback_completed')) {
+		database.exec('ALTER TABLE episodes ADD COLUMN playback_completed INTEGER DEFAULT 0');
+		console.log('[database] Added playback_completed column to episodes');
+	}
+
+	// Add last_played_at timestamp
+	if (!columnExists('episodes', 'last_played_at')) {
+		database.exec('ALTER TABLE episodes ADD COLUMN last_played_at INTEGER');
+		console.log('[database] Added last_played_at column to episodes');
 	}
 }
 

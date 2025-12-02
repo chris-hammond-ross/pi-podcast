@@ -1,5 +1,5 @@
 const { getHealth: getDatabaseHealth } = require('../config/database');
-const { bluetoothService } = require('../services');
+const { bluetoothService, mediaPlayerService } = require('../services');
 const podcastService = require('../services/podcastService');
 
 // Track server start time for uptime calculation
@@ -37,6 +37,19 @@ async function getHealth(options = {}) {
 	// Add mock_mode flag if present
 	if (bluetoothHealth.mock_mode) {
 		health.services.bluetooth.mockMode = true;
+	}
+
+	// Media player health
+	const mediaHealth = mediaPlayerService.getHealth();
+	health.services.mediaPlayer = {
+		status: mediaHealth.status,
+		mpvRunning: mediaHealth.mpvRunning,
+		socketConnected: mediaHealth.socketConnected
+	};
+
+	// Add mock_mode flag if present
+	if (mediaHealth.mockMode) {
+		health.services.mediaPlayer.mockMode = true;
 	}
 
 	// Podcast service health

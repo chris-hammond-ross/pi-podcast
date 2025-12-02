@@ -7,7 +7,7 @@ const corsMiddleware = require('./middleware/cors');
 const errorHandler = require('./middleware/errorHandler');
 const routes = require('./routes');
 const { initializeWebSocket } = require('./websocket');
-const { bluetoothService, downloadProcessor } = require('./services');
+const { bluetoothService, downloadProcessor, mediaPlayerService } = require('./services');
 const { getHealth } = require('./utils/health');
 
 const app = express();
@@ -49,29 +49,41 @@ app.use(errorHandler);
 initializeWebSocket(server);
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
 	console.log(`[server] Listening on http://localhost:${PORT}`);
+	
 	console.log('[server] Starting Bluetooth initialization...');
 	bluetoothService.initialize();
+	
 	console.log('[server] Starting download processor...');
 	downloadProcessor.start();
+	
+	console.log('[server] Starting media player initialization...');
+	try {
+		await mediaPlayerService.initialize();
+	} catch (err) {
+		console.error('[server] Media player initialization failed:', err.message);
+		console.log('[server] Continuing without media player - playback will not be available');
+	}
 });
 
 // Cleanup on exit
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
 	console.log('[server] Shutting down...');
 	downloadProcessor.stop();
 	bluetoothService.cleanup();
+	await mediaPlayerService.cleanup();
 	closeDatabase();
 	server.close(() => {
 		process.exit(0);
 	});
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
 	console.log('[server] Shutting down...');
 	downloadProcessor.stop();
 	bluetoothService.cleanup();
+	await mediaPlayerService.cleanup();
 	closeDatabase();
 	server.close(() => {
 		process.exit(0);

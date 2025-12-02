@@ -19,8 +19,15 @@ cleanup() {
             systemctl disable pi-podcast 2>/dev/null || true
         fi
 
-        # Remove service file if it exists
+        # Stop and disable PulseAudio system service if it was created
+        if systemctl is-enabled pulseaudio-system &>/dev/null; then
+            systemctl stop pulseaudio-system 2>/dev/null || true
+            systemctl disable pulseaudio-system 2>/dev/null || true
+        fi
+
+        # Remove service files if they exist
         [ -f "$SERVICE_FILE" ] && rm -f "$SERVICE_FILE"
+        [ -f "$PULSEAUDIO_SERVICE_FILE" ] && rm -f "$PULSEAUDIO_SERVICE_FILE"
 
         # Remove installation directory if it was created during this run
         if [ "$INSTALL_DIR_CREATED" = "true" ] && [ -d "$INSTALL_DIR" ]; then
@@ -50,11 +57,15 @@ NC='\033[0m' # No Color
 REPO_URL="https://github.com/chris-hammond-ross/pi-podcast.git"
 INSTALL_DIR="/opt/pi-podcast"
 SERVICE_FILE="/etc/systemd/system/pi-podcast.service"
+PULSEAUDIO_SERVICE_FILE="/etc/systemd/system/pulseaudio-system.service"
 DB_FILE="/opt/pi-podcast/api/podcast.db"
 NODE_VERSION="20"
-INSTALL_USER="${SUDO_USER:-pi}"
+SERVICE_USER="pi-podcast"
+SERVICE_GROUP="pi-podcast"
 HOSTNAME="pi-podcast"
 PORT="80"
+RUNTIME_DIR="/run/pi-podcast"
+MPV_SOCKET="/run/pi-podcast/mpv.sock"
 
 # Parse arguments
 SKIP_HOSTNAME=false
@@ -119,6 +130,34 @@ update_system() {
     print_success "System packages updated"
 }
 
+create_service_user() {
+    print_header "Creating service user and group"
+
+    # Create system group if it doesn't exist
+    if ! getent group "$SERVICE_GROUP" &>/dev/null; then
+        groupadd --system "$SERVICE_GROUP"
+        print_success "Created system group: $SERVICE_GROUP"
+    else
+        print_info "Group $SERVICE_GROUP already exists"
+    fi
+
+    # Create system user if it doesn't exist
+    if ! id "$SERVICE_USER" &>/dev/null; then
+        useradd --system \
+            --no-create-home \
+            --shell /usr/sbin/nologin \
+            --gid "$SERVICE_GROUP" \
+            "$SERVICE_USER"
+        print_success "Created system user: $SERVICE_USER"
+    else
+        print_info "User $SERVICE_USER already exists"
+    fi
+
+    # Add user to required groups
+    usermod -aG bluetooth,audio "$SERVICE_USER"
+    print_success "Added $SERVICE_USER to bluetooth and audio groups"
+}
+
 install_nodejs() {
     print_header "Installing Node.js and npm"
 
@@ -151,7 +190,7 @@ install_nodejs() {
 install_dependencies() {
     print_header "Installing dependencies"
 
-    # Install git, bluez, sqlite3, pulseaudio and related packages
+    # Install git, bluez, sqlite3, pulseaudio, mpv and related packages
     apt-get install -y \
         git \
         bluez \
@@ -161,9 +200,10 @@ install_dependencies() {
         avahi-daemon \
         sqlite3 \
         pulseaudio \
-        pulseaudio-module-bluetooth
+        pulseaudio-module-bluetooth \
+        mpv
 
-    print_success "Dependencies installed"
+    print_success "Dependencies installed (including MPV)"
 
     # Enable Bluetooth service
     systemctl enable bluetooth
@@ -176,56 +216,95 @@ install_dependencies() {
     print_success "Avahi daemon enabled and started"
 }
 
-configure_user_permissions() {
-    print_header "Configuring user permissions"
+configure_pulseaudio_system() {
+    print_header "Configuring PulseAudio in system mode"
 
-    # Add user to bluetooth group
-    if groups "$INSTALL_USER" | grep -q "\bbluetooth\b"; then
-        print_info "User $INSTALL_USER already in bluetooth group"
-    else
-        usermod -aG bluetooth "$INSTALL_USER"
-        print_success "Added $INSTALL_USER to bluetooth group"
-    fi
-
-    # Add user to audio group (for PulseAudio)
-    if groups "$INSTALL_USER" | grep -q "\baudio\b"; then
-        print_info "User $INSTALL_USER already in audio group"
-    else
-        usermod -aG audio "$INSTALL_USER"
-        print_success "Added $INSTALL_USER to audio group"
-    fi
-
-    print_success "User permissions configured"
-}
-
-configure_pulseaudio() {
-    print_header "Configuring PulseAudio for Bluetooth"
-
-    # Kill any existing PulseAudio instances for the user
-    su - "$INSTALL_USER" -c "pulseaudio --kill" 2>/dev/null || true
+    # Stop any user-mode PulseAudio instances
+    pkill -9 pulseaudio 2>/dev/null || true
     sleep 1
 
-    # Restart Bluetooth to pick up PulseAudio module
-    systemctl restart bluetooth
-    print_success "Bluetooth service restarted"
+    # Create PulseAudio system configuration directory
+    mkdir -p /etc/pulse
 
-    # Start PulseAudio as the install user in daemon mode
-    su - "$INSTALL_USER" -c "pulseaudio --start --daemonize" 2>/dev/null || true
-    sleep 1
+    # Create system-wide PulseAudio configuration
+    cat > /etc/pulse/system.pa << 'EOF'
+#!/usr/bin/pulseaudio -nF
+
+# System-mode PulseAudio configuration for Pi Podcast
+
+# Load device detection modules
+load-module module-udev-detect
+load-module module-detect
+
+# Load the native protocol for local connections
+load-module module-native-protocol-unix auth-anonymous=1
+
+# Bluetooth support
+load-module module-bluetooth-policy
+load-module module-bluetooth-discover
+
+# Automatically switch to newly connected devices
+load-module module-switch-on-connect
+
+# Default sink/source management
+load-module module-default-device-restore
+load-module module-always-sink
+load-module module-intended-roles
+
+# Rescue streams to default sink if their sink disappears
+load-module module-rescue-streams
+
+# Position event sounds between the left and right outputs
+load-module module-position-event-sounds
+
+# Stream/card restoration
+load-module module-card-restore
+load-module module-stream-restore restore_device=false
+EOF
+
+    print_success "Created PulseAudio system configuration"
+
+    # Create systemd service for PulseAudio in system mode
+    cat > "$PULSEAUDIO_SERVICE_FILE" << EOF
+[Unit]
+Description=PulseAudio System-Wide Server
+After=bluetooth.service
+Wants=bluetooth.service
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/pulseaudio --system --disallow-exit --disallow-module-loading=0 --log-target=journal
+Restart=on-failure
+RestartSec=5
+
+# Allow access to audio devices
+User=pulse
+Group=pulse
+SupplementaryGroups=audio bluetooth
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Add pi-podcast user to pulse-access group for PulseAudio access
+    if getent group pulse-access &>/dev/null; then
+        usermod -aG pulse-access "$SERVICE_USER"
+        print_success "Added $SERVICE_USER to pulse-access group"
+    fi
+
+    # Reload systemd and enable the service
+    systemctl daemon-reload
+    systemctl enable pulseaudio-system
+    systemctl restart pulseaudio-system
+    sleep 2
 
     # Verify PulseAudio is running
-    if su - "$INSTALL_USER" -c "pulseaudio --check" 2>/dev/null; then
-        print_success "PulseAudio started for user $INSTALL_USER"
+    if systemctl is-active --quiet pulseaudio-system; then
+        print_success "PulseAudio system service started"
     else
-        print_error "Failed to start PulseAudio"
-        print_info "Will attempt to start during service startup"
+        print_error "Failed to start PulseAudio system service"
+        print_info "Check logs with: journalctl -u pulseaudio-system"
     fi
-
-    # Load Bluetooth discovery module
-    su - "$INSTALL_USER" -c "pactl load-module module-bluetooth-discover" 2>/dev/null || true
-    print_success "Bluetooth discover module loaded"
-
-    print_info "PulseAudio configured for A2DP audio source"
 }
 
 enable_bluetooth_adapter() {
@@ -295,10 +374,21 @@ clone_repository() {
 
     cd "$INSTALL_DIR"
 
-    # Set ownership to install user
-    chown -R "$INSTALL_USER:$INSTALL_USER" "$INSTALL_DIR"
+    # Set ownership to service user
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR"
 
     print_success "Repository cloned to $INSTALL_DIR"
+}
+
+create_runtime_directory() {
+    print_header "Creating runtime directory for sockets"
+
+    # Create runtime directory with correct permissions
+    mkdir -p "$RUNTIME_DIR"
+    chown "$SERVICE_USER:$SERVICE_GROUP" "$RUNTIME_DIR"
+    chmod 750 "$RUNTIME_DIR"
+
+    print_success "Runtime directory created at $RUNTIME_DIR"
 }
 
 initialize_database() {
@@ -308,12 +398,21 @@ initialize_database() {
     # Schema is created by Node.js when the server starts
     if [ ! -f "$DB_FILE" ]; then
         touch "$DB_FILE"
-        chown "$INSTALL_USER:$INSTALL_USER" "$DB_FILE"
-        chmod 644 "$DB_FILE"
         print_success "Database file created at $DB_FILE"
     else
         print_info "Database already exists at $DB_FILE"
     fi
+
+    # Ensure correct ownership
+    chown "$SERVICE_USER:$SERVICE_GROUP" "$DB_FILE"
+    chmod 644 "$DB_FILE"
+
+    # Also ensure the downloads directory exists and has correct permissions
+    mkdir -p "$INSTALL_DIR/api/downloads"
+    chown "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/api/downloads"
+    chmod 755 "$INSTALL_DIR/api/downloads"
+
+    print_success "Database and downloads directory configured"
 }
 
 install_api_dependencies() {
@@ -329,6 +428,9 @@ install_api_dependencies() {
         npm install
     fi
 
+    # Ensure node_modules is owned by service user
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/api/node_modules"
+
     print_success "API dependencies installed"
 }
 
@@ -343,6 +445,9 @@ build_react_frontend() {
     mkdir -p "$INSTALL_DIR/api/public"
     cp -r "$INSTALL_DIR/client/dist"/* "$INSTALL_DIR/api/public/"
 
+    # Ensure correct ownership
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/api/public"
+
     print_success "React frontend built and copied to server public directory"
 }
 
@@ -352,20 +457,42 @@ create_systemd_service() {
     cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=Pi Podcast Application
-After=network.target bluetooth.service pulseaudio.service
-Wants=bluetooth.service
+After=network.target bluetooth.service pulseaudio-system.service
+Wants=bluetooth.service pulseaudio-system.service
 
 [Service]
 Type=simple
-User=root
+User=$SERVICE_USER
+Group=$SERVICE_GROUP
 WorkingDirectory=$INSTALL_DIR/api
-ExecStartPre=/bin/su - $INSTALL_USER -c "pulseaudio --check || pulseaudio --start --daemonize"
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=10
+
+# Environment
 Environment="PORT=$PORT"
+Environment="NODE_ENV=production"
+Environment="PULSE_SERVER=unix:/run/pulse/native"
+Environment="MPV_SOCKET=$MPV_SOCKET"
+
+# Runtime directory for sockets (created automatically by systemd)
+RuntimeDirectory=pi-podcast
+RuntimeDirectoryMode=0750
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=$INSTALL_DIR/api
+ReadWritePaths=$RUNTIME_DIR
+
+# Logging
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=pi-podcast
+
+# Capabilities needed for low port binding
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
 WantedBy=multi-user.target
@@ -387,12 +514,14 @@ print_installation_summary() {
     echo "  - Service name: pi-podcast"
     echo "  - Installation directory: $INSTALL_DIR"
     echo "  - Database: $DB_FILE"
-    echo "  - Running as: root (PulseAudio runs as $INSTALL_USER)"
+    echo "  - Runtime directory: $RUNTIME_DIR"
+    echo "  - MPV socket: $MPV_SOCKET"
     echo "  - Port: $PORT"
     echo ""
-    echo "User Configuration:"
-    echo "  - User: $INSTALL_USER"
-    echo "  - Groups: bluetooth, audio"
+    echo "Service User:"
+    echo "  - User: $SERVICE_USER"
+    echo "  - Group: $SERVICE_GROUP"
+    echo "  - Member of: bluetooth, audio, pulse-access"
     echo ""
     echo "Useful commands:"
     echo -e "  Start service:    ${BLUE}sudo systemctl start pi-podcast${NC}"
@@ -401,10 +530,10 @@ print_installation_summary() {
     echo -e "  Check status:     ${BLUE}sudo systemctl status pi-podcast${NC}"
     echo -e "  Restart service:  ${BLUE}sudo systemctl restart pi-podcast${NC}"
     echo ""
-    echo "PulseAudio commands (as $INSTALL_USER):"
-    echo -e "  Check status:     ${BLUE}pulseaudio --check && echo 'Running' || echo 'Not running'${NC}"
-    echo -e "  Start:            ${BLUE}pulseaudio --start${NC}"
-    echo -e "  Restart:          ${BLUE}pulseaudio --kill && pulseaudio --start${NC}"
+    echo "PulseAudio (system mode):"
+    echo -e "  Check status:     ${BLUE}sudo systemctl status pulseaudio-system${NC}"
+    echo -e "  View logs:        ${BLUE}sudo journalctl -u pulseaudio-system -f${NC}"
+    echo -e "  Restart:          ${BLUE}sudo systemctl restart pulseaudio-system${NC}"
     echo ""
     echo "Access the application:"
     if [ "$SKIP_HOSTNAME" = false ]; then
@@ -442,12 +571,13 @@ main() {
     # Installation steps
     update_system
     install_dependencies
-    configure_user_permissions
-    configure_pulseaudio
+    create_service_user
+    configure_pulseaudio_system
     enable_bluetooth_adapter
     install_nodejs
     configure_hostname
     clone_repository
+    create_runtime_directory
     initialize_database
     install_api_dependencies
     build_react_frontend

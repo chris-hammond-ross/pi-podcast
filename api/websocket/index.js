@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const { bluetoothService, downloadProcessor, downloadQueueService } = require('../services');
+const { bluetoothService, downloadProcessor, downloadQueueService, mediaPlayerService } = require('../services');
 
 /**
  * Initialize WebSocket server and set up event handlers
@@ -21,8 +21,14 @@ function initializeWebSocket(server) {
 	// Set up broadcast callback for Bluetooth service
 	bluetoothService.setBroadcastCallback(broadcast);
 
+	// Set up broadcast callback for Media Player service
+	mediaPlayerService.setBroadcastCallback(broadcast);
+
 	// Set up download processor event handlers
 	setupDownloadEvents(downloadProcessor, broadcast);
+
+	// Set up media player event handlers
+	setupMediaEvents(mediaPlayerService, broadcast);
 
 	wss.on('connection', (ws) => {
 		console.log('[websocket] Client connected');
@@ -49,6 +55,9 @@ function initializeWebSocket(server) {
 
 		// Send current download status to new client
 		sendDownloadStatus(ws);
+
+		// Send current media player status to new client
+		sendMediaStatus(ws);
 
 		ws.on('message', (message) => {
 			try {
@@ -82,9 +91,15 @@ function initializeWebSocket(server) {
 
 					// Also send download status
 					sendDownloadStatus(ws);
+
+					// Also send media status
+					sendMediaStatus(ws);
 				} else if (data.type === 'request-download-status') {
 					// Client specifically requesting download status
 					sendDownloadStatus(ws);
+				} else if (data.type === 'request-media-status') {
+					// Client specifically requesting media player status
+					sendMediaStatus(ws);
 				}
 			} catch (err) {
 				console.error('[websocket] Parse error:', err.message);
@@ -182,6 +197,32 @@ function setupDownloadEvents(processor, broadcast) {
 }
 
 /**
+ * Set up media player event handlers
+ * @param {MediaPlayerService} player - The media player service instance
+ * @param {Function} broadcast - Broadcast function
+ */
+function setupMediaEvents(player, broadcast) {
+	player.on('playback-complete', (data) => {
+		console.log('[websocket] Playback complete event:', data);
+	});
+
+	player.on('playback-error', (data) => {
+		console.log('[websocket] Playback error event:', data);
+	});
+
+	player.on('mpv-exit', () => {
+		console.log('[websocket] MPV exited');
+		broadcast({
+			type: 'media:mpv-exit'
+		});
+	});
+
+	player.on('error', (data) => {
+		console.error('[websocket] Media player error:', data);
+	});
+}
+
+/**
  * Broadcast current queue status to all clients
  * @param {Function} broadcast - Broadcast function
  */
@@ -201,6 +242,18 @@ function sendDownloadStatus(ws) {
 	const status = downloadProcessor.getStatus();
 	sendToClient(ws, {
 		type: 'download:queue-status',
+		...status
+	});
+}
+
+/**
+ * Send media player status to a specific client
+ * @param {WebSocket} ws - The WebSocket client
+ */
+function sendMediaStatus(ws) {
+	const status = mediaPlayerService.getStatus();
+	sendToClient(ws, {
+		type: 'media:status',
 		...status
 	});
 }
