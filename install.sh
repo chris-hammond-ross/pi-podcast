@@ -19,10 +19,10 @@ cleanup() {
             systemctl disable pi-podcast 2>/dev/null || true
         fi
 
-        # Stop and disable PulseAudio system service if it was created
-        if systemctl is-enabled pulseaudio-system &>/dev/null; then
-            systemctl stop pulseaudio-system 2>/dev/null || true
-            systemctl disable pulseaudio-system 2>/dev/null || true
+        # Stop and disable PulseAudio service if it was created
+        if systemctl is-enabled pulseaudio-pi-podcast &>/dev/null; then
+            systemctl stop pulseaudio-pi-podcast 2>/dev/null || true
+            systemctl disable pulseaudio-pi-podcast 2>/dev/null || true
         fi
 
         # Remove service files if they exist
@@ -57,11 +57,12 @@ NC='\033[0m' # No Color
 REPO_URL="https://github.com/chris-hammond-ross/pi-podcast.git"
 INSTALL_DIR="/opt/pi-podcast"
 SERVICE_FILE="/etc/systemd/system/pi-podcast.service"
-PULSEAUDIO_SERVICE_FILE="/etc/systemd/system/pulseaudio-system.service"
+PULSEAUDIO_SERVICE_FILE="/etc/systemd/system/pulseaudio-pi-podcast.service"
 DB_FILE="/opt/pi-podcast/api/podcast.db"
 NODE_VERSION="20"
 SERVICE_USER="pi-podcast"
 SERVICE_GROUP="pi-podcast"
+SERVICE_HOME="/var/lib/pi-podcast"
 HOSTNAME="pi-podcast"
 PORT="80"
 RUNTIME_DIR="/run/pi-podcast"
@@ -141,15 +142,19 @@ create_service_user() {
         print_info "Group $SERVICE_GROUP already exists"
     fi
 
-    # Create system user if it doesn't exist
+    # Create system user with home directory (needed for PulseAudio)
     if ! id "$SERVICE_USER" &>/dev/null; then
         useradd --system \
-            --no-create-home \
+            --home-dir "$SERVICE_HOME" \
+            --create-home \
             --shell /usr/sbin/nologin \
             --gid "$SERVICE_GROUP" \
             "$SERVICE_USER"
-        print_success "Created system user: $SERVICE_USER"
+        print_success "Created system user: $SERVICE_USER with home $SERVICE_HOME"
     else
+        # Ensure home directory exists even if user already exists
+        mkdir -p "$SERVICE_HOME"
+        chown "$SERVICE_USER:$SERVICE_GROUP" "$SERVICE_HOME"
         print_info "User $SERVICE_USER already exists"
     fi
 
@@ -216,82 +221,90 @@ install_dependencies() {
     print_success "Avahi daemon enabled and started"
 }
 
-configure_pulseaudio_system() {
-    print_header "Configuring PulseAudio in system mode"
+configure_pulseaudio() {
+    print_header "Configuring PulseAudio for $SERVICE_USER"
 
-    # Stop any user-mode PulseAudio instances
+    # Stop any existing PulseAudio instances
     pkill -9 pulseaudio 2>/dev/null || true
     sleep 1
 
-    # Create PulseAudio runtime directory with correct permissions
-    # This is critical - PulseAudio system mode needs this directory
-    mkdir -p /run/pulse
-    chown pulse:pulse /run/pulse
-    chmod 755 /run/pulse
+    # Create XDG_RUNTIME_DIR for the service user
+    local PA_RUNTIME_DIR="$RUNTIME_DIR/pulse"
+    mkdir -p "$PA_RUNTIME_DIR"
+    chown "$SERVICE_USER:$SERVICE_GROUP" "$PA_RUNTIME_DIR"
+    chmod 700 "$PA_RUNTIME_DIR"
 
-    # Create state directory for PulseAudio
-    mkdir -p /var/lib/pulse
-    chown pulse:pulse /var/lib/pulse
-    chmod 755 /var/lib/pulse
+    # Create PulseAudio config directory
+    local PA_CONFIG_DIR="$SERVICE_HOME/.config/pulse"
+    mkdir -p "$PA_CONFIG_DIR"
 
-    print_success "Created PulseAudio runtime directories"
-
-    # Create PulseAudio system configuration directory
-    mkdir -p /etc/pulse
-
-    # Create system-wide PulseAudio configuration
-    cat > /etc/pulse/system.pa << 'EOF'
+    # Create a custom PulseAudio configuration
+    cat > "$PA_CONFIG_DIR/default.pa" << 'EOF'
 #!/usr/bin/pulseaudio -nF
 
-# System-mode PulseAudio configuration for Pi Podcast
+# Pi Podcast PulseAudio configuration
 
-# Load device detection modules
+# Load device detection
+.ifexists module-udev-detect.so
 load-module module-udev-detect
+.else
 load-module module-detect
+.endif
 
-# Load the native protocol for local connections
-load-module module-native-protocol-unix auth-anonymous=1
+# Load the native protocol
+load-module module-native-protocol-unix
 
 # Bluetooth support
+.ifexists module-bluetooth-policy.so
 load-module module-bluetooth-policy
+.endif
+
+.ifexists module-bluetooth-discover.so
 load-module module-bluetooth-discover
+.endif
 
 # Automatically switch to newly connected devices
 load-module module-switch-on-connect
 
-# Default sink/source management
-load-module module-default-device-restore
+# Always have a sink available
 load-module module-always-sink
+
+# Honor intended roles
 load-module module-intended-roles
 
-# Rescue streams to default sink if their sink disappears
+# Rescue streams when sinks disappear
 load-module module-rescue-streams
 
-# Position event sounds between the left and right outputs
-load-module module-position-event-sounds
-
-# Stream/card restoration
+# Restore defaults
+load-module module-default-device-restore
 load-module module-card-restore
 load-module module-stream-restore restore_device=false
 EOF
 
-    print_success "Created PulseAudio system configuration"
+    # Set ownership
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$SERVICE_HOME/.config"
+    print_success "Created PulseAudio configuration"
 
-    # Create systemd service for PulseAudio in system mode
-    # Run as root but drop to pulse user via PulseAudio's own mechanism
-    cat > "$PULSEAUDIO_SERVICE_FILE" << 'EOF'
+    # Create systemd service for PulseAudio running as pi-podcast user
+    cat > "$PULSEAUDIO_SERVICE_FILE" << EOF
 [Unit]
-Description=PulseAudio System-Wide Server
+Description=PulseAudio Sound Server for Pi Podcast
 After=bluetooth.service sound.target
 Wants=bluetooth.service
 
 [Service]
-Type=notify
-ExecStartPre=/bin/mkdir -p /run/pulse
-ExecStartPre=/bin/chown pulse:pulse /run/pulse
-ExecStart=/usr/bin/pulseaudio --system --realtime --disallow-exit --disallow-module-loading=0 --log-target=journal
+Type=simple
+User=$SERVICE_USER
+Group=$SERVICE_GROUP
+Environment="HOME=$SERVICE_HOME"
+Environment="XDG_RUNTIME_DIR=$RUNTIME_DIR"
+ExecStart=/usr/bin/pulseaudio --daemonize=no --exit-idle-time=-1 --log-target=journal
 Restart=on-failure
 RestartSec=5
+
+# Runtime directory
+RuntimeDirectory=pi-podcast
+RuntimeDirectoryMode=0755
 
 [Install]
 WantedBy=multi-user.target
@@ -299,38 +312,23 @@ EOF
 
     print_success "Created PulseAudio systemd service"
 
-    # Add pi-podcast user to pulse-access group for PulseAudio access
-    if getent group pulse-access &>/dev/null; then
-        usermod -aG pulse-access "$SERVICE_USER"
-        print_success "Added $SERVICE_USER to pulse-access group"
-    else
-        # Create pulse-access group if it doesn't exist
-        groupadd --system pulse-access
-        usermod -aG pulse-access "$SERVICE_USER"
-        print_success "Created pulse-access group and added $SERVICE_USER"
-    fi
-
-    # Also add pulse user to audio and bluetooth groups
-    usermod -aG audio,bluetooth pulse 2>/dev/null || true
-    print_success "Added pulse user to audio and bluetooth groups"
-
     # Reload systemd and enable the service
     systemctl daemon-reload
-    systemctl enable pulseaudio-system
+    systemctl enable pulseaudio-pi-podcast
 
-    # Start PulseAudio system service
-    if systemctl start pulseaudio-system; then
+    # Start PulseAudio service
+    if systemctl start pulseaudio-pi-podcast; then
         sleep 2
-        if systemctl is-active --quiet pulseaudio-system; then
-            print_success "PulseAudio system service started"
+        if systemctl is-active --quiet pulseaudio-pi-podcast; then
+            print_success "PulseAudio service started for $SERVICE_USER"
         else
-            print_error "PulseAudio system service failed to stay running"
-            print_info "Check logs with: journalctl -u pulseaudio-system -n 50"
+            print_error "PulseAudio service failed to stay running"
+            print_info "Check logs with: journalctl -u pulseaudio-pi-podcast -n 50"
             exit 1
         fi
     else
-        print_error "Failed to start PulseAudio system service"
-        print_info "Check logs with: journalctl -u pulseaudio-system -n 50"
+        print_error "Failed to start PulseAudio service"
+        print_info "Check logs with: journalctl -u pulseaudio-pi-podcast -n 50"
         exit 1
     fi
 }
@@ -412,9 +410,10 @@ create_runtime_directory() {
     print_header "Creating runtime directory for sockets"
 
     # Create runtime directory with correct permissions
+    # Note: This may already exist from PulseAudio setup
     mkdir -p "$RUNTIME_DIR"
     chown "$SERVICE_USER:$SERVICE_GROUP" "$RUNTIME_DIR"
-    chmod 750 "$RUNTIME_DIR"
+    chmod 755 "$RUNTIME_DIR"
 
     print_success "Runtime directory created at $RUNTIME_DIR"
 }
@@ -485,8 +484,9 @@ create_systemd_service() {
     cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=Pi Podcast Application
-After=network.target bluetooth.service pulseaudio-system.service
-Wants=bluetooth.service pulseaudio-system.service
+After=network.target bluetooth.service pulseaudio-pi-podcast.service
+Wants=bluetooth.service
+Requires=pulseaudio-pi-podcast.service
 
 [Service]
 Type=simple
@@ -500,12 +500,13 @@ RestartSec=10
 # Environment
 Environment="PORT=$PORT"
 Environment="NODE_ENV=production"
-Environment="PULSE_SERVER=unix:/run/pulse/native"
+Environment="HOME=$SERVICE_HOME"
+Environment="XDG_RUNTIME_DIR=$RUNTIME_DIR"
 Environment="MPV_SOCKET=$MPV_SOCKET"
 
 # Runtime directory for sockets (created automatically by systemd)
 RuntimeDirectory=pi-podcast
-RuntimeDirectoryMode=0750
+RuntimeDirectoryMode=0755
 
 # Security hardening
 NoNewPrivileges=true
@@ -513,6 +514,7 @@ ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=$INSTALL_DIR/api
 ReadWritePaths=$RUNTIME_DIR
+ReadWritePaths=$SERVICE_HOME
 
 # Logging
 StandardOutput=journal
@@ -549,7 +551,8 @@ print_installation_summary() {
     echo "Service User:"
     echo "  - User: $SERVICE_USER"
     echo "  - Group: $SERVICE_GROUP"
-    echo "  - Member of: bluetooth, audio, pulse-access"
+    echo "  - Home: $SERVICE_HOME"
+    echo "  - Member of: bluetooth, audio"
     echo ""
     echo "Useful commands:"
     echo -e "  Start service:    ${BLUE}sudo systemctl start pi-podcast${NC}"
@@ -558,10 +561,10 @@ print_installation_summary() {
     echo -e "  Check status:     ${BLUE}sudo systemctl status pi-podcast${NC}"
     echo -e "  Restart service:  ${BLUE}sudo systemctl restart pi-podcast${NC}"
     echo ""
-    echo "PulseAudio (system mode):"
-    echo -e "  Check status:     ${BLUE}sudo systemctl status pulseaudio-system${NC}"
-    echo -e "  View logs:        ${BLUE}sudo journalctl -u pulseaudio-system -f${NC}"
-    echo -e "  Restart:          ${BLUE}sudo systemctl restart pulseaudio-system${NC}"
+    echo "PulseAudio:"
+    echo -e "  Check status:     ${BLUE}sudo systemctl status pulseaudio-pi-podcast${NC}"
+    echo -e "  View logs:        ${BLUE}sudo journalctl -u pulseaudio-pi-podcast -f${NC}"
+    echo -e "  Restart:          ${BLUE}sudo systemctl restart pulseaudio-pi-podcast${NC}"
     echo ""
     echo "Access the application:"
     if [ "$SKIP_HOSTNAME" = false ]; then
@@ -600,8 +603,8 @@ main() {
     update_system
     install_dependencies
     create_service_user
-    configure_pulseaudio_system
     enable_bluetooth_adapter
+    configure_pulseaudio
     install_nodejs
     configure_hostname
     clone_repository

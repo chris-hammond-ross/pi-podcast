@@ -3,7 +3,6 @@
 # Pi Podcast - Raspberry Pi Uninstallation Script
 # Removes the Pi Podcast application and service
 # Usage: curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/uninstall.sh | sudo bash
-# Use -y or --yes flag to skip confirmation prompt
 
 set -e
 
@@ -19,9 +18,10 @@ INSTALL_DIR="/opt/pi-podcast"
 DB_FILE="/opt/pi-podcast/api/podcast.db"
 SERVICE_NAME="pi-podcast"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-PULSEAUDIO_SERVICE_FILE="/etc/systemd/system/pulseaudio-system.service"
+PULSEAUDIO_SERVICE_FILE="/etc/systemd/system/pulseaudio-pi-podcast.service"
 SERVICE_USER="pi-podcast"
 SERVICE_GROUP="pi-podcast"
+SERVICE_HOME="/var/lib/pi-podcast"
 RUNTIME_DIR="/run/pi-podcast"
 
 # Parse arguments
@@ -60,10 +60,10 @@ for arg in "$@"; do
             echo ""
             echo "Options:"
             echo "  -i, --interactive     Prompt for confirmation before uninstalling"
-            echo "  --keep-data           Keep the installation directory (only remove service)"
+            echo "  --keep-data           Keep the installation directory and database (only remove service)"
             echo "  --keep-bluetooth      Keep paired/trusted Bluetooth devices"
             echo "  --keep-user           Keep the pi-podcast system user and group"
-            echo "  --keep-pulseaudio     Keep PulseAudio system configuration"
+            echo "  --keep-pulseaudio     Keep PulseAudio service and configuration"
             echo "  -h, --help            Show this help message"
             exit 0
             ;;
@@ -116,9 +116,10 @@ confirm_uninstall() {
     if [ "$KEEP_SERVICE_USER" = false ]; then
         echo "  - System user: ${SERVICE_USER}"
         echo "  - System group: ${SERVICE_GROUP}"
+        echo "  - User home directory: ${SERVICE_HOME}"
     fi
     if [ "$KEEP_PULSEAUDIO_CONFIG" = false ]; then
-        echo "  - PulseAudio system service and configuration"
+        echo "  - PulseAudio service for pi-podcast"
     fi
     echo ""
     echo -e "${YELLOW}Note: System packages (Node.js, git, bluez, sqlite3, pulseaudio, mpv) will NOT be removed.${NC}"
@@ -168,35 +169,38 @@ remove_service_file() {
 }
 
 remove_pulseaudio_config() {
-    print_header "Removing PulseAudio system configuration"
+    print_header "Removing PulseAudio service"
 
     if [ "$KEEP_PULSEAUDIO_CONFIG" = true ]; then
         print_info "Keeping PulseAudio configuration (--keep-pulseaudio flag set)"
         return 0
     fi
 
-    # Stop and disable the PulseAudio system service
-    if systemctl is-active --quiet pulseaudio-system 2>/dev/null; then
-        systemctl stop pulseaudio-system
-        print_success "Stopped PulseAudio system service"
+    # Stop and disable the PulseAudio service
+    if systemctl is-active --quiet pulseaudio-pi-podcast 2>/dev/null; then
+        systemctl stop pulseaudio-pi-podcast
+        print_success "Stopped PulseAudio service"
     fi
 
-    if systemctl is-enabled --quiet pulseaudio-system 2>/dev/null; then
-        systemctl disable pulseaudio-system
-        print_success "Disabled PulseAudio system service"
+    if systemctl is-enabled --quiet pulseaudio-pi-podcast 2>/dev/null; then
+        systemctl disable pulseaudio-pi-podcast
+        print_success "Disabled PulseAudio service"
     fi
 
     # Remove the service file
     if [ -f "$PULSEAUDIO_SERVICE_FILE" ]; then
         rm -f "$PULSEAUDIO_SERVICE_FILE"
-        print_success "Removed PulseAudio system service file"
+        print_success "Removed PulseAudio service file"
     fi
 
-    # Remove the system.pa configuration
-    if [ -f "/etc/pulse/system.pa" ]; then
-        rm -f "/etc/pulse/system.pa"
-        print_success "Removed PulseAudio system configuration"
+    # Also check for old service name (pulseaudio-system)
+    if systemctl is-active --quiet pulseaudio-system 2>/dev/null; then
+        systemctl stop pulseaudio-system 2>/dev/null || true
     fi
+    if systemctl is-enabled --quiet pulseaudio-system 2>/dev/null; then
+        systemctl disable pulseaudio-system 2>/dev/null || true
+    fi
+    [ -f "/etc/systemd/system/pulseaudio-system.service" ] && rm -f "/etc/systemd/system/pulseaudio-system.service"
 
     systemctl daemon-reload
     print_info "Note: Default user-mode PulseAudio will resume on next login"
@@ -265,6 +269,12 @@ remove_service_user() {
     if [ "$KEEP_SERVICE_USER" = true ]; then
         print_info "Keeping service user (--keep-user flag set)"
         return 0
+    fi
+
+    # Remove user home directory
+    if [ -d "$SERVICE_HOME" ]; then
+        rm -rf "$SERVICE_HOME"
+        print_success "Removed user home directory: $SERVICE_HOME"
     fi
 
     # Remove user (this also removes the user from all groups)
@@ -337,17 +347,17 @@ print_uninstall_summary() {
         echo -e "${YELLOW}Note: Service user was kept:${NC}"
         echo "  - User: ${SERVICE_USER}"
         echo "  - Group: ${SERVICE_GROUP}"
-        echo "To remove manually: sudo userdel ${SERVICE_USER} && sudo groupdel ${SERVICE_GROUP}"
+        echo "  - Home: ${SERVICE_HOME}"
+        echo "To remove manually: sudo userdel ${SERVICE_USER} && sudo groupdel ${SERVICE_GROUP} && sudo rm -rf ${SERVICE_HOME}"
         echo ""
     fi
 
     if [ "$KEEP_PULSEAUDIO_CONFIG" = true ]; then
-        echo -e "${YELLOW}Note: PulseAudio system configuration was kept${NC}"
+        echo -e "${YELLOW}Note: PulseAudio service was kept${NC}"
         echo "To remove manually:"
-        echo "  sudo systemctl stop pulseaudio-system"
-        echo "  sudo systemctl disable pulseaudio-system"
-        echo "  sudo rm /etc/systemd/system/pulseaudio-system.service"
-        echo "  sudo rm /etc/pulse/system.pa"
+        echo "  sudo systemctl stop pulseaudio-pi-podcast"
+        echo "  sudo systemctl disable pulseaudio-pi-podcast"
+        echo "  sudo rm /etc/systemd/system/pulseaudio-pi-podcast.service"
         echo ""
     fi
 
