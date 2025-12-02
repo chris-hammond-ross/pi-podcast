@@ -30,7 +30,7 @@ class EpisodeService {
 		} = options;
 
 		// Validate orderBy to prevent SQL injection
-		const allowedColumns = ['pub_date', 'title', 'created_at', 'downloaded_at'];
+		const allowedColumns = ['pub_date', 'title', 'created_at', 'downloaded_at', 'last_played_at'];
 		const safeOrderBy = allowedColumns.includes(orderBy) ? orderBy : 'pub_date';
 		const safeOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
@@ -249,6 +249,109 @@ class EpisodeService {
 		
 		console.log(`[episode] Deleted ${result.changes} episodes for subscription ${subscriptionId}`);
 		return result.changes;
+	}
+
+	// ===== Playback State Methods =====
+
+	/**
+	 * Update playback position for an episode
+	 * @param {number} episodeId - Episode ID
+	 * @param {number} position - Position in seconds
+	 */
+	updatePlaybackPosition(episodeId, position) {
+		const db = getDatabase();
+		const now = Math.floor(Date.now() / 1000);
+		
+		db.prepare(`
+			UPDATE episodes 
+			SET playback_position = ?, last_played_at = ?
+			WHERE id = ?
+		`).run(Math.floor(position), now, episodeId);
+	}
+
+	/**
+	 * Mark episode as completed
+	 * @param {number} episodeId - Episode ID
+	 */
+	markAsCompleted(episodeId) {
+		const db = getDatabase();
+		const now = Math.floor(Date.now() / 1000);
+		
+		db.prepare(`
+			UPDATE episodes 
+			SET playback_completed = 1, playback_position = 0, last_played_at = ?
+			WHERE id = ?
+		`).run(now, episodeId);
+
+		console.log(`[episode] Marked episode ${episodeId} as completed`);
+	}
+
+	/**
+	 * Reset playback state for an episode (mark as unplayed)
+	 * @param {number} episodeId - Episode ID
+	 */
+	resetPlaybackState(episodeId) {
+		const db = getDatabase();
+		
+		db.prepare(`
+			UPDATE episodes 
+			SET playback_position = 0, playback_completed = 0, last_played_at = NULL
+			WHERE id = ?
+		`).run(episodeId);
+
+		console.log(`[episode] Reset playback state for episode ${episodeId}`);
+	}
+
+	/**
+	 * Get playback state for an episode
+	 * @param {number} episodeId - Episode ID
+	 * @returns {Object|null} Playback state or null
+	 */
+	getPlaybackState(episodeId) {
+		const db = getDatabase();
+		const stmt = db.prepare(`
+			SELECT playback_position, playback_completed, last_played_at 
+			FROM episodes WHERE id = ?
+		`);
+		return stmt.get(episodeId) || null;
+	}
+
+	/**
+	 * Get recently played episodes across all subscriptions
+	 * @param {number} limit - Max episodes to return (default 10)
+	 * @returns {Array} List of recently played episodes with subscription info
+	 */
+	getRecentlyPlayed(limit = 10) {
+		const db = getDatabase();
+		const stmt = db.prepare(`
+			SELECT e.*, s.name as subscription_name, s.artworkUrl100 as subscription_artwork
+			FROM episodes e
+			JOIN subscriptions s ON e.subscription_id = s.id
+			WHERE e.last_played_at IS NOT NULL
+			ORDER BY e.last_played_at DESC
+			LIMIT ?
+		`);
+		return stmt.all(limit);
+	}
+
+	/**
+	 * Get in-progress episodes (started but not completed)
+	 * @param {number} limit - Max episodes to return (default 10)
+	 * @returns {Array} List of in-progress episodes with subscription info
+	 */
+	getInProgress(limit = 10) {
+		const db = getDatabase();
+		const stmt = db.prepare(`
+			SELECT e.*, s.name as subscription_name, s.artworkUrl100 as subscription_artwork
+			FROM episodes e
+			JOIN subscriptions s ON e.subscription_id = s.id
+			WHERE e.playback_position > 0 
+			  AND e.playback_completed = 0
+			  AND e.downloaded_at IS NOT NULL
+			ORDER BY e.last_played_at DESC
+			LIMIT ?
+		`);
+		return stmt.all(limit);
 	}
 }
 
