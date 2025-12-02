@@ -10,7 +10,7 @@ import {
 	Badge
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { Download, Trash2, X, Clock, Loader } from 'lucide-react';
+import { Download, Trash2, X, Clock, Loader, Play, Pause } from 'lucide-react';
 import { useDownloadContext } from '../contexts';
 import { deleteEpisodeDownload } from '../services';
 import type { EpisodeRecord } from '../services';
@@ -125,6 +125,13 @@ function EpisodeDetailModal({
 		}
 	};
 
+	const mediaAction = (action: 'play' | 'pause') => {
+		console.log(action);
+		// TODO: replaec placeholder with actual logic
+		// play episode
+		// pause episode
+	};
+
 	if (!episode) return null;
 
 	const description = episode.description ? stripHtml(episode.description) : '';
@@ -132,16 +139,36 @@ function EpisodeDetailModal({
 	const renderActionButton = () => {
 		if (isDownloaded) {
 			return (
-				<Button
-					fullWidth
-					variant="light"
-					color="red"
-					leftSection={<Trash2 size={16} />}
-					onClick={handleDelete}
-					loading={isDeleting}
-				>
-					Delete Download
-				</Button>
+				<Group gap="sm" grow w="100%">
+					<Button
+						variant="light"
+						color="red"
+						leftSection={<Trash2 size={16} />}
+						onClick={handleDelete}
+						loading={isDeleting}
+					>
+						Delete
+					</Button>
+					<Button
+						variant="light"
+						color="teal"
+						leftSection={<Play size={16} />}
+						onClick={() => mediaAction('play')}
+						loading={false}
+					>
+						Play
+					</Button>
+					{/* TODO: conditionally show either play or pause button
+					<Button
+						variant="light"
+						color="teal"
+						leftSection={<Pause size={16} />}
+						onClick={() => mediaAction('pause')}
+						loading={false}
+					>
+						Pause
+					</Button>*/}
+				</Group>
 			);
 		}
 
