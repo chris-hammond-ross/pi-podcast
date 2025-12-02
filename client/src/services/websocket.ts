@@ -6,32 +6,40 @@
 import type { BluetoothDevice } from './bluetooth';
 
 // Message types from server
-export type ServerMessageType = 
-  // Bluetooth messages
-  | 'device-found'
-  | 'device-connected'
-  | 'device-disconnected'
-  | 'device-removed'
-  | 'device-updated'
-  | 'devices-list'
-  | 'system-status'
-  | 'bluetooth-power-changed'
-  | 'scan-started'
-  | 'scan-stopped'
-  | 'output'
-  | 'pong'
-  // Download messages
-  | 'download:processor-started'
-  | 'download:processor-stopped'
-  | 'download:processor-paused'
-  | 'download:processor-resumed'
-  | 'download:queue-empty'
-  | 'download:queue-status'
-  | 'download:started'
-  | 'download:progress'
-  | 'download:completed'
-  | 'download:failed'
-  | 'download:retry';
+export type ServerMessageType =
+	// Bluetooth messages
+	| 'device-found'
+	| 'device-connected'
+	| 'device-disconnected'
+	| 'device-removed'
+	| 'device-updated'
+	| 'devices-list'
+	| 'system-status'
+	| 'bluetooth-power-changed'
+	| 'scan-started'
+	| 'scan-stopped'
+	| 'output'
+	| 'pong'
+	// Download messages
+	| 'download:processor-started'
+	| 'download:processor-stopped'
+	| 'download:processor-paused'
+	| 'download:processor-resumed'
+	| 'download:queue-empty'
+	| 'download:queue-status'
+	| 'download:started'
+	| 'download:progress'
+	| 'download:completed'
+	| 'download:failed'
+	| 'download:retry'
+	// Media player messages
+	| 'media:status'
+	| 'media:time-update'
+	| 'media:volume-change'
+	| 'media:track-changed'
+	| 'media:completed'
+	| 'media:error'
+	| 'media:disconnected';
 
 // Download-related types
 export interface DownloadQueueItem {
@@ -89,6 +97,46 @@ export interface DownloadEventData {
 	maxRetries?: number;
 }
 
+// Media player-related types
+export interface MediaCurrentEpisode {
+	id: number;
+	title: string;
+	subscription_id: number;
+	duration?: number;
+}
+
+export interface MediaStatusData {
+	isPlaying: boolean;
+	isPaused: boolean;
+	position: number;
+	duration: number;
+	volume: number;
+	currentEpisode: MediaCurrentEpisode | null;
+	mpvConnected: boolean;
+}
+
+export interface MediaTimeUpdateData {
+	position: number;
+	duration: number;
+	episodeId: number;
+}
+
+export interface MediaVolumeChangeData {
+	volume: number;
+}
+
+export interface MediaTrackChangedData {
+	episode: MediaCurrentEpisode;
+}
+
+export interface MediaCompletedData {
+	episodeId: number;
+}
+
+export interface MediaErrorData {
+	error: string;
+}
+
 export interface ServerMessage {
 	type: ServerMessageType;
 	// Bluetooth fields
@@ -128,6 +176,14 @@ export interface ServerMessage {
 	error?: string;
 	retryCount?: number;
 	maxRetries?: number;
+	// Media player fields
+	isPlaying?: boolean;
+	position?: number;
+	duration?: number;
+	volume?: number;
+	currentEpisode?: MediaCurrentEpisode | null;
+	mpvConnected?: boolean;
+	episode?: MediaCurrentEpisode;
 }
 
 export type MessageHandler = (message: ServerMessage) => void;
@@ -158,7 +214,7 @@ export class WebSocketService {
 	constructor(config: WebSocketServiceConfig = {}) {
 		// Use environment variable if set, otherwise derive from current page location
 		const wsUrl = import.meta.env.VITE_WS_URL;
-		
+
 		if (wsUrl) {
 			this.url = wsUrl;
 		} else {
@@ -166,11 +222,11 @@ export class WebSocketService {
 			const host = window.location.host;
 			this.url = `${protocol}//${host}`;
 		}
-		
+
 		if (config.url) {
 			this.url = config.url;
 		}
-		
+
 		this.reconnectInterval = config.reconnectInterval || 3000;
 		this.maxReconnectAttempts = config.maxReconnectAttempts || 5;
 		this.heartbeatInterval = config.heartbeatInterval || 30000;
@@ -211,7 +267,7 @@ export class WebSocketService {
 				this.ws.onclose = () => {
 					console.log('[WebSocketService] Closed');
 					this.stopHeartbeat();
-					
+
 					if (!this.isIntentionallyClosed) {
 						this.attemptReconnect();
 					}
@@ -230,7 +286,7 @@ export class WebSocketService {
 		console.log('[WebSocketService] Disconnecting');
 		this.isIntentionallyClosed = true;
 		this.stopHeartbeat();
-		
+
 		if (this.reconnectTimeoutId) {
 			clearTimeout(this.reconnectTimeoutId);
 			this.reconnectTimeoutId = null;
@@ -254,7 +310,7 @@ export class WebSocketService {
 	 */
 	public on(handler: MessageHandler): () => void {
 		this.messageHandlers.add(handler);
-		
+
 		// Return unsubscribe function
 		return () => {
 			this.messageHandlers.delete(handler);
@@ -284,7 +340,7 @@ export class WebSocketService {
 		try {
 			const message: ServerMessage = JSON.parse(data);
 			console.log('[WebSocketService] Message received:', message.type);
-			
+
 			// Notify all subscribers
 			this.messageHandlers.forEach((handler) => {
 				try {
@@ -311,7 +367,7 @@ export class WebSocketService {
 
 		this.reconnectAttempts++;
 		const delay = this.reconnectInterval * this.reconnectAttempts;
-		
+
 		console.log(
 			`[WebSocketService] Reconnecting attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`
 		);
@@ -328,7 +384,7 @@ export class WebSocketService {
 	 */
 	private startHeartbeat(): void {
 		this.stopHeartbeat();
-		
+
 		this.heartbeatTimeoutId = setInterval(() => {
 			if (this.isConnected()) {
 				this.send({ type: 'ping' });
