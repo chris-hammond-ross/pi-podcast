@@ -7,6 +7,7 @@ export * from './podcasts';
 export * from './subscriptions';
 export * from './downloads';
 export * from './episodes';
+export * from './mediaPlayer';
 export {
 	WebSocketService,
 	getWebSocketService,
@@ -19,5 +20,12 @@ export {
 	type DownloadQueueCounts,
 	type DownloadQueueStatus,
 	type DownloadProgressData,
-	type DownloadEventData
+	type DownloadEventData,
+	type MediaCurrentEpisode,
+	type MediaStatusData,
+	type MediaTimeUpdateData,
+	type MediaVolumeChangeData,
+	type MediaTrackChangedData,
+	type MediaCompletedData,
+	type MediaErrorData
 } from './websocket';

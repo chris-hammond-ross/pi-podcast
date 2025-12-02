@@ -11,7 +11,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Download, Trash2, X, Clock, Loader, Play, Pause } from 'lucide-react';
-import { useDownloadContext } from '../contexts';
+import { useDownloadContext, useMediaPlayer } from '../contexts';
 import { deleteEpisodeDownload } from '../services';
 import type { EpisodeRecord } from '../services';
 
@@ -70,7 +70,16 @@ function EpisodeDetailModal({
 	onEpisodeUpdate
 }: EpisodeDetailModalProps) {
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [isMediaLoading, setIsMediaLoading] = useState(false);
 	const { addToQueue, currentDownload, activeItems } = useDownloadContext();
+	const {
+		play,
+		pause,
+		currentEpisode,
+		isPlaying,
+		isPaused,
+		error: mediaError
+	} = useMediaPlayer();
 
 	// Check if this episode is currently downloading
 	const isDownloading = currentDownload?.episodeId === episode?.id;
@@ -82,6 +91,10 @@ function EpisodeDetailModal({
 			item => item.episode_id === episode.id && item.status === 'pending'
 		);
 	}, [activeItems, episode]);
+
+	// Check if this episode is currently playing
+	const isCurrentlyPlaying = currentEpisode?.id === episode?.id && isPlaying && !isPaused;
+	const isCurrentlyPaused = currentEpisode?.id === episode?.id && isPaused;
 
 	const isDownloaded = !!episode?.downloaded_at;
 
@@ -125,11 +138,38 @@ function EpisodeDetailModal({
 		}
 	};
 
-	const mediaAction = (action: 'play' | 'pause') => {
-		console.log(action);
-		// TODO: replaec placeholder with actual logic
-		// play episode
-		// pause episode
+	const handlePlay = async () => {
+		if (!episode) return;
+
+		setIsMediaLoading(true);
+		try {
+			await play(episode.id);
+			notifications.show({
+				color: 'teal',
+				message: `Now playing "${episode.title}"`
+			});
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to play episode'
+			});
+		} finally {
+			setIsMediaLoading(false);
+		}
+	};
+
+	const handlePause = async () => {
+		setIsMediaLoading(true);
+		try {
+			await pause();
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to pause'
+			});
+		} finally {
+			setIsMediaLoading(false);
+		}
 	};
 
 	if (!episode) return null;
@@ -149,25 +189,27 @@ function EpisodeDetailModal({
 					>
 						Delete
 					</Button>
-					<Button
-						variant="light"
-						color="teal"
-						leftSection={<Play size={16} />}
-						onClick={() => mediaAction('play')}
-						loading={false}
-					>
-						Play
-					</Button>
-					{/* TODO: conditionally show either play or pause button
-					<Button
-						variant="light"
-						color="teal"
-						leftSection={<Pause size={16} />}
-						onClick={() => mediaAction('pause')}
-						loading={false}
-					>
-						Pause
-					</Button>*/}
+					{isCurrentlyPlaying ? (
+						<Button
+							variant="light"
+							color="orange"
+							leftSection={<Pause size={16} />}
+							onClick={handlePause}
+							loading={isMediaLoading}
+						>
+							Pause
+						</Button>
+					) : (
+						<Button
+							variant="light"
+							color="teal"
+							leftSection={<Play size={16} />}
+							onClick={handlePlay}
+							loading={isMediaLoading}
+						>
+							{isCurrentlyPaused ? 'Resume' : 'Play'}
+						</Button>
+					)}
 				</Group>
 			);
 		}
@@ -280,6 +322,16 @@ function EpisodeDetailModal({
 							{isQueued && (
 								<Badge variant="light" color="grape" size="sm">
 									Queued
+								</Badge>
+							)}
+							{isCurrentlyPlaying && (
+								<Badge variant="light" color="teal" size="sm">
+									Playing
+								</Badge>
+							)}
+							{isCurrentlyPaused && (
+								<Badge variant="light" color="yellow" size="sm">
+									Paused
 								</Badge>
 							)}
 						</Group>
