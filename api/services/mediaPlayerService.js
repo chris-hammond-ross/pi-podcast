@@ -104,7 +104,32 @@ class MediaPlayerService extends EventEmitter {
 				fs.mkdirSync(socketDir, { recursive: true });
 			}
 
+			// Determine the runtime directory from environment or default
+			const xdgRuntimeDir = process.env.XDG_RUNTIME_DIR || '/run/pi-podcast';
+			
+			// PulseAudio socket path - check multiple possible locations
+			const possiblePulseSockets = [
+				`${xdgRuntimeDir}/pulse/native`,
+				'/run/pi-podcast/pulse/native',
+				`/tmp/pulse-${process.getuid()}/native`
+			];
+			
+			let pulseServer = process.env.PULSE_SERVER;
+			if (!pulseServer) {
+				for (const socketPath of possiblePulseSockets) {
+					if (fs.existsSync(socketPath)) {
+						pulseServer = `unix:${socketPath}`;
+						console.log(`[media] Found PulseAudio socket at: ${socketPath}`);
+						break;
+					}
+				}
+			}
+			
+			console.log(`[media] XDG_RUNTIME_DIR: ${xdgRuntimeDir}`);
+			console.log(`[media] PULSE_SERVER: ${pulseServer || 'not set'}`);
+
 			// Spawn MPV in idle mode with IPC socket
+			// Use PulseAudio for audio output (configured by install.sh)
 			const args = [
 				'--idle=yes',
 				'--no-video',
@@ -118,14 +143,27 @@ class MediaPlayerService extends EventEmitter {
 
 			console.log('[media] Starting MPV with args:', args.join(' '));
 
+			// Build environment for MPV process
+			const mpvEnv = {
+				...process.env,
+				XDG_RUNTIME_DIR: xdgRuntimeDir,
+				HOME: process.env.HOME || '/var/lib/pi-podcast'
+			};
+			
+			// Only set PULSE_SERVER if we found a socket
+			if (pulseServer) {
+				mpvEnv.PULSE_SERVER = pulseServer;
+			}
+
+			console.log('[media] MPV environment:', {
+				XDG_RUNTIME_DIR: mpvEnv.XDG_RUNTIME_DIR,
+				PULSE_SERVER: mpvEnv.PULSE_SERVER,
+				HOME: mpvEnv.HOME
+			});
+
 			this.mpvProcess = spawn('mpv', args, {
 				stdio: ['ignore', 'pipe', 'pipe'],
-				env: {
-					...process.env,
-					// Ensure PulseAudio can find the server
-					PULSE_SERVER: process.env.PULSE_SERVER || 'unix:/run/pi-podcast/pulse/native',
-					XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || '/run/pi-podcast'
-				}
+				env: mpvEnv
 			});
 
 			this.mpvProcess.stdout.on('data', (data) => {
@@ -347,10 +385,10 @@ class MediaPlayerService extends EventEmitter {
 	handleEndFile(message) {
 		const reason = message.reason;
 		const fileError = message.file_error;
-
+		
 		console.log('[media] End file event:', JSON.stringify(message));
 		console.log('[media] End file, reason:', reason);
-
+		
 		if (fileError) {
 			console.error('[media] File error:', fileError);
 		}
