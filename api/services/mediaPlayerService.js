@@ -108,26 +108,39 @@ class MediaPlayerService extends EventEmitter {
 			const args = [
 				'--idle=yes',
 				'--no-video',
-				'--no-terminal',
 				`--input-ipc-server=${this.socketPath}`,
 				'--audio-display=no',
 				'--keep-open=yes',
 				'--hr-seek=yes',
-				'--ao=pulse'
+				'--ao=pulse',
+				'--msg-level=all=v'  // Verbose logging for debugging
 			];
 
 			console.log('[media] Starting MPV with args:', args.join(' '));
 
 			this.mpvProcess = spawn('mpv', args, {
-				stdio: ['ignore', 'pipe', 'pipe']
+				stdio: ['ignore', 'pipe', 'pipe'],
+				env: {
+					...process.env,
+					// Ensure PulseAudio can find the server
+					PULSE_SERVER: process.env.PULSE_SERVER || 'unix:/run/pi-podcast/pulse/native',
+					XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || '/run/pi-podcast'
+				}
 			});
 
 			this.mpvProcess.stdout.on('data', (data) => {
-				console.log('[mpv stdout]', data.toString().trim());
+				const output = data.toString().trim();
+				if (output) {
+					console.log('[mpv stdout]', output);
+				}
 			});
 
 			this.mpvProcess.stderr.on('data', (data) => {
-				console.error('[mpv stderr]', data.toString().trim());
+				const output = data.toString().trim();
+				if (output) {
+					// Log all stderr output for debugging
+					console.log('[mpv stderr]', output);
+				}
 			});
 
 			this.mpvProcess.on('error', (error) => {
@@ -267,11 +280,16 @@ class MediaPlayerService extends EventEmitter {
 				console.log('[media] Playback restart');
 				break;
 
+			case 'log-message':
+				// Log MPV's internal log messages
+				if (message.level && message.text) {
+					console.log(`[mpv ${message.level}] ${message.prefix}: ${message.text}`);
+				}
+				break;
+
 			default:
 				// Log unknown events for debugging
-				if (event !== 'log-message') {
-					console.log('[media] Event:', event, message);
-				}
+				console.log('[media] Event:', event, JSON.stringify(message));
 		}
 	}
 
@@ -328,15 +346,24 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	handleEndFile(message) {
 		const reason = message.reason;
+		const fileError = message.file_error;
+
+		console.log('[media] End file event:', JSON.stringify(message));
 		console.log('[media] End file, reason:', reason);
+
+		if (fileError) {
+			console.error('[media] File error:', fileError);
+		}
 
 		if (reason === 'eof') {
 			this.handlePlaybackComplete();
 		} else if (reason === 'error') {
-			this.emit('playback-error', { error: 'Playback error' });
+			const errorMsg = fileError || 'Playback error';
+			console.error('[media] Playback error:', errorMsg);
+			this.emit('playback-error', { error: errorMsg });
 			this.broadcast({
 				type: 'media:error',
-				error: 'Playback error occurred'
+				error: errorMsg
 			});
 		}
 	}
@@ -461,6 +488,7 @@ class MediaPlayerService extends EventEmitter {
 		}
 
 		console.log(`[media] Playing episode: ${episode.title}`);
+		console.log(`[media] File path: ${episode.file_path}`);
 
 		// Stop current playback if any
 		if (this.currentEpisode) {
