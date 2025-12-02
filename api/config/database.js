@@ -105,7 +105,6 @@ function createTables(database) {
 		CREATE INDEX IF NOT EXISTS idx_episodes_subscription_id ON episodes(subscription_id);
 		CREATE INDEX IF NOT EXISTS idx_episodes_guid ON episodes(guid);
 		CREATE INDEX IF NOT EXISTS idx_episodes_downloaded_at ON episodes(downloaded_at);
-		CREATE INDEX IF NOT EXISTS idx_episodes_last_played_at ON episodes(last_played_at);
 		CREATE INDEX IF NOT EXISTS idx_download_queue_status ON download_queue(status);
 		CREATE INDEX IF NOT EXISTS idx_download_queue_episode_id ON download_queue(episode_id);
 	`);
@@ -125,6 +124,14 @@ function runMigrations(database) {
 	const columnExists = (table, column) => {
 		const result = database.prepare(`PRAGMA table_info(${table})`).all();
 		return result.some(col => col.name === column);
+	};
+
+	// Helper to check if index exists
+	const indexExists = (indexName) => {
+		const result = database.prepare(
+			`SELECT name FROM sqlite_master WHERE type='index' AND name=?`
+		).get(indexName);
+		return !!result;
 	};
 
 	// === Subscription migrations ===
@@ -158,6 +165,12 @@ function runMigrations(database) {
 	if (!columnExists('episodes', 'last_played_at')) {
 		database.exec('ALTER TABLE episodes ADD COLUMN last_played_at INTEGER');
 		console.log('[database] Added last_played_at column to episodes');
+	}
+
+	// Create index for last_played_at (after column exists)
+	if (!indexExists('idx_episodes_last_played_at')) {
+		database.exec('CREATE INDEX idx_episodes_last_played_at ON episodes(last_played_at)');
+		console.log('[database] Added index idx_episodes_last_played_at');
 	}
 }
 
