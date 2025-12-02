@@ -8,9 +8,6 @@ let db = null;
  * @param {Database} database - The database instance
  */
 function createTables(database) {
-	// Run migrations for existing tables
-	runMigrations(database);
-
 	database.exec(`
 		-- Podcast subscriptions table (aligned with iTunes Podcast schema)
 		CREATE TABLE IF NOT EXISTS subscriptions (
@@ -114,6 +111,9 @@ function createTables(database) {
 	`);
 
 	console.log('[database] Tables verified/created');
+
+	// Run migrations AFTER tables exist
+	runMigrations(database);
 }
 
 /**

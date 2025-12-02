@@ -17,6 +17,8 @@ NC='\033[0m' # No Color
 # Configuration
 INSTALL_DIR="/opt/pi-podcast"
 SERVICE_NAME="pi-podcast"
+SERVICE_USER="pi-podcast"
+SERVICE_GROUP="pi-podcast"
 
 # Helper functions
 print_header() {
@@ -57,8 +59,15 @@ pull_latest() {
     print_header "Pulling latest changes"
 
     cd "$INSTALL_DIR"
+
+    # Add safe directory for git (needed when repo is owned by different user)
+    git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null || true
+
     git fetch origin
     git reset --hard origin/main
+
+    # Restore ownership to service user
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR"
 
     print_success "Latest changes pulled from repository"
 }
@@ -68,6 +77,9 @@ update_api() {
 
     cd "$INSTALL_DIR/api"
     npm install
+
+    # Restore ownership
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/api/node_modules"
 
     print_success "API dependencies updated"
 }
@@ -83,6 +95,10 @@ build_frontend() {
     mkdir -p "$INSTALL_DIR/api/public"
     rm -rf "$INSTALL_DIR/api/public"/*
     cp -r "$INSTALL_DIR/client/dist"/* "$INSTALL_DIR/api/public/"
+
+    # Restore ownership
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/api/public"
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/client/node_modules"
 
     print_success "React frontend built and updated"
 }
