@@ -112,7 +112,8 @@ class MediaPlayerService extends EventEmitter {
 				`--input-ipc-server=${this.socketPath}`,
 				'--audio-display=no',
 				'--keep-open=yes',
-				'--hr-seek=yes'
+				'--hr-seek=yes',
+				'--ao=pulse'
 			];
 
 			console.log('[media] Starting MPV with args:', args.join(' '));
