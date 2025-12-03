@@ -370,6 +370,7 @@ RestartSec=5
 # Runtime directory
 RuntimeDirectory=pi-podcast
 RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
 
 [Install]
 WantedBy=multi-user.target

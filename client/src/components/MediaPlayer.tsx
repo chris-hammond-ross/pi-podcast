@@ -1,15 +1,15 @@
 import { Container, Group, Stack, ActionIcon, Slider } from '@mantine/core';
 import { useHover } from '@mantine/hooks';
-import { Play, SkipBack, SkipForward, VolumeOff, Shuffle, Volume2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, VolumeOff, Shuffle, Volume2 } from 'lucide-react';
 import { useMediaPlayer } from '../contexts';
 
 function MediaPlayer() {
 	const { hovered, ref } = useHover();
 	const {
 		// State
-		isPlaying,
-		isPaused,
-		isLoading,
+		isPlaying,       // Is currently playing boolean
+		isPaused,        // Is currently paused boolean
+		isLoading,       // Is currently loading boolean
 		position,        // Current position in seconds
 		duration,        // Total duration in seconds
 		volume,          // 0-100
@@ -32,33 +32,18 @@ function MediaPlayer() {
 		refreshStatus,   // () => Promise<void>
 	} = useMediaPlayer();
 
-	console.log(isPlaying);
-	console.log(isPaused);
-	console.log(isLoading);
-	console.log(position);
-	console.log(duration);
-	console.log(volume);
-	console.log(currentEpisode);
-	console.log(mpvConnected);
-	console.log(error);
-	console.log(progress);
-	console.log(play);
-	console.log(pause);
-	console.log(resume);
-	console.log(togglePlayPause);
-	console.log(stop);
-	console.log(seekTo);
-	console.log(seekRelative);
-	console.log(setVolume);
-	console.log(refreshStatus);
+	const handleSliderChange = async (percentage: number) => {
+		const newPosition = (percentage / 100) * duration;
+		await seekTo(newPosition);
+	};
 
 	return (
 		<Container size="sm" px="md" py="xs" w="100%">
 			<Stack gap="xs" w="100%">
 				<Slider
 					color='teal'
-					value={volume}
-					onChangeEnd={setVolume}
+					value={progress}
+					onChangeEnd={handleSliderChange}
 					ref={ref}
 					styles={{
 						thumb: {
@@ -84,14 +69,27 @@ function MediaPlayer() {
 					>
 						<SkipBack size={16} />
 					</ActionIcon>
-					<ActionIcon
-						variant="light"
-						color="teal"
-						size="xl"
-						aria-label="Play"
-					>
-						<Play size={16} />
-					</ActionIcon>
+					{/* TODO: show play if currently paused */}
+					{isPaused && (
+						<ActionIcon
+							variant="light"
+							color="teal"
+							size="xl"
+							aria-label="Play"
+						>
+							<Play size={16} />
+						</ActionIcon>
+					)}
+					{isPlaying && (
+						<ActionIcon
+							variant="light"
+							color="teal"
+							size="xl"
+							aria-label="Pause"
+						>
+							<Pause size={16} />
+						</ActionIcon>
+					)}
 					<ActionIcon
 						variant="light"
 						color="teal"

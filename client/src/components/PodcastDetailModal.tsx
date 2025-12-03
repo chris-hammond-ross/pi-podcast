@@ -15,10 +15,11 @@ import {
 	ThemeIcon
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { AlertCircle, Download, CheckCircle, ArrowLeft, Ellipsis, X, Clock, LoaderCircle } from 'lucide-react';
+import { AlertCircle, Download, CheckCircle, ArrowLeft, Ellipsis, X, Clock, LoaderCircle, ListPlus } from 'lucide-react';
 import type { Subscription } from '../services';
 import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord } from '../services';
 import { useDownloadContext } from '../contexts';
+import { useMediaPlayer } from '../contexts';
 import EpisodeDetailModal from './EpisodeDetailModal';
 
 interface PodcastDetailModalProps {
@@ -74,6 +75,8 @@ function PodcastDetailModal({
 	const [error, setError] = useState<string | null>(null);
 	const [selectedEpisode, setSelectedEpisode] = useState<EpisodeRecord | null>(null);
 	const [episodeModalOpened, setEpisodeModalOpened] = useState(false);
+
+	const { addToQueue: addMediaToQueue, removeFromQueue } = useMediaPlayer();
 
 	// Track previous initialEpisodeId to detect changes (for back navigation)
 	const prevInitialEpisodeIdRef = useRef<number | null | undefined>(undefined);
@@ -247,12 +250,31 @@ function PodcastDetailModal({
 		);
 	};
 
+	const handleAddToQueue = async (episode: EpisodeRecord, e: React.MouseEvent) => {
+		e.stopPropagation();
+		await addMediaToQueue(episode.id);
+		notifications.show({
+			color: 'cyan',
+			message: `Added ${episode.title} to queue`
+		});
+	};
+
 	const renderEpisodeStatus = (episode: EpisodeRecord) => {
 		if (episode.downloaded_at) {
 			return (
-				<ThemeIcon variant="light" color="green" title="Downloaded">
-					<CheckCircle size={16} />
-				</ThemeIcon>
+				<Stack gap="xs">
+					<ThemeIcon variant="light" color="teal" title="Downloaded">
+						<CheckCircle size={16} />
+					</ThemeIcon>
+					<ActionIcon
+						variant="light"
+						color="cyan"
+						onClick={(e) => handleAddToQueue(episode, e)}
+						title="Add to Queue"
+					>
+						<ListPlus size={16} />
+					</ActionIcon>
+				</Stack>
 			);
 		}
 
