@@ -25,6 +25,8 @@ export interface UseSubscriptionsReturn {
 	unsubscribeFromPodcast: (feedUrl: string) => Promise<boolean>;
 	/** Check subscription status from the server (for when local state might be stale) */
 	checkSubscriptionStatus: (feedUrl: string) => Promise<boolean>;
+	/** Grab a subscription with a certain id */
+	getSubscriptionById: (id: number) => Subscription | undefined;
 }
 
 /**
@@ -107,6 +109,10 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 		}
 	}, []);
 
+	const getSubscriptionById = useCallback((id: number): Subscription | undefined => {
+		return subscriptions.find(sub => sub.id === id);
+	}, [subscriptions]);
+
 	return {
 		subscriptions,
 		isLoading,
@@ -115,6 +121,7 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 		isSubscribed: isSubscribedLocal,
 		subscribeToPodcast,
 		unsubscribeFromPodcast,
-		checkSubscriptionStatus
+		checkSubscriptionStatus,
+		getSubscriptionById
 	};
 }

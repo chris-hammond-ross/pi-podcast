@@ -307,7 +307,7 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionS
 		buttonColor = 'orange';
 	} else if (isConnected) {
 		statusText = 'Connected';
-		buttonColor = 'green';
+		buttonColor = 'teal';
 	} else if (isPaired && !isOnline) {
 		statusText = 'Offline';
 		buttonColor = 'gray';
