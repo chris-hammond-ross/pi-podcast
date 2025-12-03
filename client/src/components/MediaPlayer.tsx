@@ -68,22 +68,52 @@ function MediaPlayer() {
 					}}
 				/>
 				<Group gap="sm" grow>
-					<ActionIcon variant="light" color="teal" size="xl" aria-label="Mute">
+					<ActionIcon
+						variant="light"
+						color="teal"
+						size="xl"
+						aria-label="Mute"
+					>
 						<VolumeOff size={16} />
 					</ActionIcon>
-					<ActionIcon variant="light" color="teal" size="xl" aria-label="Previous">
+					<ActionIcon
+						variant="light"
+						color="teal"
+						size="xl"
+						aria-label="Previous"
+					>
 						<SkipBack size={16} />
 					</ActionIcon>
-					<ActionIcon variant="light" color="teal" size="xl" aria-label="Play">
+					<ActionIcon
+						variant="light"
+						color="teal"
+						size="xl"
+						aria-label="Play"
+					>
 						<Play size={16} />
 					</ActionIcon>
-					<ActionIcon variant="light" color="teal" size="xl" aria-label="Next">
+					<ActionIcon
+						variant="light"
+						color="teal"
+						size="xl"
+						aria-label="Next"
+					>
 						<SkipForward size={16} />
 					</ActionIcon>
-					<ActionIcon variant="light" color="teal" size="xl" aria-label="Shuffle">
+					<ActionIcon
+						variant="light"
+						color="teal"
+						size="xl"
+						aria-label="Shuffle"
+					>
 						<Shuffle size={16} />
 					</ActionIcon>
-					<ActionIcon variant="light" color="teal" size="xl" aria-label="Volume">
+					<ActionIcon
+						variant="light"
+						color="teal"
+						size="xl"
+						aria-label="Volume"
+					>
 						<Volume2 size={16} />
 					</ActionIcon>
 				</Group>

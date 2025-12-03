@@ -37,9 +37,11 @@ export type ServerMessageType =
 	| 'media:time-update'
 	| 'media:volume-change'
 	| 'media:track-changed'
-	| 'media:completed'
+	| 'media:episode-completed'
 	| 'media:error'
-	| 'media:disconnected';
+	| 'media:disconnected'
+	| 'media:queue-update'
+	| 'media:queue-finished';
 
 // Download-related types
 export interface DownloadQueueItem {
@@ -105,6 +107,15 @@ export interface MediaCurrentEpisode {
 	duration?: number;
 }
 
+export interface MediaQueueItem {
+	index: number;
+	episodeId: number;
+	title: string;
+	subscription_id: number;
+	duration: string;
+	isPlaying: boolean;
+}
+
 export interface MediaStatusData {
 	isPlaying: boolean;
 	isPaused: boolean;
@@ -112,6 +123,8 @@ export interface MediaStatusData {
 	duration: number;
 	volume: number;
 	currentEpisode: MediaCurrentEpisode | null;
+	queuePosition: number;
+	queueLength: number;
 	mpvConnected: boolean;
 }
 
@@ -127,6 +140,8 @@ export interface MediaVolumeChangeData {
 
 export interface MediaTrackChangedData {
 	episode: MediaCurrentEpisode;
+	queuePosition: number;
+	queueLength: number;
 }
 
 export interface MediaCompletedData {
@@ -135,6 +150,12 @@ export interface MediaCompletedData {
 
 export interface MediaErrorData {
 	error: string;
+}
+
+export interface MediaQueueUpdateData {
+	items: MediaQueueItem[];
+	currentIndex: number;
+	length: number;
 }
 
 export interface ServerMessage {
@@ -184,6 +205,12 @@ export interface ServerMessage {
 	currentEpisode?: MediaCurrentEpisode | null;
 	mpvConnected?: boolean;
 	episode?: MediaCurrentEpisode;
+	queuePosition?: number;
+	queueLength?: number;
+	// Media queue fields
+	items?: MediaQueueItem[];
+	currentIndex?: number;
+	length?: number;
 }
 
 export type MessageHandler = (message: ServerMessage) => void;

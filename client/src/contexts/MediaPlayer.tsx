@@ -1,15 +1,15 @@
 /**
  * Media Player Context
- * Provides media playback state and controls to the entire app
+ * Provides media playback state, queue management, and controls to the entire app
  * with real-time WebSocket updates
  */
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
-import { getWebSocketService, type ServerMessage, type MediaCurrentEpisode } from '../services/websocket';
+import { getWebSocketService, type ServerMessage, type MediaCurrentEpisode, type MediaQueueItem } from '../services/websocket';
 import * as mediaApi from '../services/mediaPlayer';
 
 export interface MediaPlayerContextValue {
-	// State
+	// Playback State
 	isPlaying: boolean;
 	isPaused: boolean;
 	isLoading: boolean;
@@ -20,10 +20,17 @@ export interface MediaPlayerContextValue {
 	mpvConnected: boolean;
 	error: string | null;
 
+	// Queue State
+	queue: MediaQueueItem[];
+	queuePosition: number;
+	queueLength: number;
+
 	// Computed
 	progress: number; // 0-100
+	hasNext: boolean;
+	hasPrevious: boolean;
 
-	// Actions
+	// Playback Actions
 	play: (episodeId: number) => Promise<void>;
 	pause: () => Promise<void>;
 	resume: () => Promise<void>;
@@ -32,12 +39,26 @@ export interface MediaPlayerContextValue {
 	seekTo: (position: number) => Promise<void>;
 	seekRelative: (offset: number) => Promise<void>;
 	setVolume: (volume: number) => Promise<void>;
+
+	// Queue Actions
+	addToQueue: (episodeId: number) => Promise<void>;
+	addMultipleToQueue: (episodeIds: number[]) => Promise<void>;
+	removeFromQueue: (index: number) => Promise<void>;
+	clearQueue: () => Promise<void>;
+	moveInQueue: (from: number, to: number) => Promise<void>;
+	playQueueIndex: (index: number) => Promise<void>;
+	playNext: () => Promise<void>;
+	playPrevious: () => Promise<void>;
+
+	// Utility
 	refreshStatus: () => Promise<void>;
+	refreshQueue: () => Promise<void>;
 }
 
 const MediaPlayerContext = createContext<MediaPlayerContextValue | null>(null);
 
-export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
+export function MediaPlayerProvider({ children }: { children: ReactNode }) {
+	// Playback state
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [isPaused, setIsPaused] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
@@ -48,12 +69,19 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 	const [mpvConnected, setMpvConnected] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
+	// Queue state
+	const [queue, setQueue] = useState<MediaQueueItem[]>([]);
+	const [queuePosition, setQueuePosition] = useState(-1);
+	const [queueLength, setQueueLength] = useState(0);
+
 	const unsubscribeRef = useRef<(() => void) | null>(null);
 	const serviceRef = useRef(getWebSocketService());
 	const initializedRef = useRef(false);
 
-	// Computed progress percentage
+	// Computed values
 	const progress = duration > 0 ? (position / duration) * 100 : 0;
+	const hasNext = queuePosition < queueLength - 1;
+	const hasPrevious = queuePosition > 0;
 
 	// Connect to WebSocket and subscribe - only once on mount
 	useEffect(() => {
@@ -78,6 +106,8 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 					setDuration(message.duration ?? 0);
 					setVolumeState(message.volume ?? 100);
 					setCurrentEpisode(message.currentEpisode ?? null);
+					setQueuePosition(message.queuePosition ?? -1);
+					setQueueLength(message.queueLength ?? 0);
 					setMpvConnected(message.mpvConnected ?? false);
 					setIsLoading(false);
 					break;
@@ -102,14 +132,37 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 							setDuration(message.episode.duration);
 						}
 					}
+					if (message.queuePosition !== undefined) {
+						setQueuePosition(message.queuePosition);
+					}
+					if (message.queueLength !== undefined) {
+						setQueueLength(message.queueLength);
+					}
 					break;
 
-				case 'media:completed':
+				case 'media:episode-completed':
+					// Episode finished, status will be updated via other messages
+					break;
+
+				case 'media:queue-finished':
 					setCurrentEpisode(null);
 					setIsPlaying(false);
 					setIsPaused(false);
 					setPosition(0);
 					setDuration(0);
+					setQueuePosition(-1);
+					break;
+
+				case 'media:queue-update':
+					if (message.items) {
+						setQueue(message.items);
+					}
+					if (message.currentIndex !== undefined) {
+						setQueuePosition(message.currentIndex);
+					}
+					if (message.length !== undefined) {
+						setQueueLength(message.length);
+					}
 					break;
 
 				case 'media:error':
@@ -123,6 +176,9 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 					setIsPlaying(false);
 					setIsPaused(false);
 					setCurrentEpisode(null);
+					setQueue([]);
+					setQueuePosition(-1);
+					setQueueLength(0);
 					break;
 			}
 		};
@@ -138,7 +194,7 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 					await service.connect();
 				}
 
-				// Request media status - the server will broadcast it
+				// Request media status
 				if (mounted) {
 					service.send({ type: 'request-media-status' });
 				}
@@ -155,8 +211,18 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 								setDuration(status.duration);
 								setVolumeState(status.volume);
 								setCurrentEpisode(status.currentEpisode);
+								setQueuePosition(status.queuePosition);
+								setQueueLength(status.queueLength);
 								setMpvConnected(status.mpvConnected);
 								setIsLoading(false);
+							}
+
+							// Also fetch queue
+							const queueInfo = await mediaApi.getQueue();
+							if (mounted) {
+								setQueue(queueInfo.items);
+								setQueuePosition(queueInfo.currentIndex);
+								setQueueLength(queueInfo.length);
 							}
 						} catch {
 							if (mounted) {
@@ -185,7 +251,7 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 	}, []); // Empty dependency array - only run once
 
 	// Helper to refresh status from API
-	const fetchAndUpdateStatus = useCallback(async () => {
+	const refreshStatus = useCallback(async () => {
 		try {
 			const status = await mediaApi.getMediaStatus();
 			setIsPlaying(status.isPlaying);
@@ -194,13 +260,27 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 			setDuration(status.duration);
 			setVolumeState(status.volume);
 			setCurrentEpisode(status.currentEpisode);
+			setQueuePosition(status.queuePosition);
+			setQueueLength(status.queueLength);
 			setMpvConnected(status.mpvConnected);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to refresh status');
 		}
 	}, []);
 
-	// Actions
+	// Helper to refresh queue from API
+	const refreshQueue = useCallback(async () => {
+		try {
+			const queueInfo = await mediaApi.getQueue();
+			setQueue(queueInfo.items);
+			setQueuePosition(queueInfo.currentIndex);
+			setQueueLength(queueInfo.length);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Failed to refresh queue');
+		}
+	}, []);
+
+	// Playback Actions
 	const play = useCallback(async (episodeId: number) => {
 		setError(null);
 		try {
@@ -217,7 +297,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		setError(null);
 		try {
 			await mediaApi.togglePause();
-			// Status will be updated via WebSocket
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to pause';
 			setError(message);
@@ -229,7 +308,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		setError(null);
 		try {
 			await mediaApi.resumePlayback();
-			// Status will be updated via WebSocket
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to resume';
 			setError(message);
@@ -241,7 +319,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		setError(null);
 		try {
 			await mediaApi.togglePause();
-			// Status will be updated via WebSocket
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to toggle playback';
 			setError(message);
@@ -253,7 +330,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		setError(null);
 		try {
 			await mediaApi.stopPlayback();
-			// Status will be updated via WebSocket
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to stop';
 			setError(message);
@@ -265,7 +341,7 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		setError(null);
 		try {
 			await mediaApi.seekTo(pos);
-			// Position will be updated via WebSocket
+			setPosition(pos); // Optimistic update
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to seek';
 			setError(message);
@@ -276,8 +352,8 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 	const seekRelative = useCallback(async (offset: number) => {
 		setError(null);
 		try {
-			await mediaApi.seekRelative(offset);
-			// Position will be updated via WebSocket
+			const result = await mediaApi.seekRelative(offset);
+			setPosition(result.position);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to seek';
 			setError(message);
@@ -289,7 +365,7 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		setError(null);
 		try {
 			await mediaApi.setVolume(vol);
-			// Volume will be updated via WebSocket
+			setVolumeState(vol); // Optimistic update
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to set volume';
 			setError(message);
@@ -297,12 +373,98 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		}
 	}, []);
 
-	const refreshStatus = useCallback(async () => {
-		await fetchAndUpdateStatus();
-	}, [fetchAndUpdateStatus]);
+	// Queue Actions
+	const addToQueue = useCallback(async (episodeId: number) => {
+		setError(null);
+		try {
+			await mediaApi.addToQueue(episodeId);
+			// Queue will be updated via WebSocket
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to add to queue';
+			setError(message);
+			throw err;
+		}
+	}, []);
+
+	const addMultipleToQueue = useCallback(async (episodeIds: number[]) => {
+		setError(null);
+		try {
+			await mediaApi.addMultipleToQueue(episodeIds);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to add to queue';
+			setError(message);
+			throw err;
+		}
+	}, []);
+
+	const removeFromQueue = useCallback(async (index: number) => {
+		setError(null);
+		try {
+			await mediaApi.removeFromQueue(index);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to remove from queue';
+			setError(message);
+			throw err;
+		}
+	}, []);
+
+	const clearQueue = useCallback(async () => {
+		setError(null);
+		try {
+			await mediaApi.clearQueue();
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to clear queue';
+			setError(message);
+			throw err;
+		}
+	}, []);
+
+	const moveInQueue = useCallback(async (from: number, to: number) => {
+		setError(null);
+		try {
+			await mediaApi.moveInQueue(from, to);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to reorder queue';
+			setError(message);
+			throw err;
+		}
+	}, []);
+
+	const playQueueIndex = useCallback(async (index: number) => {
+		setError(null);
+		try {
+			await mediaApi.playQueueIndex(index);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to play queue item';
+			setError(message);
+			throw err;
+		}
+	}, []);
+
+	const playNext = useCallback(async () => {
+		setError(null);
+		try {
+			await mediaApi.playNext();
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to play next';
+			setError(message);
+			throw err;
+		}
+	}, []);
+
+	const playPrevious = useCallback(async () => {
+		setError(null);
+		try {
+			await mediaApi.playPrevious();
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to play previous';
+			setError(message);
+			throw err;
+		}
+	}, []);
 
 	const value: MediaPlayerContextValue = {
-		// State
+		// Playback State
 		isPlaying,
 		isPaused,
 		isLoading,
@@ -312,9 +474,18 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		currentEpisode,
 		mpvConnected,
 		error,
+
+		// Queue State
+		queue,
+		queuePosition,
+		queueLength,
+
 		// Computed
 		progress,
-		// Actions
+		hasNext,
+		hasPrevious,
+
+		// Playback Actions
 		play,
 		pause,
 		resume,
@@ -323,7 +494,20 @@ export function MediaPlayerProvider({ children }: { children: ReactNode; }) {
 		seekTo,
 		seekRelative,
 		setVolume,
-		refreshStatus
+
+		// Queue Actions
+		addToQueue,
+		addMultipleToQueue,
+		removeFromQueue,
+		clearQueue,
+		moveInQueue,
+		playQueueIndex,
+		playNext,
+		playPrevious,
+
+		// Utility
+		refreshStatus,
+		refreshQueue,
 	};
 
 	return (
