@@ -3,6 +3,7 @@ import { Mic, ListMusic, Search, Settings, HardDriveDownload } from 'lucide-reac
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
 import { useDownloadContext } from '../contexts';
+import { MediaPlayer } from '../components';
 
 function AppLayout() {
 	const navigate = useNavigate();
@@ -75,22 +76,22 @@ function AppLayout() {
 			<Group
 				justify="center"
 				align="center"
-				p={isMobile ? 8 : 16}
 				style={{
 					position: 'fixed',
 					bottom: 0,
 					left: 0,
 					right: 0,
-					height: rem(80),
+					height: "var(--media-control-height)",
 					backgroundColor: 'var(--mantine-color-body)',
 					borderTop: `${rem(1)} solid var(--mantine-color-default-border)`,
 					zIndex: 100,
 				}}
 			>
 				{/* Media player placeholder */}
-				<div style={{ color: 'var(--mantine-color-dimmed)' }}>
+				{/*<div style={{ color: 'var(--mantine-color-dimmed)' }}>
 					Media Player Controls
-				</div>
+				</div>*/}
+				<MediaPlayer />
 			</Group>
 		</AppShell>
 	);
