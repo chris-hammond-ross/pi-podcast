@@ -22,10 +22,12 @@ export {
 	type DownloadProgressData,
 	type DownloadEventData,
 	type MediaCurrentEpisode,
+	type MediaQueueItem,
 	type MediaStatusData,
 	type MediaTimeUpdateData,
 	type MediaVolumeChangeData,
 	type MediaTrackChangedData,
 	type MediaCompletedData,
-	type MediaErrorData
+	type MediaErrorData,
+	type MediaQueueUpdateData
 } from './websocket';

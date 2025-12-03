@@ -15,6 +15,7 @@ const episodeService = require('./episodeService');
 /**
  * Media Player Service
  * Manages MPV playback via IPC socket for podcast episode playback
+ * Includes queue management using MPV's internal playlist
  */
 class MediaPlayerService extends EventEmitter {
 	constructor() {
@@ -32,6 +33,11 @@ class MediaPlayerService extends EventEmitter {
 		this.position = 0;
 		this.duration = 0;
 		this.volume = 100;
+
+		// Queue state - mirrors MPV's internal playlist
+		// Each item: { episodeId, episode (full data), filePath }
+		this.queue = [];
+		this.queuePosition = -1; // Current position in queue (-1 = nothing playing)
 
 		// IPC state
 		this.requestId = 0;
@@ -135,10 +141,10 @@ class MediaPlayerService extends EventEmitter {
 				'--no-video',
 				`--input-ipc-server=${this.socketPath}`,
 				'--audio-display=no',
-				'--keep-open=yes',
+				'--keep-open=no',        // Don't keep file open at end (allows playlist advance)
+				'--keep-open-pause=no',  // Don't pause at end
 				'--hr-seek=yes',
-				'--ao=pulse',
-				'--msg-level=all=v'  // Verbose logging for debugging
+				'--ao=pulse'
 			];
 
 			console.log('[media] Starting MPV with args:', args.join(' '));
@@ -176,7 +182,6 @@ class MediaPlayerService extends EventEmitter {
 			this.mpvProcess.stderr.on('data', (data) => {
 				const output = data.toString().trim();
 				if (output) {
-					// Log all stderr output for debugging
 					console.log('[mpv stderr]', output);
 				}
 			});
@@ -294,11 +299,11 @@ class MediaPlayerService extends EventEmitter {
 	 * @param {Object} message - Event message from MPV
 	 */
 	handleMpvEvent(message) {
-		const { event, name, data } = message;
+		const { event, name } = message;
 
 		switch (event) {
 			case 'property-change':
-				this.handlePropertyChange(name, data);
+				this.handlePropertyChange(name, message.data);
 				break;
 
 			case 'end-file':
@@ -307,7 +312,11 @@ class MediaPlayerService extends EventEmitter {
 
 			case 'file-loaded':
 				console.log('[media] File loaded');
-				this.emit('track-loaded');
+				this.handleFileLoaded();
+				break;
+
+			case 'start-file':
+				console.log('[media] Start file, playlist entry:', message.playlist_entry_id);
 				break;
 
 			case 'seek':
@@ -318,16 +327,23 @@ class MediaPlayerService extends EventEmitter {
 				console.log('[media] Playback restart');
 				break;
 
+			case 'idle':
+				console.log('[media] MPV idle');
+				this.handleIdle();
+				break;
+
 			case 'log-message':
-				// Log MPV's internal log messages
-				if (message.level && message.text) {
+				// Log MPV's internal log messages (only errors/warnings)
+				if (message.level && message.text && ['error', 'warn'].includes(message.level)) {
 					console.log(`[mpv ${message.level}] ${message.prefix}: ${message.text}`);
 				}
 				break;
 
 			default:
-				// Log unknown events for debugging
-				console.log('[media] Event:', event, JSON.stringify(message));
+				// Only log unknown events that aren't noisy
+				if (!['audio-reconfig'].includes(event)) {
+					console.log('[media] Event:', event);
+				}
 		}
 	}
 
@@ -370,11 +386,95 @@ class MediaPlayerService extends EventEmitter {
 				});
 				break;
 
-			case 'eof-reached':
-				if (value === true) {
-					this.handlePlaybackComplete();
+			case 'playlist-pos':
+				// MPV's playlist position changed
+				if (value !== null && value !== undefined && value !== this.queuePosition) {
+					console.log(`[media] Playlist position changed: ${this.queuePosition} -> ${value}`);
+					this.handleQueuePositionChange(value);
 				}
 				break;
+
+			case 'playlist-count':
+				console.log(`[media] Playlist count: ${value}`);
+				break;
+
+			case 'eof-reached':
+				if (value === true) {
+					console.log('[media] EOF reached');
+				}
+				break;
+		}
+	}
+
+	/**
+	 * Handle file loaded event - update current episode based on queue position
+	 */
+	async handleFileLoaded() {
+		try {
+			// Get current playlist position from MPV
+			const pos = await this.getProperty('playlist-pos');
+			if (pos !== null && pos >= 0 && pos < this.queue.length) {
+				this.queuePosition = pos;
+				const queueItem = this.queue[pos];
+				this.currentEpisode = queueItem.episode;
+				
+				// Get duration
+				try {
+					this.duration = await this.getProperty('duration') || 0;
+				} catch (err) {
+					console.warn('[media] Could not get duration:', err.message);
+				}
+
+				// Resume from saved position if available
+				if (this.currentEpisode.playback_position > 0 && !this.currentEpisode.playback_completed) {
+					console.log(`[media] Resuming from position: ${this.currentEpisode.playback_position}s`);
+					await this.seek(this.currentEpisode.playback_position);
+				}
+
+				this.isPlaying = true;
+				this.isPaused = false;
+				
+				// Start position save timer
+				this.startPositionSaveTimer();
+
+				console.log(`[media] Now playing: ${this.currentEpisode.title} (queue position ${pos})`);
+				
+				this.broadcastStatus();
+				this.broadcast({
+					type: 'media:track-changed',
+					episode: {
+						id: this.currentEpisode.id,
+						title: this.currentEpisode.title,
+						subscription_id: this.currentEpisode.subscription_id,
+						duration: this.duration
+					},
+					queuePosition: this.queuePosition,
+					queueLength: this.queue.length
+				});
+			}
+		} catch (err) {
+			console.error('[media] Error in handleFileLoaded:', err.message);
+		}
+	}
+
+	/**
+	 * Handle queue position change from MPV
+	 * @param {number} newPosition - New position in queue
+	 */
+	async handleQueuePositionChange(newPosition) {
+		// Save position of previous episode before changing
+		if (this.currentEpisode && this.position > 0) {
+			await this.saveCurrentPosition();
+		}
+
+		this.queuePosition = newPosition;
+
+		if (newPosition >= 0 && newPosition < this.queue.length) {
+			const queueItem = this.queue[newPosition];
+			this.currentEpisode = queueItem.episode;
+			this.position = 0;
+			
+			console.log(`[media] Queue position changed to ${newPosition}: ${this.currentEpisode.title}`);
 		}
 	}
 
@@ -382,11 +482,10 @@ class MediaPlayerService extends EventEmitter {
 	 * Handle end-file event from MPV
 	 * @param {Object} message - End file message
 	 */
-	handleEndFile(message) {
+	async handleEndFile(message) {
 		const reason = message.reason;
 		const fileError = message.file_error;
 		
-		console.log('[media] End file event:', JSON.stringify(message));
 		console.log('[media] End file, reason:', reason);
 		
 		if (fileError) {
@@ -394,7 +493,15 @@ class MediaPlayerService extends EventEmitter {
 		}
 
 		if (reason === 'eof') {
-			this.handlePlaybackComplete();
+			// Episode finished naturally
+			if (this.currentEpisode) {
+				episodeService.markAsCompleted(this.currentEpisode.id);
+				this.broadcast({
+					type: 'media:episode-completed',
+					episodeId: this.currentEpisode.id
+				});
+			}
+			// MPV will automatically advance to next in playlist if available
 		} else if (reason === 'error') {
 			const errorMsg = fileError || 'Playback error';
 			console.error('[media] Playback error:', errorMsg);
@@ -404,34 +511,33 @@ class MediaPlayerService extends EventEmitter {
 				error: errorMsg
 			});
 		}
+		// For 'stop' reason, we handle it elsewhere
 	}
 
 	/**
-	 * Handle playback completion
+	 * Handle MPV entering idle state (nothing playing)
 	 */
-	handlePlaybackComplete() {
-		console.log('[media] Playback complete');
-
-		if (this.currentEpisode) {
-			// Mark episode as completed in database
-			episodeService.markAsCompleted(this.currentEpisode.id);
-
-			this.broadcast({
-				type: 'media:completed',
-				episodeId: this.currentEpisode.id
-			});
-
-			this.emit('playback-complete', { episodeId: this.currentEpisode.id });
+	handleIdle() {
+		console.log('[media] Entered idle state - queue finished or stopped');
+		
+		this.stopPositionSaveTimer();
+		
+		// Save final position
+		if (this.currentEpisode && this.position > 0) {
+			this.saveCurrentPosition();
 		}
 
-		this.stopPositionSaveTimer();
 		this.currentEpisode = null;
 		this.isPlaying = false;
 		this.isPaused = false;
 		this.position = 0;
 		this.duration = 0;
+		this.queuePosition = -1;
 
 		this.broadcastStatus();
+		this.broadcast({
+			type: 'media:queue-finished'
+		});
 	}
 
 	/**
@@ -443,6 +549,8 @@ class MediaPlayerService extends EventEmitter {
 		await this.observeProperty('duration');
 		await this.observeProperty('pause');
 		await this.observeProperty('volume');
+		await this.observeProperty('playlist-pos');
+		await this.observeProperty('playlist-count');
 		await this.observeProperty('eof-reached');
 	}
 
@@ -503,14 +611,14 @@ class MediaPlayerService extends EventEmitter {
 		return this.sendCommand(['set_property', property, value]);
 	}
 
-	// ===== Public Playback Methods =====
+	// ===== Queue Management Methods =====
 
 	/**
-	 * Play an episode by ID
-	 * @param {number} episodeId - Episode ID to play
-	 * @returns {Promise<Object>} Playback result
+	 * Validate and get episode for queue operations
+	 * @param {number} episodeId - Episode ID
+	 * @returns {Object} Episode data with file path validation
 	 */
-	async playEpisode(episodeId) {
+	validateEpisodeForQueue(episodeId) {
 		const episode = episodeService.getEpisodeById(episodeId);
 
 		if (!episode) {
@@ -525,15 +633,33 @@ class MediaPlayerService extends EventEmitter {
 			throw new Error('Episode file not found');
 		}
 
-		console.log(`[media] Playing episode: ${episode.title}`);
-		console.log(`[media] File path: ${episode.file_path}`);
+		return episode;
+	}
 
-		// Stop current playback if any
+	/**
+	 * Play an episode immediately, replacing the queue
+	 * @param {number} episodeId - Episode ID to play
+	 * @returns {Promise<Object>} Playback result
+	 */
+	async playEpisode(episodeId) {
+		const episode = this.validateEpisodeForQueue(episodeId);
+
+		console.log(`[media] Playing episode: ${episode.title}`);
+
+		// Save current position before changing
 		if (this.currentEpisode) {
 			await this.saveCurrentPosition();
 		}
 
-		// Load the file
+		// Clear queue and add this episode
+		this.queue = [{
+			episodeId: episode.id,
+			episode: episode,
+			filePath: episode.file_path
+		}];
+		this.queuePosition = 0;
+
+		// Load the file (replace mode clears MPV playlist and plays)
 		await this.sendCommand(['loadfile', episode.file_path, 'replace']);
 
 		// Set current episode
@@ -560,8 +686,9 @@ class MediaPlayerService extends EventEmitter {
 		// Start position save timer
 		this.startPositionSaveTimer();
 
-		// Broadcast status
+		// Broadcast status and queue update
 		this.broadcastStatus();
+		this.broadcastQueue();
 		this.broadcast({
 			type: 'media:track-changed',
 			episode: {
@@ -569,7 +696,9 @@ class MediaPlayerService extends EventEmitter {
 				title: episode.title,
 				subscription_id: episode.subscription_id,
 				duration: this.duration
-			}
+			},
+			queuePosition: 0,
+			queueLength: 1
 		});
 
 		return {
@@ -582,6 +711,283 @@ class MediaPlayerService extends EventEmitter {
 			}
 		};
 	}
+
+	/**
+	 * Add an episode to the end of the queue
+	 * @param {number} episodeId - Episode ID to add
+	 * @returns {Promise<Object>} Result with queue info
+	 */
+	async addToQueue(episodeId) {
+		const episode = this.validateEpisodeForQueue(episodeId);
+
+		// Check if already in queue
+		if (this.queue.some(item => item.episodeId === episodeId)) {
+			throw new Error('Episode already in queue');
+		}
+
+		console.log(`[media] Adding to queue: ${episode.title}`);
+
+		// Add to our queue
+		this.queue.push({
+			episodeId: episode.id,
+			episode: episode,
+			filePath: episode.file_path
+		});
+
+		// Add to MPV playlist
+		// If nothing is playing, use 'append-play' to start playback
+		const isIdle = this.queue.length === 1 && !this.isPlaying;
+		const mode = isIdle ? 'append-play' : 'append';
+		
+		await this.sendCommand(['loadfile', episode.file_path, mode]);
+
+		if (isIdle) {
+			this.queuePosition = 0;
+		}
+
+		this.broadcastQueue();
+
+		return {
+			success: true,
+			queuePosition: this.queue.length - 1,
+			queueLength: this.queue.length
+		};
+	}
+
+	/**
+	 * Add multiple episodes to the queue
+	 * @param {number[]} episodeIds - Array of episode IDs to add
+	 * @returns {Promise<Object>} Result with queue info
+	 */
+	async addMultipleToQueue(episodeIds) {
+		const added = [];
+		const errors = [];
+
+		for (const episodeId of episodeIds) {
+			try {
+				await this.addToQueue(episodeId);
+				added.push(episodeId);
+			} catch (err) {
+				errors.push({ episodeId, error: err.message });
+			}
+		}
+
+		return {
+			success: true,
+			added: added.length,
+			errors: errors.length > 0 ? errors : undefined,
+			queueLength: this.queue.length
+		};
+	}
+
+	/**
+	 * Play next episode in queue
+	 * @returns {Promise<Object>} Result
+	 */
+	async playNext() {
+		if (this.queue.length === 0) {
+			throw new Error('Queue is empty');
+		}
+
+		if (this.queuePosition >= this.queue.length - 1) {
+			throw new Error('Already at end of queue');
+		}
+
+		// Save current position
+		if (this.currentEpisode) {
+			await this.saveCurrentPosition();
+		}
+
+		// Tell MPV to play next
+		await this.sendCommand(['playlist-next']);
+
+		return { success: true };
+	}
+
+	/**
+	 * Play previous episode in queue
+	 * @returns {Promise<Object>} Result
+	 */
+	async playPrevious() {
+		if (this.queue.length === 0) {
+			throw new Error('Queue is empty');
+		}
+
+		if (this.queuePosition <= 0) {
+			throw new Error('Already at start of queue');
+		}
+
+		// Save current position
+		if (this.currentEpisode) {
+			await this.saveCurrentPosition();
+		}
+
+		// Tell MPV to play previous
+		await this.sendCommand(['playlist-prev']);
+
+		return { success: true };
+	}
+
+	/**
+	 * Jump to a specific position in the queue
+	 * @param {number} index - Queue index to play
+	 * @returns {Promise<Object>} Result
+	 */
+	async playQueueIndex(index) {
+		if (index < 0 || index >= this.queue.length) {
+			throw new Error('Invalid queue index');
+		}
+
+		// Save current position
+		if (this.currentEpisode) {
+			await this.saveCurrentPosition();
+		}
+
+		// Set MPV playlist position
+		await this.setProperty('playlist-pos', index);
+
+		return { success: true };
+	}
+
+	/**
+	 * Remove an episode from the queue by index
+	 * @param {number} index - Queue index to remove
+	 * @returns {Promise<Object>} Result
+	 */
+	async removeFromQueue(index) {
+		if (index < 0 || index >= this.queue.length) {
+			throw new Error('Invalid queue index');
+		}
+
+		// Don't allow removing currently playing item (use skip instead)
+		if (index === this.queuePosition) {
+			throw new Error('Cannot remove currently playing episode. Use skip or stop instead.');
+		}
+
+		const removed = this.queue[index];
+		console.log(`[media] Removing from queue: ${removed.episode.title}`);
+
+		// Remove from MPV playlist
+		await this.sendCommand(['playlist-remove', index]);
+
+		// Remove from our queue
+		this.queue.splice(index, 1);
+
+		// Adjust queue position if needed
+		if (index < this.queuePosition) {
+			this.queuePosition--;
+		}
+
+		this.broadcastQueue();
+
+		return {
+			success: true,
+			removed: removed.episodeId,
+			queueLength: this.queue.length
+		};
+	}
+
+	/**
+	 * Clear the entire queue and stop playback
+	 * @returns {Promise<Object>} Result
+	 */
+	async clearQueue() {
+		console.log('[media] Clearing queue');
+
+		// Save current position
+		if (this.currentEpisode) {
+			await this.saveCurrentPosition();
+		}
+
+		// Clear MPV playlist
+		await this.sendCommand(['playlist-clear']);
+
+		// Clear our queue
+		this.queue = [];
+		this.queuePosition = -1;
+		this.currentEpisode = null;
+		this.isPlaying = false;
+		this.isPaused = false;
+		this.position = 0;
+		this.duration = 0;
+
+		this.stopPositionSaveTimer();
+		this.broadcastStatus();
+		this.broadcastQueue();
+
+		return { success: true };
+	}
+
+	/**
+	 * Move an item in the queue
+	 * @param {number} fromIndex - Current index
+	 * @param {number} toIndex - Target index
+	 * @returns {Promise<Object>} Result
+	 */
+	async moveInQueue(fromIndex, toIndex) {
+		if (fromIndex < 0 || fromIndex >= this.queue.length) {
+			throw new Error('Invalid from index');
+		}
+		if (toIndex < 0 || toIndex >= this.queue.length) {
+			throw new Error('Invalid to index');
+		}
+		if (fromIndex === toIndex) {
+			return { success: true, queueLength: this.queue.length };
+		}
+
+		console.log(`[media] Moving queue item from ${fromIndex} to ${toIndex}`);
+
+		// Move in MPV playlist
+		await this.sendCommand(['playlist-move', fromIndex, toIndex]);
+
+		// Move in our queue
+		const [item] = this.queue.splice(fromIndex, 1);
+		this.queue.splice(toIndex, 0, item);
+
+		// Adjust queue position
+		if (fromIndex === this.queuePosition) {
+			this.queuePosition = toIndex;
+		} else if (fromIndex < this.queuePosition && toIndex >= this.queuePosition) {
+			this.queuePosition--;
+		} else if (fromIndex > this.queuePosition && toIndex <= this.queuePosition) {
+			this.queuePosition++;
+		}
+
+		this.broadcastQueue();
+
+		return { success: true, queueLength: this.queue.length };
+	}
+
+	/**
+	 * Get the current queue
+	 * @returns {Object} Queue information
+	 */
+	getQueue() {
+		return {
+			items: this.queue.map((item, index) => ({
+				index,
+				episodeId: item.episodeId,
+				title: item.episode.title,
+				subscription_id: item.episode.subscription_id,
+				duration: item.episode.duration,
+				isPlaying: index === this.queuePosition
+			})),
+			currentIndex: this.queuePosition,
+			length: this.queue.length
+		};
+	}
+
+	/**
+	 * Broadcast current queue to all clients
+	 */
+	broadcastQueue() {
+		this.broadcast({
+			type: 'media:queue-update',
+			...this.getQueue()
+		});
+	}
+
+	// ===== Playback Control Methods =====
 
 	/**
 	 * Pause or resume playback
@@ -621,7 +1027,7 @@ class MediaPlayerService extends EventEmitter {
 	}
 
 	/**
-	 * Stop playback completely
+	 * Stop playback completely (keeps queue)
 	 */
 	async stop() {
 		if (this.currentEpisode) {
@@ -636,6 +1042,7 @@ class MediaPlayerService extends EventEmitter {
 		this.isPaused = false;
 		this.position = 0;
 		this.duration = 0;
+		// Note: We keep the queue intact, just stop playback
 
 		this.broadcastStatus();
 	}
@@ -691,6 +1098,8 @@ class MediaPlayerService extends EventEmitter {
 				title: this.currentEpisode.title,
 				subscription_id: this.currentEpisode.subscription_id
 			} : null,
+			queuePosition: this.queuePosition,
+			queueLength: this.queue.length,
 			mpvConnected: this.socket !== null
 		};
 	}
@@ -766,6 +1175,8 @@ class MediaPlayerService extends EventEmitter {
 		this.currentEpisode = null;
 		this.isPlaying = false;
 		this.isPaused = false;
+		this.queue = [];
+		this.queuePosition = -1;
 		this.pendingRequests.clear();
 
 		this.broadcast({

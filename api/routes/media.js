@@ -18,7 +18,7 @@ router.get('/status', (req, res) => {
 
 /**
  * POST /api/media/play/:episodeId
- * Start playing an episode
+ * Start playing an episode (replaces queue with single episode)
  */
 router.post('/play/:episodeId', async (req, res) => {
 	try {
@@ -85,7 +85,7 @@ router.post('/resume', async (req, res) => {
 
 /**
  * POST /api/media/stop
- * Stop playback completely
+ * Stop playback (keeps queue intact)
  */
 router.post('/stop', async (req, res) => {
 	try {
@@ -170,6 +170,191 @@ router.put('/volume', async (req, res) => {
 		res.status(500).json({ error: error.message });
 	}
 });
+
+// ===== Queue Management Routes =====
+
+/**
+ * GET /api/media/queue
+ * Get current queue
+ */
+router.get('/queue', (req, res) => {
+	try {
+		const queue = mediaPlayerService.getQueue();
+		res.json(queue);
+	} catch (error) {
+		console.error('[media-route] Error getting queue:', error);
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
+ * POST /api/media/queue
+ * Add episode(s) to queue
+ * Body: { episodeId: number } or { episodeIds: number[] }
+ */
+router.post('/queue', async (req, res) => {
+	try {
+		const { episodeId, episodeIds } = req.body;
+
+		if (episodeIds && Array.isArray(episodeIds)) {
+			// Add multiple episodes
+			const result = await mediaPlayerService.addMultipleToQueue(episodeIds);
+			res.json(result);
+		} else if (typeof episodeId === 'number') {
+			// Add single episode
+			const result = await mediaPlayerService.addToQueue(episodeId);
+			res.json(result);
+		} else {
+			return res.status(400).json({ error: 'Invalid request. Provide episodeId or episodeIds.' });
+		}
+	} catch (error) {
+		console.error('[media-route] Error adding to queue:', error);
+
+		if (error.message === 'Episode not found') {
+			return res.status(404).json({ error: error.message });
+		}
+
+		if (error.message === 'Episode not downloaded' || error.message === 'Episode already in queue') {
+			return res.status(400).json({ error: error.message });
+		}
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
+ * DELETE /api/media/queue
+ * Clear the entire queue
+ */
+router.delete('/queue', async (req, res) => {
+	try {
+		const result = await mediaPlayerService.clearQueue();
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error clearing queue:', error);
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
+ * DELETE /api/media/queue/:index
+ * Remove item from queue by index
+ */
+router.delete('/queue/:index', async (req, res) => {
+	try {
+		const index = parseInt(req.params.index, 10);
+
+		if (isNaN(index)) {
+			return res.status(400).json({ error: 'Invalid index' });
+		}
+
+		const result = await mediaPlayerService.removeFromQueue(index);
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error removing from queue:', error);
+
+		if (error.message === 'Invalid queue index') {
+			return res.status(400).json({ error: error.message });
+		}
+
+		if (error.message.includes('Cannot remove currently playing')) {
+			return res.status(400).json({ error: error.message });
+		}
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
+ * POST /api/media/queue/move
+ * Move item in queue
+ * Body: { from: number, to: number }
+ */
+router.post('/queue/move', async (req, res) => {
+	try {
+		const { from, to } = req.body;
+
+		if (typeof from !== 'number' || typeof to !== 'number') {
+			return res.status(400).json({ error: 'Invalid from or to index' });
+		}
+
+		const result = await mediaPlayerService.moveInQueue(from, to);
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error moving in queue:', error);
+
+		if (error.message.includes('Invalid')) {
+			return res.status(400).json({ error: error.message });
+		}
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
+ * POST /api/media/queue/play/:index
+ * Jump to specific position in queue
+ */
+router.post('/queue/play/:index', async (req, res) => {
+	try {
+		const index = parseInt(req.params.index, 10);
+
+		if (isNaN(index)) {
+			return res.status(400).json({ error: 'Invalid index' });
+		}
+
+		const result = await mediaPlayerService.playQueueIndex(index);
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error playing queue index:', error);
+
+		if (error.message === 'Invalid queue index') {
+			return res.status(400).json({ error: error.message });
+		}
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
+ * POST /api/media/next
+ * Play next episode in queue
+ */
+router.post('/next', async (req, res) => {
+	try {
+		const result = await mediaPlayerService.playNext();
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error playing next:', error);
+
+		if (error.message === 'Queue is empty' || error.message === 'Already at end of queue') {
+			return res.status(400).json({ error: error.message });
+		}
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
+ * POST /api/media/previous
+ * Play previous episode in queue
+ */
+router.post('/previous', async (req, res) => {
+	try {
+		const result = await mediaPlayerService.playPrevious();
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error playing previous:', error);
+
+		if (error.message === 'Queue is empty' || error.message === 'Already at start of queue') {
+			return res.status(400).json({ error: error.message });
+		}
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+// ===== Episode Progress Routes =====
 
 /**
  * GET /api/media/recently-played
