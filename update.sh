@@ -19,6 +19,9 @@ INSTALL_DIR="/opt/pi-podcast"
 SERVICE_NAME="pi-podcast"
 SERVICE_USER="pi-podcast"
 SERVICE_GROUP="pi-podcast"
+SERVICE_HOME="/var/lib/pi-podcast"
+RUNTIME_DIR="/run/pi-podcast"
+PULSE_SOCKET="/run/pi-podcast/pulse/native"
 
 # Helper functions
 print_header() {
@@ -53,6 +56,150 @@ check_installation() {
         exit 1
     fi
     print_success "Pi Podcast installation found"
+}
+
+stop_services() {
+    print_header "Stopping services"
+
+    # Stop pi-podcast first (it depends on pulseaudio)
+    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        systemctl stop "$SERVICE_NAME"
+        print_success "Stopped pi-podcast service"
+    fi
+
+    # Stop pulseaudio-pi-podcast
+    if systemctl is-active --quiet pulseaudio-pi-podcast 2>/dev/null; then
+        systemctl stop pulseaudio-pi-podcast
+        print_success "Stopped pulseaudio-pi-podcast service"
+    fi
+}
+
+disable_user_pulseaudio() {
+    print_header "Ensuring user PulseAudio is disabled"
+
+    # Kill any running user PulseAudio instances
+    pkill -9 pulseaudio 2>/dev/null || true
+    sleep 1
+
+    # Stop, disable, and mask PulseAudio for all currently logged-in users
+    local logged_in_users=$(who | awk '{print $1}' | sort -u)
+    
+    for username in $logged_in_users; do
+        # Skip if user doesn't exist or is a system user (UID < 1000)
+        local uid=$(id -u "$username" 2>/dev/null) || continue
+        if [ "$uid" -lt 1000 ]; then
+            continue
+        fi
+        
+        # Get the user's XDG_RUNTIME_DIR
+        local user_runtime_dir="/run/user/$uid"
+        
+        if [ -d "$user_runtime_dir" ]; then
+            # Stop PulseAudio services for this user
+            sudo -u "$username" XDG_RUNTIME_DIR="$user_runtime_dir" \
+                systemctl --user stop pulseaudio.socket pulseaudio.service 2>/dev/null || true
+            
+            # Disable PulseAudio services for this user
+            sudo -u "$username" XDG_RUNTIME_DIR="$user_runtime_dir" \
+                systemctl --user disable pulseaudio.socket pulseaudio.service 2>/dev/null || true
+            
+            # Mask PulseAudio services to prevent them from starting
+            sudo -u "$username" XDG_RUNTIME_DIR="$user_runtime_dir" \
+                systemctl --user mask pulseaudio.socket pulseaudio.service 2>/dev/null || true
+            
+            print_info "Disabled PulseAudio for user: $username"
+        fi
+        
+        # Kill any remaining PulseAudio processes for this user
+        pkill -u "$username" pulseaudio 2>/dev/null || true
+    done
+
+    # Final cleanup
+    sleep 1
+    pkill -9 pulseaudio 2>/dev/null || true
+
+    print_success "User PulseAudio disabled"
+}
+
+ensure_pulseaudio_config() {
+    print_header "Ensuring PulseAudio configuration"
+
+    # Create runtime directory structure
+    mkdir -p "$RUNTIME_DIR/pulse"
+    chown "$SERVICE_USER:$SERVICE_GROUP" "$RUNTIME_DIR"
+    chown "$SERVICE_USER:$SERVICE_GROUP" "$RUNTIME_DIR/pulse"
+    chmod 755 "$RUNTIME_DIR"
+    chmod 700 "$RUNTIME_DIR/pulse"
+
+    # Ensure PulseAudio config directory exists
+    local PA_CONFIG_DIR="$SERVICE_HOME/.config/pulse"
+    mkdir -p "$PA_CONFIG_DIR"
+
+    # Ensure pulse cookie file exists
+    if [ ! -f "$SERVICE_HOME/.pulse-cookie" ]; then
+        touch "$SERVICE_HOME/.pulse-cookie"
+        chmod 600 "$SERVICE_HOME/.pulse-cookie"
+        chown "$SERVICE_USER:$SERVICE_GROUP" "$SERVICE_HOME/.pulse-cookie"
+        print_info "Created PulseAudio cookie file"
+    fi
+
+    # Ensure client.conf exists
+    if [ ! -f "$PA_CONFIG_DIR/client.conf" ]; then
+        cat > "$PA_CONFIG_DIR/client.conf" << EOF
+# Pi Podcast PulseAudio client configuration
+default-server = unix:$PULSE_SOCKET
+autospawn = no
+EOF
+        print_info "Created PulseAudio client configuration"
+    fi
+
+    # Ensure default.pa exists
+    if [ ! -f "$PA_CONFIG_DIR/default.pa" ]; then
+        cat > "$PA_CONFIG_DIR/default.pa" << EOF
+#!/usr/bin/pulseaudio -nF
+
+# Pi Podcast PulseAudio configuration
+
+# Load device detection
+.ifexists module-udev-detect.so
+load-module module-udev-detect
+.else
+load-module module-detect
+.endif
+
+# Load the native protocol with explicit socket path
+load-module module-native-protocol-unix socket=$PULSE_SOCKET
+
+# Bluetooth support
+.ifexists module-bluetooth-policy.so
+load-module module-bluetooth-policy
+.endif
+
+.ifexists module-bluetooth-discover.so
+load-module module-bluetooth-discover
+.endif
+
+# Automatically switch to newly connected devices
+load-module module-switch-on-connect
+
+# Always have a sink available (fallback when no devices connected)
+load-module module-always-sink
+
+# Honor intended roles
+load-module module-intended-roles
+
+# Restore defaults
+load-module module-default-device-restore
+load-module module-card-restore
+load-module module-stream-restore restore_device=false
+EOF
+        print_info "Created PulseAudio server configuration"
+    fi
+
+    # Set ownership of config directory
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$SERVICE_HOME/.config"
+
+    print_success "PulseAudio configuration verified"
 }
 
 pull_latest() {
@@ -103,16 +250,36 @@ build_frontend() {
     print_success "React frontend built and updated"
 }
 
-restart_service() {
-    print_header "Restarting Pi Podcast service"
+start_services() {
+    print_header "Starting services"
 
+    # Start PulseAudio first
+    systemctl restart pulseaudio-pi-podcast
+    sleep 3
+
+    if systemctl is-active --quiet pulseaudio-pi-podcast; then
+        print_success "PulseAudio service started"
+        
+        # Verify socket was created
+        if [ -S "$PULSE_SOCKET" ]; then
+            print_success "PulseAudio socket verified at $PULSE_SOCKET"
+        else
+            print_error "PulseAudio socket not found at $PULSE_SOCKET"
+            print_info "Check logs with: journalctl -u pulseaudio-pi-podcast -n 50"
+        fi
+    else
+        print_error "Failed to start PulseAudio service"
+        print_info "Check logs with: journalctl -u pulseaudio-pi-podcast -n 50"
+    fi
+
+    # Now start pi-podcast
     systemctl restart "$SERVICE_NAME"
     sleep 2
 
     if systemctl is-active --quiet "$SERVICE_NAME"; then
-        print_success "Pi Podcast service restarted successfully"
+        print_success "Pi Podcast service started"
     else
-        print_error "Failed to restart Pi Podcast service"
+        print_error "Failed to start Pi Podcast service"
         print_info "Check logs with: sudo journalctl -u pi-podcast -f"
         exit 1
     fi
@@ -128,13 +295,13 @@ print_update_summary() {
     echo "  - Repository pulled latest changes"
     echo "  - API dependencies reinstalled"
     echo "  - React frontend rebuilt"
-    echo "  - Service restarted"
+    echo "  - PulseAudio service restarted"
+    echo "  - Pi Podcast service restarted"
     echo ""
     echo "Useful commands:"
     echo -e "  View logs:        ${BLUE}sudo journalctl -u pi-podcast -f${NC}"
     echo -e "  Check status:     ${BLUE}sudo systemctl status pi-podcast${NC}"
-    echo -e "  Stop service:     ${BLUE}sudo systemctl stop pi-podcast${NC}"
-    echo -e "  Start service:    ${BLUE}sudo systemctl start pi-podcast${NC}"
+    echo -e "  PulseAudio logs:  ${BLUE}sudo journalctl -u pulseaudio-pi-podcast -f${NC}"
     echo ""
 }
 
@@ -147,11 +314,20 @@ main() {
     check_root
     check_installation
 
+    # Stop services first
+    stop_services
+
+    # Ensure PulseAudio is properly disabled for users and configured for pi-podcast
+    disable_user_pulseaudio
+    ensure_pulseaudio_config
+
     # Update steps
     pull_latest
     update_api
     build_frontend
-    restart_service
+
+    # Start services
+    start_services
 
     # Summary
     print_update_summary
