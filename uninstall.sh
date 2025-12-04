@@ -96,6 +96,12 @@ check_root() {
     fi
 }
 
+# Change to a safe directory to avoid issues with deleting current directory
+change_to_safe_directory() {
+    cd /tmp || cd /
+    print_info "Working from safe directory: $(pwd)"
+}
+
 confirm_uninstall() {
     if [ "$SKIP_CONFIRM" = true ]; then
         return 0
@@ -109,6 +115,7 @@ confirm_uninstall() {
     if [ "$KEEP_DATA" = false ]; then
         echo "  - Installation directory: ${INSTALL_DIR}"
         echo "  - Database file: ${DB_FILE}"
+        echo "  - Downloaded podcast files"
     fi
     if [ "$KEEP_BLUETOOTH_DEVICES" = false ]; then
         echo "  - All paired/trusted Bluetooth devices"
@@ -201,6 +208,17 @@ remove_pulseaudio_config() {
         systemctl disable pulseaudio-system 2>/dev/null || true
     fi
     [ -f "/etc/systemd/system/pulseaudio-system.service" ] && rm -f "/etc/systemd/system/pulseaudio-system.service"
+
+    # Remove user PulseAudio disable overrides (restore default behavior)
+    if [ -d "/etc/systemd/user/pulseaudio.socket.d" ]; then
+        rm -rf "/etc/systemd/user/pulseaudio.socket.d"
+        print_success "Removed PulseAudio socket override"
+    fi
+
+    if [ -d "/etc/systemd/user/pulseaudio.service.d" ]; then
+        rm -rf "/etc/systemd/user/pulseaudio.service.d"
+        print_success "Removed PulseAudio service override"
+    fi
 
     systemctl daemon-reload
     print_info "Note: Default user-mode PulseAudio will resume on next login"
@@ -314,8 +332,18 @@ remove_install_directory() {
     fi
 
     if [ -d "$INSTALL_DIR" ]; then
+        # Remove the entire installation directory including database and downloads
         rm -rf "$INSTALL_DIR"
-        print_success "Installation directory and database removed"
+        
+        # Verify removal
+        if [ -d "$INSTALL_DIR" ]; then
+            print_error "Failed to remove installation directory: $INSTALL_DIR"
+            print_info "You may need to remove it manually: sudo rm -rf $INSTALL_DIR"
+        else
+            print_success "Installation directory removed: $INSTALL_DIR"
+            print_success "Database removed: $DB_FILE"
+            print_success "Downloaded podcasts removed"
+        fi
     else
         print_info "Installation directory does not exist"
     fi
@@ -381,6 +409,11 @@ main() {
 
     # Checks
     check_root
+
+    # Change to safe directory before doing anything destructive
+    # This prevents issues if the script is run from within the install directory
+    change_to_safe_directory
+
     confirm_uninstall
 
     # Uninstallation steps
