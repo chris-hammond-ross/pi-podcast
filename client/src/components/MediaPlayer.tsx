@@ -66,7 +66,7 @@ function VerticalVolumeSlider({
 		<div
 			ref={ref}
 			style={{
-				width: 24,
+				width: 16,
 				height: 120,
 				backgroundColor: 'var(--mantine-color-teal-light)',
 				borderRadius: 12,
@@ -96,11 +96,11 @@ function VerticalVolumeSlider({
 					bottom: `calc(${percentage * 100}% - 8px)`,
 					left: '50%',
 					transform: 'translateX(-50%)',
-					width: 16,
-					height: 16,
+					width: 14,
+					height: 14,
 					backgroundColor: 'var(--mantine-color-teal-7)',
 					borderRadius: '50%',
-					boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+					opacity: 0,
 					transition: 'bottom 50ms ease',
 				}}
 			/>
@@ -243,7 +243,7 @@ function MediaPlayer() {
 				<Group gap="xs" justify="center" grow>
 					{/* Previous button */}
 					<ActionIcon
-						variant="subtle"
+						variant="light"
 						color="teal"
 						size="lg"
 						aria-label="Previous"
@@ -273,7 +273,7 @@ function MediaPlayer() {
 
 					{/* Next button */}
 					<ActionIcon
-						variant="subtle"
+						variant="light"
 						color="teal"
 						size="lg"
 						aria-label="Next"
@@ -289,6 +289,11 @@ function MediaPlayer() {
 						onChange={setVolumeOpen}
 						position="top"
 						shadow="md"
+						styles={{
+							dropdown: {
+								width: "56px !important"
+							}
+						}}
 					>
 						<Popover.Target>
 							<ActionIcon
@@ -313,7 +318,7 @@ function MediaPlayer() {
 									{volume}%
 								</Text>
 								<ActionIcon
-									variant="subtle"
+									variant="light"
 									color="teal"
 									size="sm"
 									onClick={handleMuteToggle}
