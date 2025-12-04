@@ -4,7 +4,8 @@ import {
 	Tabs,
 	ScrollArea,
 	Card,
-	Text
+	Text,
+	Group
 } from '@mantine/core';
 import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
@@ -77,14 +78,26 @@ function Playlists() {
 									<Text size='xs' c="dimmed">Podcast episodes in the current queue</Text>
 								</Card>
 								{queue.map((item, index) => (
-									<Card key={item.episodeId}>
-										<Stack>
-											<Text>{item.title}</Text>
-											<Text>{getSubscriptionById(item.subscription_id)?.name}</Text>
-										</Stack>
-
-										{/*{item.isPlaying && '▶️'}
-										<button onClick={() => removeFromQueue(index)}>Remove</button>*/}
+									<Card
+										withBorder
+										p="sm"
+										style={{ cursor: 'pointer' }}
+										key={index}
+									>
+										<Group justify="space-between" align="center" wrap="nowrap">
+											<div style={{ flex: 1, minWidth: 0 }}>
+												<Group gap="xs" wrap="nowrap">
+													<Text size="sm" truncate style={{ flex: 1 }}>
+														{item.title}
+													</Text>
+												</Group>
+												<Text size="xs" c="dimmed" truncate>
+													{getSubscriptionById(item.subscription_id)?.name} •
+													{/*{episode.pub_date && formatDate(episode.pub_date)}*/}
+													{item.duration && ` • ${item.duration}`}
+												</Text>
+											</div>
+										</Group>
 									</Card>
 								))}
 							</Stack>
