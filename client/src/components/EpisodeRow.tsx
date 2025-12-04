@@ -114,13 +114,15 @@ function EpisodeRow({
 			await play(episode.id);
 			notifications.show({
 				color: 'teal',
-				message: `Now playing "${episode.title}"`
+				message: `Now playing "${episode.title}"`,
+				position: 'top-right'
 			});
 			handleActionsModalClose();
 		} catch (err) {
 			notifications.show({
 				color: 'red',
-				message: err instanceof Error ? err.message : 'Failed to play episode'
+				message: err instanceof Error ? err.message : 'Failed to play episode',
+				position: 'top-right'
 			});
 		}
 	};
@@ -132,13 +134,15 @@ function EpisodeRow({
 			await addToQueue(episode.id);
 			notifications.show({
 				color: 'teal',
-				message: `Added "${episode.title}" to queue`
+				message: `Added "${episode.title}" to queue`,
+				position: 'top-right'
 			});
 			handleActionsModalClose();
 		} catch (err) {
 			notifications.show({
 				color: 'red',
-				message: err instanceof Error ? err.message : 'Failed to add episode to queue'
+				message: err instanceof Error ? err.message : 'Failed to add episode to queue',
+				position: 'top-right'
 			});
 		}
 	};
@@ -167,13 +171,15 @@ function EpisodeRow({
 
 			notifications.show({
 				color: 'teal',
-				message: `Deleted "${episode.title}"`
+				message: `Deleted "${episode.title}"`,
+				position: 'top-right'
 			});
 			handleActionsModalClose();
 		} catch (err) {
 			notifications.show({
 				color: 'red',
-				message: err instanceof Error ? err.message : 'Failed to delete'
+				message: err instanceof Error ? err.message : 'Failed to delete',
+				position: 'top-right'
 			});
 		} finally {
 			setIsDeleting(false);

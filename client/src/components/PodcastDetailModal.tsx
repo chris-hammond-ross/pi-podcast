@@ -180,7 +180,8 @@ function PodcastDetailModal({
 			if (result.added > 0) {
 				notifications.show({
 					color: 'teal',
-					message: `Synced ${result.added} new episodes`
+					message: `Synced ${result.added} new episodes`,
+					position: 'top-right'
 				});
 			}
 
@@ -188,7 +189,8 @@ function PodcastDetailModal({
 		} catch (err) {
 			notifications.show({
 				color: 'red',
-				message: err instanceof Error ? err.message : 'Failed to sync'
+				message: err instanceof Error ? err.message : 'Failed to sync',
+				position: 'top-right'
 			});
 		} finally {
 			setIsLoading(false);
@@ -200,7 +202,8 @@ function PodcastDetailModal({
 		await addToQueue(episode.id);
 		notifications.show({
 			color: 'teal',
-			message: `Added "${episode.title}" to download queue`
+			message: `Added "${episode.title}" to download queue`,
+			position: 'top-right'
 		});
 	};
 
@@ -211,7 +214,8 @@ function PodcastDetailModal({
 		if (notDownloaded.length === 0) {
 			notifications.show({
 				color: 'blue',
-				message: 'All episodes already downloaded'
+				message: 'All episodes already downloaded',
+				position: 'top-right'
 			});
 			return;
 		}
@@ -219,7 +223,8 @@ function PodcastDetailModal({
 		await addBatchToQueue(notDownloaded.map(e => e.id));
 		notifications.show({
 			color: 'teal',
-			message: `Added ${notDownloaded.length} episodes to download queue`
+			message: `Added ${notDownloaded.length} episodes to download queue`,
+			position: 'top-right'
 		});
 	};
 
@@ -255,7 +260,8 @@ function PodcastDetailModal({
 		await addMediaToQueue(episode.id);
 		notifications.show({
 			color: 'cyan',
-			message: `Added ${episode.title} to queue`
+			message: `Added ${episode.title} to queue`,
+			position: 'top-right'
 		});
 	};
 
