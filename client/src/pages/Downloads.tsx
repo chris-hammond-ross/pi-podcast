@@ -24,7 +24,7 @@ import {
 	RefreshCw
 } from 'lucide-react';
 import { useDownloadContext } from '../contexts';
-import { EpisodeDetailModal } from '../components';
+import { EpisodeDetailModal, EpisodeRow } from '../components';
 import * as downloadsApi from '../services/downloads';
 import { getEpisode, getSubscriptionById, type EpisodeRecord } from '../services';
 import type { DownloadQueueItem } from '../services/websocket';
@@ -206,7 +206,7 @@ function Downloads() {
 		}
 	}, []);
 
-	if (isLoading) {
+	if (!isLoading) {
 		return (
 			<Container size="sm" py="md">
 				<Group justify="center" py="xl">
@@ -452,25 +452,9 @@ function Downloads() {
 												<>
 													<Divider label="Recent" />
 													{recentCompletedItems.map((item) => (
-														<Card
-															key={item.id}
-															withBorder
-															p="sm"
-															onClick={() => handleEpisodeClick(item)}
-															style={{ cursor: 'pointer' }}
-														>
-															<Group justify="space-between" align="center" wrap="nowrap">
-																<div style={{ flex: 1, minWidth: 0 }}>
-																	<Text size="sm" truncate>
-																		{item.episode_title}
-																	</Text>
-																	<Text size="xs" c="dimmed" truncate>
-																		{item.subscription_name}
-																		{item.completed_at && ` • ${formatDate(item.completed_at)}`}
-																	</Text>
-																</div>
-															</Group>
-														</Card>
+														<EpisodeRow
+															episodeId={item.id}
+														/>
 													))}
 												</>
 											)}
@@ -483,25 +467,10 @@ function Downloads() {
 														mt={recentCompletedItems.length > 0 ? 'md' : undefined}
 													/>
 													{olderCompletedItems.map((item) => (
-														<Card
-															key={item.id}
-															withBorder
-															p="sm"
-															onClick={() => handleEpisodeClick(item)}
-															style={{ cursor: 'pointer' }}
-														>
-															<Group justify="space-between" align="center" wrap="nowrap">
-																<div style={{ flex: 1, minWidth: 0 }}>
-																	<Text size="sm" truncate>
-																		{item.episode_title}
-																	</Text>
-																	<Text size="xs" c="dimmed" truncate>
-																		{item.subscription_name}
-																		{item.completed_at && ` • ${formatDate(item.completed_at)}`}
-																	</Text>
-																</div>
-															</Group>
-														</Card>
+														<EpisodeRow
+															episodeId={item.id}
+															subscriptionName={item.subscription_name}
+														/>
 													))}
 												</>
 											)}

@@ -9,7 +9,7 @@ function AppLayout() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const isMobile = useMediaQuery('(max-width: 768px)');
-	const isActive = (path: string) => location.pathname === path;
+	const isActive = (path: string) => location.pathname.startsWith(path);
 	const { isActive: isDownloading } = useDownloadContext();
 
 	const navItems = [
