@@ -60,6 +60,10 @@
 	pointer-events: none;
 }
 
+.mantine-Popover-dropdown {
+	width: 56px !important;
+}
+
 /* Spin animation for download in progress icon */
 @keyframes spin {
 	from {
