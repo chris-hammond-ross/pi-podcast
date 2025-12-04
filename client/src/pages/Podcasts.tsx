@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
 	Container,
-	Title,
 	Text,
 	SimpleGrid,
 	Card,
@@ -16,6 +15,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { AlertCircle } from 'lucide-react';
+import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
 import { getSubscriptionById, getAllDownloadedEpisodes } from '../services';
@@ -38,6 +38,8 @@ function Podcasts() {
 	const { subscriptionId, episodeId } = useParams<{ subscriptionId: string; episodeId: string; }>();
 	const navigate = useNavigate();
 	const location = useLocation();
+
+	const { queue } = useMediaPlayer();
 
 	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
@@ -184,9 +186,6 @@ function Podcasts() {
 	if (error) {
 		return (
 			<Container size="sm" py="md">
-				<Title order={1} mb="md">
-					Podcasts
-				</Title>
 				<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
 					{error}
 				</Alert>
@@ -198,11 +197,8 @@ function Podcasts() {
 	if (subscriptions.length === 0) {
 		return (
 			<Container size="sm" py="md">
-				<Title order={1} mb="md">
-					Podcasts
-				</Title>
 				<Text c="dimmed">
-					No subscriptions yet. Search for podcasts to subscribe!
+					No subscriptions yet. Search for podcasts to subscribe to!
 				</Text>
 			</Container>
 		);
@@ -221,6 +217,9 @@ function Podcasts() {
 				<Tabs.List justify='flex-start'>
 					<Tabs.Tab size="xl" value="podcasts">
 						Podcasts
+					</Tabs.Tab>
+					<Tabs.Tab value="queue">
+						Playing
 					</Tabs.Tab>
 					<Tabs.Tab value="episodes">
 						Episodes
@@ -271,6 +270,36 @@ function Podcasts() {
 								<Loader size="lg" />
 							</Group>
 						)}
+					</Tabs.Panel>
+					<Tabs.Panel value="queue">
+						<Stack>
+							<Card>
+								<Text size='xs' c="dimmed">Podcast episodes in the current queue</Text>
+							</Card>
+							{queue.map((item, index) => (
+								<Card
+									withBorder
+									p="sm"
+									style={{ cursor: 'pointer' }}
+									key={index}
+								>
+									<Group justify="space-between" align="center" wrap="nowrap">
+										<div style={{ flex: 1, minWidth: 0 }}>
+											<Group gap="xs" wrap="nowrap">
+												<Text size="sm" truncate style={{ flex: 1 }}>
+													{item.title}
+												</Text>
+											</Group>
+											<Text size="xs" c="dimmed" truncate>
+												{getSubscriptionById(item.subscription_id)?.name} •
+												{/*{episode.pub_date && formatDate(episode.pub_date)}*/}
+												{item.duration && ` • ${item.duration}`}
+											</Text>
+										</div>
+									</Group>
+								</Card>
+							))}
+						</Stack>
 					</Tabs.Panel>
 					<Tabs.Panel value="episodes">
 						{isLoadingEpisodes ? (

@@ -4,34 +4,33 @@ import {
 	Tabs,
 	ScrollArea,
 	Card,
-	Text,
-	Group
+	Text
 } from '@mantine/core';
-import { useMediaPlayer } from '../contexts';
-import { useSubscriptions } from '../hooks';
+// import { useMediaPlayer } from '../contexts';
+// import { useSubscriptions } from '../hooks';
 
 function Playlists() {
-	const {
-		// Queue state
-		queue,
-		queuePosition,
-		queueLength,
-		hasNext,
-		hasPrevious,
+	// const {
+	// 	// Queue state
+	// 	queue,
+	// 	queuePosition,
+	// 	queueLength,
+	// 	hasNext,
+	// 	hasPrevious,
 
-		// Queue actions
-		addToQueue,
-		playNext,
-		playPrevious,
-		removeFromQueue,
-		clearQueue,
-	} = useMediaPlayer();
+	// 	// Queue actions
+	// 	addToQueue,
+	// 	playNext,
+	// 	playPrevious,
+	// 	removeFromQueue,
+	// 	clearQueue,
+	// } = useMediaPlayer();
 
-	const { getSubscriptionById } = useSubscriptions();
+	// const { getSubscriptionById } = useSubscriptions();
 
 	return (
 		<Tabs
-			defaultValue="queue"
+			defaultValue="playlists"
 			style={{
 				display: 'flex',
 				flexDirection: 'column',
@@ -40,9 +39,6 @@ function Playlists() {
 		>
 			<Container size="sm" style={{ width: '100%' }}>
 				<Tabs.List justify='flex-start'>
-					<Tabs.Tab size="xl" value="queue">
-						Current
-					</Tabs.Tab>
 					<Tabs.Tab value="playlists">
 						Saved Playlists
 					</Tabs.Tab>
@@ -72,36 +68,6 @@ function Playlists() {
 			>
 				<Container size="sm" py="md">
 					<Stack gap="xl">
-						<Tabs.Panel value="queue">
-							<Stack>
-								<Card>
-									<Text size='xs' c="dimmed">Podcast episodes in the current queue</Text>
-								</Card>
-								{queue.map((item, index) => (
-									<Card
-										withBorder
-										p="sm"
-										style={{ cursor: 'pointer' }}
-										key={index}
-									>
-										<Group justify="space-between" align="center" wrap="nowrap">
-											<div style={{ flex: 1, minWidth: 0 }}>
-												<Group gap="xs" wrap="nowrap">
-													<Text size="sm" truncate style={{ flex: 1 }}>
-														{item.title}
-													</Text>
-												</Group>
-												<Text size="xs" c="dimmed" truncate>
-													{getSubscriptionById(item.subscription_id)?.name} •
-													{/*{episode.pub_date && formatDate(episode.pub_date)}*/}
-													{item.duration && ` • ${item.duration}`}
-												</Text>
-											</div>
-										</Group>
-									</Card>
-								))}
-							</Stack>
-						</Tabs.Panel>
 						<Tabs.Panel value="playlists">
 							<Card>
 								<Text size='xs' c="dimmed">Your saved custom playlists</Text>
