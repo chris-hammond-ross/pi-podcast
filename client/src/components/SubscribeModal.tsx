@@ -100,6 +100,7 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 				message: <Text size='xs' c="dimmed" lineClamp={2}>
 					You subscribed to <Text span c="var(--mantine-color-text)">{podcast.name}</Text>
 				</Text>,
+				position: 'top-right'
 			});
 			onClose();
 		} catch (err) {
