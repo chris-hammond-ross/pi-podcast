@@ -392,7 +392,7 @@ function Podcasts() {
 										key={episode.id}
 										episodeId={episode.id}
 										subscriptionName={episode.subscription_name}
-										showDownloadStatus={true}
+										showDownloadStatus={false}
 									/>
 								))}
 							</Stack>

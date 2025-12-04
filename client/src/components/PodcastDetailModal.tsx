@@ -181,7 +181,8 @@ function PodcastDetailModal({
 				notifications.show({
 					color: 'teal',
 					message: `Synced ${result.added} new episodes`,
-					position: 'top-right'
+					position: 'top-right',
+					autoClose: 1500
 				});
 			}
 
@@ -190,7 +191,8 @@ function PodcastDetailModal({
 			notifications.show({
 				color: 'red',
 				message: err instanceof Error ? err.message : 'Failed to sync',
-				position: 'top-right'
+				position: 'top-right',
+				autoClose: 3000
 			});
 		} finally {
 			setIsLoading(false);
@@ -203,7 +205,8 @@ function PodcastDetailModal({
 		notifications.show({
 			color: 'teal',
 			message: `Added "${episode.title}" to download queue`,
-			position: 'top-right'
+			position: 'top-right',
+			autoClose: 1500
 		});
 	};
 
@@ -215,7 +218,8 @@ function PodcastDetailModal({
 			notifications.show({
 				color: 'blue',
 				message: 'All episodes already downloaded',
-				position: 'top-right'
+				position: 'top-right',
+				autoClose: 1500
 			});
 			return;
 		}
@@ -224,7 +228,8 @@ function PodcastDetailModal({
 		notifications.show({
 			color: 'teal',
 			message: `Added ${notDownloaded.length} episodes to download queue`,
-			position: 'top-right'
+			position: 'top-right',
+			autoClose: 1500
 		});
 	};
 
@@ -261,7 +266,8 @@ function PodcastDetailModal({
 		notifications.show({
 			color: 'cyan',
 			message: `Added ${episode.title} to queue`,
-			position: 'top-right'
+			position: 'top-right',
+			autoClose: 1500
 		});
 	};
 

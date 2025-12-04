@@ -105,7 +105,8 @@ function EpisodeDetailModal({
 		notifications.show({
 			color: 'teal',
 			message: `Added "${episode.title}" to download queue`,
-			position: 'top-right'
+			position: 'top-right',
+			autoClose: 1500
 		});
 		onClose();
 	};
@@ -119,7 +120,8 @@ function EpisodeDetailModal({
 			notifications.show({
 				color: 'teal',
 				message: `Deleted "${episode.title}"`,
-				position: 'top-right'
+				position: 'top-right',
+				autoClose: 1500
 			});
 			if (onEpisodeUpdate) {
 				onEpisodeUpdate({
@@ -134,7 +136,8 @@ function EpisodeDetailModal({
 			notifications.show({
 				color: 'red',
 				message: err instanceof Error ? err.message : 'Failed to delete',
-				position: 'top-right'
+				position: 'top-right',
+				autoClose: 3000
 			});
 		} finally {
 			setIsDeleting(false);
@@ -150,13 +153,15 @@ function EpisodeDetailModal({
 			notifications.show({
 				color: 'teal',
 				message: `Now playing "${episode.title}"`,
-				position: 'top-right'
+				position: 'top-right',
+				autoClose: 1500
 			});
 		} catch (err) {
 			notifications.show({
 				color: 'red',
 				message: err instanceof Error ? err.message : 'Failed to play episode',
-				position: 'top-right'
+				position: 'top-right',
+				autoClose: 3000
 			});
 		} finally {
 			setIsMediaLoading(false);
@@ -171,7 +176,8 @@ function EpisodeDetailModal({
 			notifications.show({
 				color: 'red',
 				message: err instanceof Error ? err.message : 'Failed to pause',
-				position: 'top-right'
+				position: 'top-right',
+				autoClose: 3000
 			});
 		} finally {
 			setIsMediaLoading(false);
