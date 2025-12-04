@@ -267,7 +267,8 @@ remove_bluetooth_devices() {
                 else
                     print_success "Removed device: $mac"
                 fi
-                ((removed_count++))
+                # Use arithmetic that doesn't fail on zero
+                removed_count=$((removed_count + 1))
             else
                 print_error "Failed to remove device: $mac"
             fi
