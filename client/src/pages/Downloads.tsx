@@ -453,7 +453,9 @@ function Downloads() {
 													<Divider label="Recent" />
 													{recentCompletedItems.map((item) => (
 														<EpisodeRow
+															key={item.id}
 															episodeId={item.id}
+															subscriptionName={item.subscription_name}
 														/>
 													))}
 												</>
@@ -468,6 +470,7 @@ function Downloads() {
 													/>
 													{olderCompletedItems.map((item) => (
 														<EpisodeRow
+															key={item.id}
 															episodeId={item.id}
 															subscriptionName={item.subscription_name}
 														/>
