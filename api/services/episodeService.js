@@ -101,6 +101,47 @@ class EpisodeService {
 	}
 
 	/**
+	 * Get all downloaded episodes across all subscriptions
+	 * @param {Object} options - Query options
+	 * @param {number} options.limit - Max episodes to return
+	 * @param {number} options.offset - Offset for pagination
+	 * @param {string} options.orderBy - Column to order by (default: pub_date)
+	 * @param {string} options.order - ASC or DESC (default: DESC)
+	 * @returns {Array} List of downloaded episodes with subscription info
+	 */
+	getAllDownloadedEpisodes(options = {}) {
+		const db = getDatabase();
+		const {
+			limit = null,
+			offset = 0,
+			orderBy = 'pub_date',
+			order = 'DESC'
+		} = options;
+
+		// Validate orderBy to prevent SQL injection
+		const allowedColumns = ['pub_date', 'title', 'created_at', 'downloaded_at', 'last_played_at'];
+		const safeOrderBy = allowedColumns.includes(orderBy) ? orderBy : 'pub_date';
+		const safeOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+		let sql = `
+			SELECT e.*, s.name as subscription_name, s.artworkUrl100 as subscription_artwork
+			FROM episodes e
+			JOIN subscriptions s ON e.subscription_id = s.id
+			WHERE e.downloaded_at IS NOT NULL
+			ORDER BY e.${safeOrderBy} ${safeOrder}
+		`;
+		const params = [];
+
+		if (limit) {
+			sql += ' LIMIT ? OFFSET ?';
+			params.push(limit, offset);
+		}
+
+		const stmt = db.prepare(sql);
+		return params.length > 0 ? stmt.all(...params) : stmt.all();
+	}
+
+	/**
 	 * Sync episodes from RSS feed into database
 	 * @param {number} subscriptionId - The subscription ID
 	 * @returns {Promise<Object>} Sync result with counts

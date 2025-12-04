@@ -23,6 +23,11 @@ export interface EpisodeRecord {
 	created_at: number;
 }
 
+export interface DownloadedEpisodeRecord extends EpisodeRecord {
+	subscription_name: string;
+	subscription_artwork: string | null;
+}
+
 export interface EpisodeCounts {
 	total: number;
 	downloaded: number;
@@ -32,6 +37,12 @@ export interface EpisodeCounts {
 export interface EpisodesResponse {
 	success: boolean;
 	episodes: EpisodeRecord[];
+	count: number;
+}
+
+export interface DownloadedEpisodesResponse {
+	success: boolean;
+	episodes: DownloadedEpisodeRecord[];
 	count: number;
 }
 
@@ -52,6 +63,13 @@ export interface SyncEpisodesResponse {
 
 export interface GetEpisodesOptions {
 	downloaded?: boolean;
+	limit?: number;
+	offset?: number;
+	orderBy?: string;
+	order?: 'ASC' | 'DESC';
+}
+
+export interface GetAllDownloadedOptions {
 	limit?: number;
 	offset?: number;
 	orderBy?: string;
@@ -87,6 +105,36 @@ export async function getEpisodes(
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.error || 'Failed to get episodes');
+	}
+
+	return response.json();
+}
+
+/**
+ * Get all downloaded episodes across all subscriptions
+ */
+export async function getAllDownloadedEpisodes(
+	options: GetAllDownloadedOptions = {}
+): Promise<DownloadedEpisodesResponse> {
+	const params = new URLSearchParams();
+	
+	if (options.limit) params.append('limit', String(options.limit));
+	if (options.offset) params.append('offset', String(options.offset));
+	if (options.orderBy) params.append('orderBy', options.orderBy);
+	if (options.order) params.append('order', options.order);
+
+	const query = params.toString();
+	const response = await fetch(
+		`${API_BASE_URL}/api/episodes/downloaded${query ? `?${query}` : ''}`,
+		{
+			method: 'GET',
+			headers: { 'Content-Type': 'application/json' }
+		}
+	);
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to get downloaded episodes');
 	}
 
 	return response.json();

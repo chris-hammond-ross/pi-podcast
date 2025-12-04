@@ -17,9 +17,9 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { AlertCircle } from 'lucide-react';
 import { useSubscriptions } from '../hooks';
-import { PodcastResults, PodcastDetailModal } from '../components';
-import { getSubscriptionById } from '../services';
-import type { Subscription } from '../services';
+import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
+import { getSubscriptionById, getAllDownloadedEpisodes } from '../services';
+import type { Subscription, DownloadedEpisodeRecord } from '../services';
 
 function Podcasts() {
 	const { subscriptions, isLoading, error, refresh } = useSubscriptions();
@@ -29,12 +29,43 @@ function Podcasts() {
 	const [currentEpisodeId, setCurrentEpisodeId] = useState<number | null>(null);
 	const isMobile = useMediaQuery('(max-width: 768px)');
 
+	// Downloaded episodes state
+	const [downloadedEpisodes, setDownloadedEpisodes] = useState<DownloadedEpisodeRecord[]>([]);
+	const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
+	const [episodesError, setEpisodesError] = useState<string | null>(null);
+	const [episodesLoaded, setEpisodesLoaded] = useState(false);
+
 	const { subscriptionId, episodeId } = useParams<{ subscriptionId: string; episodeId: string; }>();
 	const navigate = useNavigate();
 	const location = useLocation();
 
 	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
+
+	// Fetch downloaded episodes
+	const fetchDownloadedEpisodes = useCallback(async () => {
+		setIsLoadingEpisodes(true);
+		setEpisodesError(null);
+		try {
+			const response = await getAllDownloadedEpisodes({
+				orderBy: 'pub_date',
+				order: 'DESC'
+			});
+			setDownloadedEpisodes(response.episodes);
+			setEpisodesLoaded(true);
+		} catch (err) {
+			setEpisodesError(err instanceof Error ? err.message : 'Failed to load episodes');
+		} finally {
+			setIsLoadingEpisodes(false);
+		}
+	}, []);
+
+	// Load downloaded episodes on mount
+	useEffect(() => {
+		if (!episodesLoaded) {
+			fetchDownloadedEpisodes();
+		}
+	}, [episodesLoaded, fetchDownloadedEpisodes]);
 
 	// Handle URL changes
 	useEffect(() => {
@@ -105,7 +136,9 @@ function Podcasts() {
 		setCurrentEpisodeId(null);
 		isNavigatingRef.current = true;
 		navigate('/podcasts', { replace: false });
-	}, [navigate]);
+		// Refresh downloaded episodes when modal closes in case something changed
+		fetchDownloadedEpisodes();
+	}, [navigate, fetchDownloadedEpisodes]);
 
 	const handleSubscriptionUpdate = useCallback((updated: Subscription) => {
 		setSelectedSubscription(updated);
@@ -240,7 +273,40 @@ function Podcasts() {
 						)}
 					</Tabs.Panel>
 					<Tabs.Panel value="episodes">
-						<Text>Hello</Text>
+						{isLoadingEpisodes ? (
+							<Stack gap="sm">
+								{[...Array(6).keys()].map(i => (
+									<Card key={i} withBorder p="sm">
+										<Group justify="space-between" align="center" wrap="nowrap">
+											<div style={{ flex: 1, minWidth: 0 }}>
+												<Skeleton height={16} width="70%" mb={8} />
+												<Skeleton height={12} width="50%" />
+											</div>
+											<Skeleton height={28} width={28} circle />
+										</Group>
+									</Card>
+								))}
+							</Stack>
+						) : episodesError ? (
+							<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
+								{episodesError}
+							</Alert>
+						) : downloadedEpisodes.length === 0 ? (
+							<Text c="dimmed">
+								No downloaded episodes yet. Download episodes from your subscribed podcasts!
+							</Text>
+						) : (
+							<Stack gap="sm">
+								{downloadedEpisodes.map(episode => (
+									<EpisodeRow
+										key={episode.id}
+										episodeId={episode.id}
+										subscriptionName={episode.subscription_name}
+										showDownloadStatus={true}
+									/>
+								))}
+							</Stack>
+						)}
 					</Tabs.Panel>
 					<PodcastDetailModal
 						subscription={selectedSubscription}
