@@ -66,16 +66,62 @@ function Playlists() {
 				scrollbars="y"
 				scrollbarSize={4}
 			>
-				<Container size="sm" py="md">
-					<Stack gap="xl">
-						<Tabs.Panel value="playlists">
-							<Card>
-								<Text size='xs' c="dimmed">Your saved custom playlists</Text>
+				<Container
+					size="sm"
+					py="md"
+					style={{
+						display: 'flex',
+						flexDirection: 'column',
+						height: 'var(--main-content-with-tabs-height)'
+					}}
+				>
+					<Stack
+						gap="md"
+						style={{
+							flex: 1,
+							display: 'flex',
+							flexDirection: 'column',
+							overflow: 'hidden'
+						}}
+					>
+						<Tabs.Panel
+							value="playlists"
+							style={{
+								flex: 1,
+								display: 'flex',
+								flexDirection: 'column'
+							}}
+						>
+							<Card
+								withBorder
+								style={{
+									flex: 1,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center'
+								}}
+							>
+								<Text c="dimmed">Playlists comming soon!</Text>
 							</Card>
 						</Tabs.Panel>
-						<Tabs.Panel value="auto">
-							<Card>
-								<Text size='xs' c="dimmed">Auto generated playlists created from your podcasts</Text>
+						<Tabs.Panel
+							value="auto"
+							style={{
+								flex: 1,
+								display: 'flex',
+								flexDirection: 'column'
+							}}
+						>
+							<Card
+								withBorder
+								style={{
+									flex: 1,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center'
+								}}
+							>
+								<Text c="dimmed">Playlists comming soon!</Text>
 							</Card>
 						</Tabs.Panel>
 					</Stack>

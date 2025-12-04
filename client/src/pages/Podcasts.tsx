@@ -193,17 +193,6 @@ function Podcasts() {
 		);
 	}
 
-	// Empty state
-	if (subscriptions.length === 0) {
-		return (
-			<Container size="sm" py="md">
-				<Text c="dimmed">
-					No subscriptions yet. Search for podcasts to subscribe to!
-				</Text>
-			</Container>
-		);
-	}
-
 	return (
 		<Tabs
 			defaultValue="podcasts"
@@ -245,63 +234,127 @@ function Podcasts() {
 				scrollbars="y"
 				scrollbarSize={4}
 			>
-				<Container size="sm" py="md">
-					<Tabs.Panel value="podcasts">
-						<PodcastResults
-							podcasts={subscriptions}
-							onPodcastClick={handlePodcastClick}
-						/>
-
-						{/* Loading state when fetching subscription directly from URL */}
-						{isLoadingSubscription && !selectedSubscription && (
-							<Group
-								justify="center"
-								align="center"
+				<Container
+					size="sm"
+					py="md"
+					style={{
+						display: 'flex',
+						flexDirection: 'column',
+						height: 'var(--main-content-with-tabs-height)'
+					}}
+				>
+					<Tabs.Panel
+						value="podcasts"
+						style={{
+							flex: 1,
+							display: 'flex',
+							flexDirection: 'column'
+						}}
+					>
+						{subscriptions.length === 0 ? (
+							<Card
+								withBorder
 								style={{
-									position: 'fixed',
-									top: 0,
-									left: 0,
-									right: 0,
-									bottom: 0,
-									backgroundColor: 'rgba(0, 0, 0, 0.5)',
-									zIndex: 1000
+									flex: 1,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center'
 								}}
 							>
-								<Loader size="lg" />
-							</Group>
+								<Text c="dimmed">No podcast subscriptions</Text>
+							</Card>
+						) : (
+							<>
+								<PodcastResults
+									podcasts={subscriptions}
+									onPodcastClick={handlePodcastClick}
+								/>
+
+								{/* Loading state when fetching subscription directly from URL */}
+								{isLoadingSubscription && !selectedSubscription && (
+									<Group
+										justify="center"
+										align="center"
+										style={{
+											position: 'fixed',
+											top: 0,
+											left: 0,
+											right: 0,
+											bottom: 0,
+											backgroundColor: 'rgba(0, 0, 0, 0.5)',
+											zIndex: 1000
+										}}
+									>
+										<Loader size="lg" />
+									</Group>
+								)}
+							</>
 						)}
 					</Tabs.Panel>
-					<Tabs.Panel value="queue">
-						<Stack>
-							<Card>
-								<Text size='xs' c="dimmed">Podcast episodes in the current queue</Text>
-							</Card>
-							{queue.map((item, index) => (
+					<Tabs.Panel
+						value="queue"
+						style={{
+							flex: 1,
+							display: 'flex',
+							flexDirection: 'column'
+						}}
+					>
+						<Stack
+							style={{
+								flex: 1,
+								display: 'flex',
+								flexDirection: 'column'
+							}}
+						>
+							{queue.length === 0 ? (
 								<Card
 									withBorder
-									p="sm"
-									style={{ cursor: 'pointer' }}
-									key={index}
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center'
+									}}
 								>
-									<Group justify="space-between" align="center" wrap="nowrap">
-										<div style={{ flex: 1, minWidth: 0 }}>
-											<Group gap="xs" wrap="nowrap">
-												<Text size="sm" truncate style={{ flex: 1 }}>
-													{item.title}
-												</Text>
-											</Group>
-											<Text size="xs" c="dimmed" truncate>
-												{getSubscriptionById(item.subscription_id)?.name} •
-												{/*{episode.pub_date && formatDate(episode.pub_date)}*/}
-												{item.duration && ` • ${item.duration}`}
-											</Text>
-										</div>
-									</Group>
+									<Text c="dimmed">No episodes in the queue</Text>
 								</Card>
-							))}
+							) : (
+								<>
+									{queue.map((item, index) => (
+										<Card
+											withBorder
+											p="sm"
+											style={{ cursor: 'pointer' }}
+											key={index}
+										>
+											<Group justify="space-between" align="center" wrap="nowrap">
+												<div style={{ flex: 1, minWidth: 0 }}>
+													<Group gap="xs" wrap="nowrap">
+														<Text size="sm" truncate style={{ flex: 1 }}>
+															{item.title}
+														</Text>
+													</Group>
+													<Text size="xs" c="dimmed" truncate>
+														{getSubscriptionById(item.subscription_id)?.name} •
+														{/*{episode.pub_date && formatDate(episode.pub_date)}*/}
+														{item.duration && ` • ${item.duration}`}
+													</Text>
+												</div>
+											</Group>
+										</Card>
+									))}
+								</>
+							)}
 						</Stack>
 					</Tabs.Panel>
-					<Tabs.Panel value="episodes">
+					<Tabs.Panel
+						value="episodes"
+						style={{
+							flex: 1,
+							display: 'flex',
+							flexDirection: 'column'
+						}}
+					>
 						{isLoadingEpisodes ? (
 							<Stack gap="sm">
 								{[...Array(6).keys()].map(i => (
@@ -321,9 +374,17 @@ function Podcasts() {
 								{episodesError}
 							</Alert>
 						) : downloadedEpisodes.length === 0 ? (
-							<Text c="dimmed">
-								No downloaded episodes yet. Download episodes from your subscribed podcasts!
-							</Text>
+							<Card
+								withBorder
+								style={{
+									flex: 1,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center'
+								}}
+							>
+								<Text c="dimmed">No episodes have been downloaded</Text>
+							</Card>
 						) : (
 							<Stack gap="sm">
 								{downloadedEpisodes.map(episode => (

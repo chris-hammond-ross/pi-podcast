@@ -1,6 +1,9 @@
 :root {
 	--header-height: 60px;
 	--media-control-height: 96px;
+	--main-contents-tabs-height: 39px;
 	--main-content-offset: calc(var(--header-height) + var(--media-control-height));
+	--main-content-with-tabs-offset: calc(var(--header-height) + var(--media-control-height) + var(--main-contents-tabs-height));
 	--main-content-height: calc(100svh - var(--main-content-offset));
+	--main-content-with-tabs-height: calc(100svh - var(--main-content-with-tabs-offset));
 }
