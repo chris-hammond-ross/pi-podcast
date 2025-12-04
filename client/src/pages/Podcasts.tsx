@@ -1,6 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Title, Text, SimpleGrid, Card, Stack, Skeleton, Alert, Loader, Group } from '@mantine/core';
+import {
+	Container,
+	Title,
+	Text,
+	SimpleGrid,
+	Card,
+	Stack,
+	Skeleton,
+	Alert,
+	Loader,
+	Group,
+	Tabs,
+	ScrollArea
+} from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { AlertCircle } from 'lucide-react';
 import { useSubscriptions } from '../hooks';
@@ -16,7 +29,7 @@ function Podcasts() {
 	const [currentEpisodeId, setCurrentEpisodeId] = useState<number | null>(null);
 	const isMobile = useMediaQuery('(max-width: 768px)');
 
-	const { subscriptionId, episodeId } = useParams<{ subscriptionId: string; episodeId: string }>();
+	const { subscriptionId, episodeId } = useParams<{ subscriptionId: string; episodeId: string; }>();
 	const navigate = useNavigate();
 	const location = useLocation();
 
@@ -163,41 +176,84 @@ function Podcasts() {
 	}
 
 	return (
-		<Container size="sm" py="md">
-			<PodcastResults
-				podcasts={subscriptions}
-				onPodcastClick={handlePodcastClick}
-			/>
-
-			{/* Loading state when fetching subscription directly from URL */}
-			{isLoadingSubscription && !selectedSubscription && (
-				<Group
-					justify="center"
-					align="center"
+		<Tabs
+			defaultValue="podcasts"
+			style={{
+				display: 'flex',
+				flexDirection: 'column',
+				height: 'var(--main-content-height)'
+			}}
+		>
+			<Container size="sm" style={{ width: '100%' }}>
+				<Tabs.List justify='flex-start'>
+					<Tabs.Tab size="xl" value="podcasts">
+						Podcasts
+					</Tabs.Tab>
+					<Tabs.Tab value="episodes">
+						Episodes
+					</Tabs.Tab>
+				</Tabs.List>
+				<div
 					style={{
-						position: 'fixed',
-						top: 0,
-						left: 0,
-						right: 0,
-						bottom: 0,
-						backgroundColor: 'rgba(0, 0, 0, 0.5)',
-						zIndex: 1000
+						position: "absolute",
+						left: "0",
+						marginTop: "-1px",
+						zIndex: "-1",
+						height: "1px",
+						width: "100vw",
+						backgroundColor: "var(--tab-border-color)"
 					}}
 				>
-					<Loader size="lg" />
-				</Group>
-			)}
+					&nbsp;
+				</div>
+			</Container>
 
-			<PodcastDetailModal
-				subscription={selectedSubscription}
-				opened={modalOpened}
-				onClose={handleModalClose}
-				onSubscriptionUpdate={handleSubscriptionUpdate}
-				initialEpisodeId={currentEpisodeId}
-				onEpisodeOpen={handleEpisodeOpen}
-				onEpisodeClose={handleEpisodeClose}
-			/>
-		</Container>
+			<ScrollArea
+				style={{ flex: 1 }}
+				scrollbars="y"
+				scrollbarSize={4}
+			>
+				<Container size="sm" py="md">
+					<Tabs.Panel value="podcasts">
+						<PodcastResults
+							podcasts={subscriptions}
+							onPodcastClick={handlePodcastClick}
+						/>
+
+						{/* Loading state when fetching subscription directly from URL */}
+						{isLoadingSubscription && !selectedSubscription && (
+							<Group
+								justify="center"
+								align="center"
+								style={{
+									position: 'fixed',
+									top: 0,
+									left: 0,
+									right: 0,
+									bottom: 0,
+									backgroundColor: 'rgba(0, 0, 0, 0.5)',
+									zIndex: 1000
+								}}
+							>
+								<Loader size="lg" />
+							</Group>
+						)}
+					</Tabs.Panel>
+					<Tabs.Panel value="episodes">
+						<Text>Hello</Text>
+					</Tabs.Panel>
+					<PodcastDetailModal
+						subscription={selectedSubscription}
+						opened={modalOpened}
+						onClose={handleModalClose}
+						onSubscriptionUpdate={handleSubscriptionUpdate}
+						initialEpisodeId={currentEpisodeId}
+						onEpisodeOpen={handleEpisodeOpen}
+						onEpisodeClose={handleEpisodeClose}
+					/>
+				</Container>
+			</ScrollArea>
+		</Tabs>
 	);
 }
 
