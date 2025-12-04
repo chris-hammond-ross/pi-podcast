@@ -6,6 +6,35 @@ const episodeService = require('../services/episodeService');
 const { DOWNLOADS_DIR } = require('../config/constants');
 
 /**
+ * GET /api/episodes/downloaded
+ * Get all downloaded episodes across all subscriptions
+ */
+router.get('/downloaded', (req, res) => {
+	try {
+		const { limit, offset, orderBy, order } = req.query;
+
+		const options = {};
+		if (limit) options.limit = parseInt(limit);
+		if (offset) options.offset = parseInt(offset);
+		if (orderBy) options.orderBy = orderBy;
+		if (order) options.order = order;
+
+		const episodes = episodeService.getAllDownloadedEpisodes(options);
+
+		res.json({
+			success: true,
+			episodes,
+			count: episodes.length
+		});
+	} catch (err) {
+		res.status(500).json({
+			success: false,
+			error: err.message
+		});
+	}
+});
+
+/**
  * GET /api/episodes/subscription/:subscriptionId
  * Get all episodes for a subscription
  */
