@@ -66,7 +66,7 @@ function VerticalVolumeSlider({
 		<div
 			ref={ref}
 			style={{
-				width: 16,
+				width: 12,
 				height: 120,
 				backgroundColor: 'var(--mantine-color-teal-light)',
 				borderRadius: 12,

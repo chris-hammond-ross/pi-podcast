@@ -969,6 +969,7 @@ class MediaPlayerService extends EventEmitter {
 				episodeId: item.episodeId,
 				title: item.episode.title,
 				subscription_id: item.episode.subscription_id,
+				pub_date: item.episode.pub_date,
 				duration: item.episode.duration,
 				isPlaying: index === this.queuePosition
 			})),

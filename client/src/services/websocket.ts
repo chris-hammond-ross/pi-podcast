@@ -112,6 +112,7 @@ export interface MediaQueueItem {
 	episodeId: number;
 	title: string;
 	subscription_id: number;
+	pub_date: string;
 	duration: string;
 	isPlaying: boolean;
 }
