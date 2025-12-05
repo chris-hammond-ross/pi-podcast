@@ -343,12 +343,17 @@ function Podcasts() {
 												p="sm"
 												style={{ cursor: 'pointer' }}
 												key={index}
-												bg={isCurrentEpisode ? "var(--mantine-color-teal-light-color)" : undefined}
+												bg={isCurrentEpisode ? "var(--mantine-color-teal-light)" : undefined}
 											>
 												<Group justify="space-between" align="center" wrap="nowrap">
 													<div style={{ flex: 1, minWidth: 0 }}>
 														<Group gap="xs" wrap="nowrap">
-															<Text size="sm" truncate style={{ flex: 1 }}>
+															<Text
+																size="sm"
+																c={isCurrentEpisode ? "var(--mantine-color-teal-light-color)" : undefined}
+																truncate
+																style={{ flex: 1 }}
+															>
 																{item.title}
 															</Text>
 														</Group>
