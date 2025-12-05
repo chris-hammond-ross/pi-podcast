@@ -552,12 +552,18 @@ initialize_database() {
     chown "$SERVICE_USER:$SERVICE_GROUP" "$DB_FILE"
     chmod 644 "$DB_FILE"
 
-    # Also ensure the downloads directory exists and has correct permissions
+    # Ensure the downloads directory exists and has correct permissions
     mkdir -p "$INSTALL_DIR/api/downloads"
     chown "$SERVICE_USER:$SERVICE_GROUP" "$INSTALL_DIR/api/downloads"
     chmod 755 "$INSTALL_DIR/api/downloads"
 
-    print_success "Database and downloads directory configured"
+    # Ensure the playlists directories exist and have correct permissions
+    mkdir -p "$SERVICE_HOME/playlists/auto"
+    mkdir -p "$SERVICE_HOME/playlists/user"
+    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$SERVICE_HOME/playlists"
+    chmod -R 755 "$SERVICE_HOME/playlists"
+
+    print_success "Database, downloads, and playlists directories configured"
 }
 
 install_api_dependencies() {
