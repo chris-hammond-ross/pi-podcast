@@ -4,6 +4,7 @@
 # Updates the Node.js API and React frontend without full reinstallation
 # Usage: curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/update.sh | sudo bash
 # Or locally: sudo ./update.sh
+# Client only: sudo ./update.sh --client-only
 
 set -e
 
@@ -22,6 +23,23 @@ SERVICE_GROUP="pi-podcast"
 SERVICE_HOME="/var/lib/pi-podcast"
 RUNTIME_DIR="/run/pi-podcast"
 PULSE_SOCKET="/run/pi-podcast/pulse/native"
+
+# Parse command line arguments
+CLIENT_ONLY=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --client-only)
+            CLIENT_ONLY=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--client-only]"
+            exit 1
+            ;;
+    esac
+done
 
 # Helper functions
 print_header() {
@@ -285,49 +303,81 @@ start_services() {
     fi
 }
 
+restart_service_only() {
+    print_header "Restarting Pi Podcast service"
+
+    systemctl restart "$SERVICE_NAME"
+    sleep 2
+
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+        print_success "Pi Podcast service restarted"
+    else
+        print_error "Failed to restart Pi Podcast service"
+        print_info "Check logs with: sudo journalctl -u pi-podcast -f"
+        exit 1
+    fi
+}
+
 print_update_summary() {
     print_header "Update Complete"
 
     echo ""
-    echo -e "${GREEN}Pi Podcast has been successfully updated!${NC}"
-    echo ""
-    echo "What was updated:"
-    echo "  - Repository pulled latest changes"
-    echo "  - API dependencies reinstalled"
-    echo "  - React frontend rebuilt"
-    echo "  - PulseAudio service restarted"
-    echo "  - Pi Podcast service restarted"
+    if [ "$CLIENT_ONLY" = true ]; then
+        echo -e "${GREEN}Pi Podcast client has been successfully updated!${NC}"
+        echo ""
+        echo "What was updated:"
+        echo "  - Repository pulled latest changes"
+        echo "  - React frontend rebuilt"
+        echo "  - Pi Podcast service restarted"
+    else
+        echo -e "${GREEN}Pi Podcast has been successfully updated!${NC}"
+        echo ""
+        echo "What was updated:"
+        echo "  - Repository pulled latest changes"
+        echo "  - API dependencies reinstalled"
+        echo "  - React frontend rebuilt"
+        echo "  - PulseAudio service restarted"
+        echo "  - Pi Podcast service restarted"
+    fi
     echo ""
     echo "Useful commands:"
     echo -e "  View logs:        ${BLUE}sudo journalctl -u pi-podcast -f${NC}"
     echo -e "  Check status:     ${BLUE}sudo systemctl status pi-podcast${NC}"
-    echo -e "  PulseAudio logs:  ${BLUE}sudo journalctl -u pulseaudio-pi-podcast -f${NC}"
+    if [ "$CLIENT_ONLY" = false ]; then
+        echo -e "  PulseAudio logs:  ${BLUE}sudo journalctl -u pulseaudio-pi-podcast -f${NC}"
+    fi
     echo ""
 }
 
 main() {
-    print_header "Pi Podcast Update"
-    echo "This script will update the API and frontend without reinstalling the environment"
+    if [ "$CLIENT_ONLY" = true ]; then
+        print_header "Pi Podcast Update (Client Only)"
+        echo "This script will update only the React frontend"
+    else
+        print_header "Pi Podcast Update"
+        echo "This script will update the API and frontend without reinstalling the environment"
+    fi
     echo ""
 
     # Checks
     check_root
     check_installation
 
-    # Stop services first
-    stop_services
-
-    # Ensure PulseAudio is properly disabled for users and configured for pi-podcast
-    disable_user_pulseaudio
-    ensure_pulseaudio_config
-
-    # Update steps
-    pull_latest
-    update_api
-    build_frontend
-
-    # Start services
-    start_services
+    if [ "$CLIENT_ONLY" = true ]; then
+        # Client-only update flow
+        pull_latest
+        build_frontend
+        restart_service_only
+    else
+        # Full update flow
+        stop_services
+        disable_user_pulseaudio
+        ensure_pulseaudio_config
+        pull_latest
+        update_api
+        build_frontend
+        start_services
+    fi
 
     # Summary
     print_update_summary
