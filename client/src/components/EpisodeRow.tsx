@@ -1,31 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Card, Group, Text, ActionIcon, Skeleton, Badge, Modal, Stack, Button } from '@mantine/core';
-import { Ellipsis, ListPlus, Play, Trash2, X } from 'lucide-react';
+import { Ellipsis, ListPlus, Play, Trash2 } from 'lucide-react';
 import { notifications } from '@mantine/notifications';
 import { useLocation } from 'react-router-dom';
 import { useEpisodesContext, useDownloadContext, useMediaPlayer } from '../contexts';
 import { deleteEpisodeDownload } from '../services';
 import EpisodeDetailModal from './EpisodeDetailModal';
+import { secondsToHms, formatDate } from '../utilities';
 import type { EpisodeRecord } from '../services';
 
 interface EpisodeRowProps {
 	episodeId: number;
 	subscriptionName?: string;
 	showDownloadStatus?: boolean;
-}
-
-function formatDate(dateString: string | null): string {
-	if (!dateString) return '';
-	try {
-		const date = new Date(dateString);
-		return date.toLocaleDateString(undefined, {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	} catch {
-		return dateString;
-	}
 }
 
 function EpisodeRow({
@@ -230,7 +217,7 @@ function EpisodeRow({
 					<div style={{ flex: 1, minWidth: 0 }}>
 						<Group gap="xs" wrap="nowrap">
 							<Text size="sm" truncate style={{ flex: 1 }}>
-								{episode.title}
+								{episode.title} <Text span c="dimmed" size='xs'>{episode.duration && ` - ${secondsToHms(Number(episode.duration))}`}</Text>
 							</Text>
 							{showDownloadStatus && (
 								<>
@@ -250,7 +237,6 @@ function EpisodeRow({
 						<Text size="xs" c="dimmed" truncate>
 							{subscriptionName && `${subscriptionName} • `}
 							{episode.pub_date && formatDate(episode.pub_date)}
-							{episode.duration && ` • ${episode.duration}`}
 						</Text>
 					</div>
 

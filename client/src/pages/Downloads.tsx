@@ -37,16 +37,6 @@ function formatBytes(bytes: number): string {
 	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-function formatDate(timestamp: number): string {
-	const date = new Date(timestamp * 1000);
-	return date.toLocaleDateString(undefined, {
-		month: 'short',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit'
-	});
-}
-
 function isRecent(timestamp: number): boolean {
 	const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
 	return (timestamp * 1000) > twentyFourHoursAgo;
