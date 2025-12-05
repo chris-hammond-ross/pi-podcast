@@ -21,8 +21,22 @@ import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
 import { getSubscriptionById, getAllDownloadedEpisodes } from '../services';
 import type { Subscription, DownloadedEpisodeRecord } from '../services';
 
+function formatDate(dateString: string | null): string {
+	if (!dateString) return '';
+	try {
+		const date = new Date(dateString);
+		return date.toLocaleDateString(undefined, {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
+	} catch {
+		return dateString;
+	}
+}
+
 function Podcasts() {
-	const { subscriptions, isLoading, error, refresh } = useSubscriptions();
+	const { subscriptions, isLoading, error, refresh, getSubscriptionById: getSubscriptionByIdHook } = useSubscriptions();
 	const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
 	const [modalOpened, setModalOpened] = useState(false);
 	const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
@@ -335,8 +349,8 @@ function Podcasts() {
 														</Text>
 													</Group>
 													<Text size="xs" c="dimmed" truncate>
-														{getSubscriptionById(item.subscription_id)?.name} •
-														{/*{episode.pub_date && formatDate(episode.pub_date)}*/}
+														{getSubscriptionByIdHook(item.subscription_id)?.name}
+														{item.pub_date && ` • ${formatDate(item.pub_date)}`}
 														{item.duration && ` • ${item.duration}`}
 													</Text>
 												</div>
