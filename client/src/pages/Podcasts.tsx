@@ -19,21 +19,8 @@ import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
 import { getSubscriptionById, getAllDownloadedEpisodes } from '../services';
+import { secondsToHms, formatDate } from '../utilities';
 import type { Subscription, DownloadedEpisodeRecord } from '../services';
-
-function formatDate(dateString: string | null): string {
-	if (!dateString) return '';
-	try {
-		const date = new Date(dateString);
-		return date.toLocaleDateString(undefined, {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	} catch {
-		return dateString;
-	}
-}
 
 function Podcasts() {
 	const { subscriptions, isLoading, error, refresh, getSubscriptionById: getSubscriptionByIdHook } = useSubscriptions();
@@ -355,13 +342,12 @@ function Podcasts() {
 																truncate
 																style={{ flex: 1 }}
 															>
-																{item.title}
+																{item.title} <Text span c="dimmed" size='xs'>{item.duration && ` - ${secondsToHms(Number(item.duration))}`}</Text>
 															</Text>
 														</Group>
 														<Text size="xs" c="dimmed" truncate>
 															{getSubscriptionByIdHook(item.subscription_id)?.name}
 															{item.pub_date && ` • ${formatDate(item.pub_date)}`}
-															{item.duration && ` • ${item.duration}`}
 														</Text>
 													</div>
 												</Group>
