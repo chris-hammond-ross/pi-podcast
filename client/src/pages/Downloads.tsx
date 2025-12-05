@@ -444,7 +444,7 @@ function Downloads() {
 													{recentCompletedItems.map((item) => (
 														<EpisodeRow
 															key={item.id}
-															episodeId={item.id}
+															episodeId={item.episode_id}
 															subscriptionName={item.subscription_name}
 														/>
 													))}
