@@ -670,6 +670,9 @@ class MediaPlayerService extends EventEmitter {
 		// Wait a moment for file to load
 		await new Promise(resolve => setTimeout(resolve, 500));
 
+		// Ensure playback is not paused (MPV can preserve pause state from previous playback)
+		await this.setProperty('pause', false);
+
 		// Get duration
 		try {
 			this.duration = await this.getProperty('duration') || 0;
