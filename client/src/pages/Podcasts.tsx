@@ -53,7 +53,7 @@ function Podcasts() {
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const { queue } = useMediaPlayer();
+	const { queue, currentEpisode } = useMediaPlayer();
 
 	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
@@ -334,29 +334,34 @@ function Podcasts() {
 								</Card>
 							) : (
 								<>
-									{queue.map((item, index) => (
-										<Card
-											withBorder
-											p="sm"
-											style={{ cursor: 'pointer' }}
-											key={index}
-										>
-											<Group justify="space-between" align="center" wrap="nowrap">
-												<div style={{ flex: 1, minWidth: 0 }}>
-													<Group gap="xs" wrap="nowrap">
-														<Text size="sm" truncate style={{ flex: 1 }}>
-															{item.title}
+									{queue.map((item, index) => {
+										const isCurrentEpisode = currentEpisode?.id === item.episodeId;
+
+										return (
+											<Card
+												withBorder
+												p="sm"
+												style={{ cursor: 'pointer' }}
+												key={index}
+												bg={isCurrentEpisode ? "var(--mantine-color-teal-light-color)" : undefined}
+											>
+												<Group justify="space-between" align="center" wrap="nowrap">
+													<div style={{ flex: 1, minWidth: 0 }}>
+														<Group gap="xs" wrap="nowrap">
+															<Text size="sm" truncate style={{ flex: 1 }}>
+																{item.title}
+															</Text>
+														</Group>
+														<Text size="xs" c="dimmed" truncate>
+															{getSubscriptionByIdHook(item.subscription_id)?.name}
+															{item.pub_date && ` • ${formatDate(item.pub_date)}`}
+															{item.duration && ` • ${item.duration}`}
 														</Text>
-													</Group>
-													<Text size="xs" c="dimmed" truncate>
-														{getSubscriptionByIdHook(item.subscription_id)?.name}
-														{item.pub_date && ` • ${formatDate(item.pub_date)}`}
-														{item.duration && ` • ${item.duration}`}
-													</Text>
-												</div>
-											</Group>
-										</Card>
-									))}
+													</div>
+												</Group>
+											</Card>
+										);
+									})}
 								</>
 							)}
 						</Stack>
