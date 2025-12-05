@@ -182,7 +182,7 @@ function PodcastDetailModal({
 					color: 'teal',
 					message: `Synced ${result.added} new episodes`,
 					position: 'top-right',
-					autoClose: 1500
+					autoClose: 1200
 				});
 			}
 
@@ -206,7 +206,7 @@ function PodcastDetailModal({
 			color: 'teal',
 			message: `Added "${episode.title}" to download queue`,
 			position: 'top-right',
-			autoClose: 1500
+			autoClose: 1200
 		});
 	};
 
@@ -219,7 +219,7 @@ function PodcastDetailModal({
 				color: 'blue',
 				message: 'All episodes already downloaded',
 				position: 'top-right',
-				autoClose: 1500
+				autoClose: 1200
 			});
 			return;
 		}
@@ -229,7 +229,7 @@ function PodcastDetailModal({
 			color: 'teal',
 			message: `Added ${notDownloaded.length} episodes to download queue`,
 			position: 'top-right',
-			autoClose: 1500
+			autoClose: 1200
 		});
 	};
 
@@ -267,7 +267,7 @@ function PodcastDetailModal({
 			color: 'cyan',
 			message: `Added ${episode.title} to queue`,
 			position: 'top-right',
-			autoClose: 1500
+			autoClose: 1200
 		});
 	};
 

@@ -314,6 +314,7 @@ function Podcasts() {
 						}}
 					>
 						<Stack
+							gap="xs"
 							style={{
 								flex: 1,
 								display: 'flex',
@@ -410,7 +411,7 @@ function Podcasts() {
 								<Text c="dimmed">No episodes have been downloaded</Text>
 							</Card>
 						) : (
-							<Stack gap="sm">
+							<Stack gap="xs">
 								{downloadedEpisodes.map(episode => (
 									<EpisodeRow
 										key={episode.id}
