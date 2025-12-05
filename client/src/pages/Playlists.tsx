@@ -4,33 +4,50 @@ import {
 	Tabs,
 	ScrollArea,
 	Card,
-	Text
+	Text,
+	Group,
+	ActionIcon,
+	Loader,
+	Center
 } from '@mantine/core';
-// import { useMediaPlayer } from '../contexts';
-// import { useSubscriptions } from '../hooks';
+import { Play } from 'lucide-react';
+import { useAutoPlaylists } from '../hooks';
+import { getEpisodes, addMultipleToQueue, playEpisode } from '../services';
 
 function Playlists() {
-	// const {
-	// 	// Queue state
-	// 	queue,
-	// 	queuePosition,
-	// 	queueLength,
-	// 	hasNext,
-	// 	hasPrevious,
+	const { playlists, isLoading, error } = useAutoPlaylists();
 
-	// 	// Queue actions
-	// 	addToQueue,
-	// 	playNext,
-	// 	playPrevious,
-	// 	removeFromQueue,
-	// 	clearQueue,
-	// } = useMediaPlayer();
+	const handlePlayPlaylist = async (subscriptionId: number) => {
+		try {
+			// Get all downloaded episodes for this subscription, sorted by pub_date DESC
+			const response = await getEpisodes(subscriptionId, {
+				downloaded: true,
+				orderBy: 'pub_date',
+				order: 'DESC'
+			});
 
-	// const { getSubscriptionById } = useSubscriptions();
+			if (response.episodes.length === 0) {
+				console.warn('[Playlists] No downloaded episodes to play');
+				return;
+			}
+
+			const episodeIds = response.episodes.map(ep => ep.id);
+
+			// Play the first episode immediately
+			await playEpisode(episodeIds[0]);
+
+			// Queue the rest if there are more
+			if (episodeIds.length > 1) {
+				await addMultipleToQueue(episodeIds.slice(1));
+			}
+		} catch (err) {
+			console.error('[Playlists] Failed to play playlist:', err);
+		}
+	};
 
 	return (
 		<Tabs
-			defaultValue="playlists"
+			defaultValue="auto"
 			style={{
 				display: 'flex',
 				flexDirection: 'column',
@@ -101,7 +118,7 @@ function Playlists() {
 									justifyContent: 'center'
 								}}
 							>
-								<Text c="dimmed">Playlists comming soon!</Text>
+								<Text c="dimmed">Saved playlists coming soon!</Text>
 							</Card>
 						</Tabs.Panel>
 						<Tabs.Panel
@@ -112,17 +129,66 @@ function Playlists() {
 								flexDirection: 'column'
 							}}
 						>
-							<Card
-								withBorder
-								style={{
-									flex: 1,
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center'
-								}}
-							>
-								<Text c="dimmed">Playlists comming soon!</Text>
-							</Card>
+							{isLoading ? (
+								<Center style={{ flex: 1 }}>
+									<Loader size="sm" />
+								</Center>
+							) : error ? (
+								<Card
+									withBorder
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center'
+									}}
+								>
+									<Text c="red">{error}</Text>
+								</Card>
+							) : playlists.length === 0 ? (
+								<Card
+									withBorder
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center'
+									}}
+								>
+									<Text c="dimmed">No auto playlists yet. Subscribe to a podcast and download some episodes!</Text>
+								</Card>
+							) : (
+								<Stack gap="sm">
+									{playlists.map((playlist) => (
+										<Card
+											withBorder
+											p="sm"
+											key={playlist.id}
+										>
+											<Group justify="space-between" align="center" wrap="nowrap">
+												<Text
+													size="sm"
+													truncate
+												>
+													{playlist.subscription_name}{' '}
+													<Text span c="dimmed" size="xs">
+														({playlist.episode_count})
+													</Text>
+												</Text>
+												<ActionIcon
+													variant="light"
+													color="cyan"
+													onClick={() => handlePlayPlaylist(playlist.subscription_id)}
+													title="Play Playlist"
+													disabled={playlist.episode_count === 0}
+												>
+													<Play size={16} />
+												</ActionIcon>
+											</Group>
+										</Card>
+									))}
+								</Stack>
+							)}
 						</Tabs.Panel>
 					</Stack>
 				</Container>

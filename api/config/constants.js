@@ -29,6 +29,30 @@ function getDownloadDir() {
 }
 
 /**
+ * Get playlist directory based on platform/environment
+ * @returns {string} Playlist directory path
+ */
+function getPlaylistDir() {
+	// Check for explicit environment variable first
+	if (process.env.PLAYLIST_DIR) {
+		return process.env.PLAYLIST_DIR;
+	}
+
+	// Development mode on Windows - use a local folder
+	if (process.env.NODE_ENV === 'development' && process.platform === 'win32') {
+		return path.join(__dirname, '..', 'playlists');
+	}
+
+	// Production on Linux (Raspberry Pi) - use system location
+	if (process.platform === 'linux') {
+		return '/var/lib/pi-podcast/playlists';
+	}
+
+	// Fallback to local directory
+	return path.join(__dirname, '..', 'playlists');
+}
+
+/**
  * Get MPV socket path based on platform/environment
  * @returns {string} MPV socket path
  */
@@ -74,6 +98,9 @@ module.exports = {
 	DOWNLOAD_TIMEOUT: 600000, // 10 minutes
 	DOWNLOAD_PROGRESS_INTERVAL: 1000, // ms between progress updates
 	DOWNLOAD_MIN_DISK_SPACE: 500 * 1024 * 1024, // 500MB
+
+	// Playlist configuration
+	PLAYLIST_DIR: getPlaylistDir(),
 
 	// Media player configuration
 	MPV_SOCKET_PATH: getMpvSocketPath(),

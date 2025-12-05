@@ -8,6 +8,7 @@ const subscriptionRoutes = require('./subscriptions');
 const episodeRoutes = require('./episodes');
 const downloadRoutes = require('./downloads');
 const mediaRoutes = require('./media');
+const playlistRoutes = require('./playlists');
 
 // Mount routes
 router.use('/bluetooth', bluetoothRoutes);
@@ -16,8 +17,6 @@ router.use('/subscriptions', subscriptionRoutes);
 router.use('/episodes', episodeRoutes);
 router.use('/downloads', downloadRoutes);
 router.use('/media', mediaRoutes);
-
-// Future routes will be added here:
-// router.use('/playlists', playlistRoutes);
+router.use('/playlists', playlistRoutes);
 
 module.exports = router;

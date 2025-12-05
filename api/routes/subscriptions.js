@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const subscriptionService = require('../services/subscriptionService');
+const playlistService = require('../services/playlistService');
 
 /**
  * GET /api/subscriptions
@@ -125,6 +126,13 @@ router.post('/', (req, res) => {
 			country
 		});
 
+		// Create auto playlist for this subscription
+		try {
+			playlistService.onSubscriptionCreated(subscription.id);
+		} catch (playlistErr) {
+			console.error(`[subscription] Failed to create auto playlist: ${playlistErr.message}`);
+		}
+
 		res.status(201).json({
 			success: true,
 			subscription
@@ -161,6 +169,10 @@ router.delete('/', (req, res) => {
 			});
 		}
 
+		// Get subscription ID before deleting (for playlist cleanup)
+		const subscription = subscriptionService.getSubscriptionByFeedUrl(feedUrl);
+		const subscriptionId = subscription?.id;
+
 		const success = subscriptionService.unsubscribe(feedUrl);
 
 		if (!success) {
@@ -168,6 +180,15 @@ router.delete('/', (req, res) => {
 				success: false,
 				error: 'Subscription not found'
 			});
+		}
+
+		// Delete auto playlist for this subscription
+		if (subscriptionId) {
+			try {
+				playlistService.onSubscriptionDeleted(subscriptionId);
+			} catch (playlistErr) {
+				console.error(`[subscription] Failed to delete auto playlist: ${playlistErr.message}`);
+			}
 		}
 
 		res.json({

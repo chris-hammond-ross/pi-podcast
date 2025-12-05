@@ -32,6 +32,7 @@ const subscriptionService = require('./subscriptionService');
 const episodeService = require('./episodeService');
 const downloadQueueService = require('./downloadQueueService');
 const downloadProcessor = require('./downloadProcessor');
+const playlistService = require('./playlistService');
 
 module.exports = {
 	bluetoothService,
@@ -40,5 +41,6 @@ module.exports = {
 	subscriptionService,
 	episodeService,
 	downloadQueueService,
-	downloadProcessor
+	downloadProcessor,
+	playlistService
 };
