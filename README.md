@@ -42,6 +42,33 @@ curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/
 ```
 This script will pull the latest changes, reinstall dependencies, rebuild the frontend, and restart the service. Ideal for testing changes without running the full installer.
 
+#### Update Options
+| Flag | Description |
+|------|-------------|
+| `--client-only` | Update only the React frontend (skips API dependencies, PulseAudio, and service restarts) |
+
+**Full update** (API + frontend):
+```bash
+curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/update.sh | sudo bash
+```
+This updates both the API and frontend, including:
+- Pull latest changes from repository
+- Reinstall API dependencies
+- Rebuild React frontend
+- Restart PulseAudio service
+- Restart Pi Podcast service
+
+**Client-only update** (frontend only):
+```bash
+curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/update.sh | sudo bash -s -- --client-only
+```
+This updates only the frontend, which is much faster:
+- Pull latest changes from repository
+- Rebuild React frontend
+- Restart Pi Podcast service (skip PulseAudio restart)
+
+Use `--client-only` when you've only made changes to the React frontend (`client/` directory) and don't need to update API dependencies or PulseAudio configuration.
+
 ### Uninstall
 ```bash
 curl -fsSL https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/main/uninstall.sh | sudo bash
