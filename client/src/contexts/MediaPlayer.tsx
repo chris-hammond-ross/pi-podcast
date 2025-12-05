@@ -289,9 +289,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to play episode';
 			setError(message);
+			// Refresh status to resync with server
+			await refreshStatus();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus]);
 
 	const pause = useCallback(async () => {
 		setError(null);
@@ -300,9 +302,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to pause';
 			setError(message);
+			// Refresh status to resync with server
+			await refreshStatus();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus]);
 
 	const resume = useCallback(async () => {
 		setError(null);
@@ -311,9 +315,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to resume';
 			setError(message);
+			// Refresh status to resync with server
+			await refreshStatus();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus]);
 
 	const togglePlayPause = useCallback(async () => {
 		setError(null);
@@ -322,9 +328,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to toggle playback';
 			setError(message);
+			// Refresh status to resync with server
+			await refreshStatus();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus]);
 
 	const stop = useCallback(async () => {
 		setError(null);
@@ -333,9 +341,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to stop';
 			setError(message);
+			// Refresh status to resync with server
+			await refreshStatus();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus]);
 
 	const seekTo = useCallback(async (pos: number) => {
 		setError(null);
@@ -345,9 +355,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to seek';
 			setError(message);
+			// Refresh status to resync with server
+			await refreshStatus();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus]);
 
 	const seekRelative = useCallback(async (offset: number) => {
 		setError(null);
@@ -357,9 +369,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to seek';
 			setError(message);
+			// Refresh status to resync with server
+			await refreshStatus();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus]);
 
 	const setVolume = useCallback(async (vol: number) => {
 		setError(null);
@@ -369,9 +383,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to set volume';
 			setError(message);
+			// Refresh status to resync with server
+			await refreshStatus();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus]);
 
 	// Queue Actions
 	const addToQueue = useCallback(async (episodeId: number) => {
@@ -382,9 +398,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to add to queue';
 			setError(message);
+			// Refresh queue to resync with server
+			await refreshQueue();
 			throw err;
 		}
-	}, []);
+	}, [refreshQueue]);
 
 	const addMultipleToQueue = useCallback(async (episodeIds: number[]) => {
 		setError(null);
@@ -393,9 +411,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to add to queue';
 			setError(message);
+			// Refresh queue to resync with server
+			await refreshQueue();
 			throw err;
 		}
-	}, []);
+	}, [refreshQueue]);
 
 	const removeFromQueue = useCallback(async (index: number) => {
 		setError(null);
@@ -404,9 +424,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to remove from queue';
 			setError(message);
+			// Refresh queue to resync with server
+			await refreshQueue();
 			throw err;
 		}
-	}, []);
+	}, [refreshQueue]);
 
 	const clearQueue = useCallback(async () => {
 		setError(null);
@@ -415,9 +437,12 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to clear queue';
 			setError(message);
+			// Refresh both status and queue to resync with server
+			await refreshStatus();
+			await refreshQueue();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus, refreshQueue]);
 
 	const moveInQueue = useCallback(async (from: number, to: number) => {
 		setError(null);
@@ -426,9 +451,11 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to reorder queue';
 			setError(message);
+			// Refresh queue to resync with server
+			await refreshQueue();
 			throw err;
 		}
-	}, []);
+	}, [refreshQueue]);
 
 	const playQueueIndex = useCallback(async (index: number) => {
 		setError(null);
@@ -437,9 +464,12 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to play queue item';
 			setError(message);
+			// Refresh both status and queue to resync with server
+			await refreshStatus();
+			await refreshQueue();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus, refreshQueue]);
 
 	const playNext = useCallback(async () => {
 		setError(null);
@@ -448,9 +478,12 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to play next';
 			setError(message);
+			// Refresh both status and queue to resync with server
+			await refreshStatus();
+			await refreshQueue();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus, refreshQueue]);
 
 	const playPrevious = useCallback(async () => {
 		setError(null);
@@ -459,9 +492,12 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to play previous';
 			setError(message);
+			// Refresh both status and queue to resync with server
+			await refreshStatus();
+			await refreshQueue();
 			throw err;
 		}
-	}, []);
+	}, [refreshStatus, refreshQueue]);
 
 	const value: MediaPlayerContextValue = {
 		// Playback State
