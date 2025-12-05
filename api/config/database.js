@@ -172,6 +172,38 @@ function runMigrations(database) {
 		database.exec('CREATE INDEX idx_episodes_last_played_at ON episodes(last_played_at)');
 		console.log('[database] Added index idx_episodes_last_played_at');
 	}
+
+	// === Playlist migrations ===
+
+	// Add type column to playlists ('user' or 'auto')
+	if (!columnExists('playlists', 'type')) {
+		database.exec("ALTER TABLE playlists ADD COLUMN type TEXT DEFAULT 'user'");
+		console.log('[database] Added type column to playlists');
+	}
+
+	// Add subscription_id column for auto playlists
+	if (!columnExists('playlists', 'subscription_id')) {
+		database.exec('ALTER TABLE playlists ADD COLUMN subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE CASCADE');
+		console.log('[database] Added subscription_id column to playlists');
+	}
+
+	// Add file_path column to store the .m3u file location
+	if (!columnExists('playlists', 'file_path')) {
+		database.exec('ALTER TABLE playlists ADD COLUMN file_path TEXT');
+		console.log('[database] Added file_path column to playlists');
+	}
+
+	// Create index for playlist type
+	if (!indexExists('idx_playlists_type')) {
+		database.exec('CREATE INDEX idx_playlists_type ON playlists(type)');
+		console.log('[database] Added index idx_playlists_type');
+	}
+
+	// Create index for playlist subscription_id
+	if (!indexExists('idx_playlists_subscription_id')) {
+		database.exec('CREATE INDEX idx_playlists_subscription_id ON playlists(subscription_id)');
+		console.log('[database] Added index idx_playlists_subscription_id');
+	}
 }
 
 /**

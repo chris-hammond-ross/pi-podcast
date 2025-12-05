@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const episodeService = require('../services/episodeService');
-const { DOWNLOADS_DIR } = require('../config/constants');
+const playlistService = require('../services/playlistService');
+const { DOWNLOAD_DIR } = require('../config/constants');
 
 /**
  * GET /api/episodes/downloaded
@@ -167,12 +168,14 @@ router.delete('/:id/download', (req, res) => {
 			});
 		}
 
+		// Store subscription_id before clearing download info
+		const subscriptionId = episode.subscription_id;
+
 		// Try to delete the file
-		const filePath = path.join(DOWNLOADS_DIR, episode.file_path);
 		try {
-			if (fs.existsSync(filePath)) {
-				fs.unlinkSync(filePath);
-				console.log(`[episode] Deleted file: ${filePath}`);
+			if (fs.existsSync(episode.file_path)) {
+				fs.unlinkSync(episode.file_path);
+				console.log(`[episode] Deleted file: ${episode.file_path}`);
 			}
 		} catch (fileErr) {
 			console.error(`[episode] Failed to delete file: ${fileErr.message}`);
@@ -181,6 +184,13 @@ router.delete('/:id/download', (req, res) => {
 
 		// Clear download info from database
 		episodeService.clearDownload(parseInt(id));
+
+		// Update auto playlist for this subscription
+		try {
+			playlistService.onEpisodeDeleted(parseInt(id), subscriptionId);
+		} catch (playlistErr) {
+			console.error(`[episode] Failed to update playlist: ${playlistErr.message}`);
+		}
 
 		res.json({
 			success: true,

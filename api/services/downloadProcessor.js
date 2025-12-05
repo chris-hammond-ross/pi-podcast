@@ -7,6 +7,15 @@ const downloadQueueService = require('./downloadQueueService');
 const episodeService = require('./episodeService');
 const constants = require('../config/constants');
 
+// Lazy load playlistService to avoid circular dependency
+let playlistService = null;
+function getPlaylistService() {
+	if (!playlistService) {
+		playlistService = require('./playlistService');
+	}
+	return playlistService;
+}
+
 /**
  * Download Processor
  * Handles the actual downloading of podcast episodes
@@ -242,6 +251,13 @@ class DownloadProcessor extends EventEmitter {
 				filePath: finalPath,
 				fileSize
 			});
+
+			// Update auto playlist for this subscription
+			try {
+				getPlaylistService().onEpisodeDownloaded(queueItem.episode_id, queueItem.subscription_id);
+			} catch (playlistErr) {
+				console.error(`[download] Failed to update playlist: ${playlistErr.message}`);
+			}
 
 		} catch (err) {
 			await this._handleDownloadError(queueItem, err);
