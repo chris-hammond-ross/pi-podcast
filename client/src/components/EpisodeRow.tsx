@@ -116,7 +116,7 @@ function EpisodeRow({
 				color: 'teal',
 				message: `Now playing "${episode.title}"`,
 				position: 'top-right',
-				autoClose: 1500
+				autoClose: 1200
 			});
 			handleActionsModalClose();
 		} catch (err) {
@@ -126,6 +126,7 @@ function EpisodeRow({
 				position: 'top-right',
 				autoClose: 3000
 			});
+			handleActionsModalClose();
 		}
 	};
 
@@ -138,7 +139,7 @@ function EpisodeRow({
 				color: 'teal',
 				message: `Added "${episode.title}" to queue`,
 				position: 'top-right',
-				autoClose: 1500
+				autoClose: 1200
 			});
 			handleActionsModalClose();
 		} catch (err) {
@@ -148,6 +149,7 @@ function EpisodeRow({
 				position: 'top-right',
 				autoClose: 3000
 			});
+			handleActionsModalClose();
 		}
 	};
 
@@ -177,7 +179,7 @@ function EpisodeRow({
 				color: 'teal',
 				message: `Deleted "${episode.title}"`,
 				position: 'top-right',
-				autoClose: 1500
+				autoClose: 1200
 			});
 			handleActionsModalClose();
 		} catch (err) {
@@ -187,6 +189,7 @@ function EpisodeRow({
 				position: 'top-right',
 				autoClose: 3000
 			});
+			handleActionsModalClose();
 		} finally {
 			setIsDeleting(false);
 		}

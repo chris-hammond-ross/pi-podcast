@@ -106,7 +106,7 @@ function EpisodeDetailModal({
 			color: 'teal',
 			message: `Added "${episode.title}" to download queue`,
 			position: 'top-right',
-			autoClose: 1500
+			autoClose: 1200
 		});
 		onClose();
 	};
@@ -121,7 +121,7 @@ function EpisodeDetailModal({
 				color: 'teal',
 				message: `Deleted "${episode.title}"`,
 				position: 'top-right',
-				autoClose: 1500
+				autoClose: 1200
 			});
 			if (onEpisodeUpdate) {
 				onEpisodeUpdate({
@@ -154,7 +154,7 @@ function EpisodeDetailModal({
 				color: 'teal',
 				message: `Now playing "${episode.title}"`,
 				position: 'top-right',
-				autoClose: 1500
+				autoClose: 1200
 			});
 		} catch (err) {
 			notifications.show({

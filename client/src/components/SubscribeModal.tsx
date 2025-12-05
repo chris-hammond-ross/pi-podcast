@@ -101,7 +101,7 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 					You subscribed to <Text span c="var(--mantine-color-text)">{podcast.name}</Text>
 				</Text>,
 				position: 'top-right',
-				autoClose: 1500
+				autoClose: 1200
 			});
 			onClose();
 		} catch (err) {
