@@ -14,6 +14,7 @@ import { notifications } from '@mantine/notifications';
 import { Download, Trash2, X, Clock, Loader, Play, Pause } from 'lucide-react';
 import { useDownloadContext, useMediaPlayer } from '../contexts';
 import { deleteEpisodeDownload } from '../services';
+import { formatDuration } from '../utilities';
 import type { EpisodeRecord } from '../services';
 
 interface EpisodeDetailModalProps {
@@ -36,19 +37,6 @@ function formatDate(dateString: string | null): string {
 	} catch {
 		return dateString;
 	}
-}
-
-function formatDuration(duration: string | null): string {
-	if (!duration) return '';
-	if (duration.includes(':')) return duration;
-	const seconds = parseInt(duration);
-	if (isNaN(seconds)) return duration;
-	const hours = Math.floor(seconds / 3600);
-	const minutes = Math.floor((seconds % 3600) / 60);
-	if (hours > 0) {
-		return `${hours}h ${minutes}m`;
-	}
-	return `${minutes}m`;
 }
 
 function stripHtml(html: string): string {

@@ -27,3 +27,16 @@ export function secondsToHms(totalSeconds: number) {
 
 	return `${hDisplay}:${mDisplay}:${sDisplay}`;
 }
+
+export function formatDuration(duration: string | null): string {
+	if (!duration) return '';
+	if (duration.includes(':')) return duration;
+	const seconds = parseInt(duration);
+	if (isNaN(seconds)) return duration;
+	const hours = Math.floor(seconds / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
+	if (hours > 0) {
+		return `${hours}h ${minutes}m`;
+	}
+	return `${minutes}m`;
+}
