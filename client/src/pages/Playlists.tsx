@@ -93,6 +93,7 @@ function Playlists() {
 					}}
 				>
 					<Tabs.Panel
+						pb="md"
 						value="playlists"
 						style={{
 							flex: 1,
@@ -113,6 +114,7 @@ function Playlists() {
 						</Card>
 					</Tabs.Panel>
 					<Tabs.Panel
+						pb="md"
 						value="auto"
 						style={{
 							flex: 1,
