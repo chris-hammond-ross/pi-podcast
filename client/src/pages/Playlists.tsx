@@ -148,7 +148,7 @@ function Playlists() {
 									justifyContent: 'center'
 								}}
 							>
-								<Text c="dimmed">No auto playlists yet. Subscribe to a podcast and download some episodes!</Text>
+								<Text c="dimmed">No auto playlists</Text>
 							</Card>
 						) : (
 							<Stack gap="sm">
@@ -159,15 +159,18 @@ function Playlists() {
 										key={playlist.id}
 									>
 										<Group justify="space-between" align="center" wrap="nowrap">
-											<Text
-												size="sm"
-												truncate
-											>
-												{playlist.subscription_name}{' '}
-												<Text span c="dimmed" size="xs">
+											<Group gap="xs" style={{ minWidth: 0, flex: 1 }}>
+												<Text
+													size="sm"
+													truncate
+													style={{ flex: 1 }}
+												>
+													{playlist.subscription_name}
+												</Text>
+												<Text span c="dimmed" size="xs" style={{ flexShrink: 0 }}>
 													({playlist.episode_count})
 												</Text>
-											</Text>
+											</Group>
 											<ActionIcon
 												variant="light"
 												color="cyan"
