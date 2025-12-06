@@ -92,23 +92,39 @@ function Playlists() {
 						height: 'var(--main-content-with-tabs-height)'
 					}}
 				>
-					<Stack
-						gap="md"
+					<Tabs.Panel
+						value="playlists"
 						style={{
 							flex: 1,
 							display: 'flex',
-							flexDirection: 'column',
-							overflow: 'hidden'
+							flexDirection: 'column'
 						}}
 					>
-						<Tabs.Panel
-							value="playlists"
+						<Card
+							withBorder
 							style={{
 								flex: 1,
 								display: 'flex',
-								flexDirection: 'column'
+								alignItems: 'center',
+								justifyContent: 'center'
 							}}
 						>
+							<Text c="dimmed">Saved playlists coming soon!</Text>
+						</Card>
+					</Tabs.Panel>
+					<Tabs.Panel
+						value="auto"
+						style={{
+							flex: 1,
+							display: 'flex',
+							flexDirection: 'column'
+						}}
+					>
+						{isLoading ? (
+							<Center style={{ flex: 1 }}>
+								<Loader size="sm" />
+							</Center>
+						) : error ? (
 							<Card
 								withBorder
 								style={{
@@ -118,79 +134,53 @@ function Playlists() {
 									justifyContent: 'center'
 								}}
 							>
-								<Text c="dimmed">Saved playlists coming soon!</Text>
+								<Text c="red">{error}</Text>
 							</Card>
-						</Tabs.Panel>
-						<Tabs.Panel
-							value="auto"
-							style={{
-								flex: 1,
-								display: 'flex',
-								flexDirection: 'column'
-							}}
-						>
-							{isLoading ? (
-								<Center style={{ flex: 1 }}>
-									<Loader size="sm" />
-								</Center>
-							) : error ? (
-								<Card
-									withBorder
-									style={{
-										flex: 1,
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center'
-									}}
-								>
-									<Text c="red">{error}</Text>
-								</Card>
-							) : playlists.length === 0 ? (
-								<Card
-									withBorder
-									style={{
-										flex: 1,
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center'
-									}}
-								>
-									<Text c="dimmed">No auto playlists yet. Subscribe to a podcast and download some episodes!</Text>
-								</Card>
-							) : (
-								<Stack gap="sm">
-									{playlists.map((playlist) => (
-										<Card
-											withBorder
-											p="sm"
-											key={playlist.id}
-										>
-											<Group justify="space-between" align="center" wrap="nowrap">
-												<Text
-													size="sm"
-													truncate
-												>
-													{playlist.subscription_name}{' '}
-													<Text span c="dimmed" size="xs">
-														({playlist.episode_count})
-													</Text>
+						) : playlists.length === 0 ? (
+							<Card
+								withBorder
+								style={{
+									flex: 1,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center'
+								}}
+							>
+								<Text c="dimmed">No auto playlists yet. Subscribe to a podcast and download some episodes!</Text>
+							</Card>
+						) : (
+							<Stack gap="sm">
+								{playlists.map((playlist) => (
+									<Card
+										withBorder
+										p="sm"
+										key={playlist.id}
+									>
+										<Group justify="space-between" align="center" wrap="nowrap">
+											<Text
+												size="sm"
+												truncate
+											>
+												{playlist.subscription_name}{' '}
+												<Text span c="dimmed" size="xs">
+													({playlist.episode_count})
 												</Text>
-												<ActionIcon
-													variant="light"
-													color="cyan"
-													onClick={() => handlePlayPlaylist(playlist.subscription_id)}
-													title="Play Playlist"
-													disabled={playlist.episode_count === 0}
-												>
-													<Play size={16} />
-												</ActionIcon>
-											</Group>
-										</Card>
-									))}
-								</Stack>
-							)}
-						</Tabs.Panel>
-					</Stack>
+											</Text>
+											<ActionIcon
+												variant="light"
+												color="cyan"
+												onClick={() => handlePlayPlaylist(playlist.subscription_id)}
+												title="Play Playlist"
+												disabled={playlist.episode_count === 0}
+											>
+												<Play size={16} />
+											</ActionIcon>
+										</Group>
+									</Card>
+								))}
+							</Stack>
+						)}
+					</Tabs.Panel>
 				</Container>
 			</ScrollArea>
 		</Tabs>
