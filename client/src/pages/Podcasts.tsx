@@ -255,7 +255,7 @@ function Podcasts() {
 					>
 						{subscriptions.length === 0 ? (
 							<Card
-								withBorder
+								mb="-1rem"
 								style={{
 									flex: 1,
 									display: 'flex',
@@ -312,7 +312,7 @@ function Podcasts() {
 						>
 							{queue.length === 0 ? (
 								<Card
-									withBorder
+									mb="-1rem"
 									style={{
 										flex: 1,
 										display: 'flex',
@@ -388,7 +388,7 @@ function Podcasts() {
 							</Alert>
 						) : downloadedEpisodes.length === 0 ? (
 							<Card
-								withBorder
+								mb="-1rem"
 								style={{
 									flex: 1,
 									display: 'flex',

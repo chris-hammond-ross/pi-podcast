@@ -102,7 +102,7 @@ function Playlists() {
 						}}
 					>
 						<Card
-							withBorder
+							mb="-1rem"
 							style={{
 								flex: 1,
 								display: 'flex',
@@ -128,9 +128,7 @@ function Playlists() {
 							</Center>
 						) : error ? (
 							<Card
-								withBorder
 								style={{
-									flex: 1,
 									display: 'flex',
 									alignItems: 'center',
 									justifyContent: 'center'
@@ -140,7 +138,7 @@ function Playlists() {
 							</Card>
 						) : playlists.length === 0 ? (
 							<Card
-								withBorder
+								mb="-1rem"
 								style={{
 									flex: 1,
 									display: 'flex',

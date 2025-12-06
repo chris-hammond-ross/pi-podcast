@@ -196,7 +196,7 @@ function Downloads() {
 		}
 	}, []);
 
-	if (isLoading) {
+	if (!isLoading) {
 		return (
 			<Container size="sm" py="md">
 				<Group justify="center" py="xl">
@@ -260,8 +260,23 @@ function Downloads() {
 					scrollbars="y"
 					scrollbarSize={4}
 				>
-					<Container size="sm" py="md">
-						<Stack gap="md">
+					<Container
+						size="sm"
+						py="md"
+						style={{
+							display: 'flex',
+							flexDirection: 'column',
+							height: 'var(--main-content-with-tabs-height)'
+						}}
+					>
+						<Stack
+							gap="md"
+							style={{
+								flex: 1,
+								display: 'flex',
+								flexDirection: 'column'
+							}}
+						>
 							{error && (
 								<Alert icon={<AlertCircle size={16} />} color="red" withCloseButton={false}>
 									{error}
@@ -269,8 +284,23 @@ function Downloads() {
 							)}
 
 							{/* Downloading Tab */}
-							<Tabs.Panel value="downloading">
-								<Stack gap="md">
+							<Tabs.Panel
+								pb="md"
+								value="downloading"
+								style={{
+									flex: 1,
+									display: 'flex',
+									flexDirection: 'column'
+								}}
+							>
+								<Stack
+									gap="md"
+									style={{
+										flex: 1,
+										display: 'flex',
+										flexDirection: 'column'
+									}}
+								>
 									{/* Controls - only shown in Downloading tab */}
 									<Group gap="xs" grow>
 										{!isRunning ? (
@@ -318,7 +348,7 @@ function Downloads() {
 
 									{/* Current download */}
 									{currentDownload ? (
-										<Card withBorder p="md">
+										<Card p="md">
 											<Stack gap="xs">
 												<Group justify="space-between" align="flex-start">
 													<div style={{ flex: 1, minWidth: 0 }}>
@@ -355,16 +385,39 @@ function Downloads() {
 											</Stack>
 										</Card>
 									) : (
-										<Text c="dimmed" ta="center" py="xl">
-											No episode currently downloading.
-										</Text>
+										<Card
+											mb="-1rem"
+											style={{
+												flex: 1,
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center'
+											}}
+										>
+											<Text c="dimmed">No episode currently downloading</Text>
+										</Card>
 									)}
 								</Stack>
 							</Tabs.Panel>
 
 							{/* Pending Tab */}
-							<Tabs.Panel value="pending">
-								<Stack gap="md">
+							<Tabs.Panel
+								pb="md"
+								value="pending"
+								style={{
+									flex: 1,
+									display: 'flex',
+									flexDirection: 'column'
+								}}
+							>
+								<Stack
+									gap="md"
+									style={{
+										flex: 1,
+										display: 'flex',
+										flexDirection: 'column'
+									}}
+								>
 									{pendingItems.length > 0 ? (
 										<>
 											<Group justify="flex-end">
@@ -379,7 +432,7 @@ function Downloads() {
 											</Group>
 											<Stack gap="xs">
 												{pendingItems.map((item) => (
-													<Card key={item.id} withBorder p="sm">
+													<Card key={item.id} p="sm">
 														<Group justify="space-between" align="center" wrap="nowrap">
 															<div style={{ flex: 1, minWidth: 0 }}>
 																<Text size="sm" truncate>
@@ -403,16 +456,39 @@ function Downloads() {
 											</Stack>
 										</>
 									) : (
-										<Text c="dimmed" ta="center" py="xl">
-											No episodes pending download.
-										</Text>
+										<Card
+											mb="-1rem"
+											style={{
+												flex: 1,
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center'
+											}}
+										>
+											<Text c="dimmed">No episodes pending download</Text>
+										</Card>
 									)}
 								</Stack>
 							</Tabs.Panel>
 
 							{/* Completed Tab */}
-							<Tabs.Panel value="completed">
-								<Stack gap="md">
+							<Tabs.Panel
+								pb="md"
+								value="completed"
+								style={{
+									flex: 1,
+									display: 'flex',
+									flexDirection: 'column'
+								}}
+							>
+								<Stack
+									gap="md"
+									style={{
+										flex: 1,
+										display: 'flex',
+										flexDirection: 'column'
+									}}
+								>
 									{completedLoading ? (
 										<Group justify="center" py="xl">
 											<Loader size="md" />
@@ -469,9 +545,17 @@ function Downloads() {
 											)}
 										</Stack>
 									) : (
-										<Text c="dimmed" ta="center" py="xl">
-											No completed downloads yet.
-										</Text>
+										<Card
+											mb="-1rem"
+											style={{
+												flex: 1,
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center'
+											}}
+										>
+											<Text c="dimmed">No completed downloads</Text>
+										</Card>
 									)}
 								</Stack>
 							</Tabs.Panel>
