@@ -214,7 +214,7 @@ function MediaPlayer() {
 
 				{/* Progress slider with time display */}
 				<Group gap="xs" w="100%" wrap="nowrap">
-					<Text size="xs" c="dimmed" w={45} ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
+					<Text size="xs" c="dimmed" ta="right" ff="Roboto Mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
 						{formatTime(displayPosition)}
 					</Text>
 					<Box style={{ flex: 1 }}>
@@ -234,7 +234,7 @@ function MediaPlayer() {
 							}}
 						/>
 					</Box>
-					<Text size="xs" c="dimmed" w={45} style={{ fontVariantNumeric: 'tabular-nums' }}>
+					<Text size="xs" c="dimmed" ff="Roboto Mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
 						{formatTime(duration)}
 					</Text>
 				</Group>
