@@ -13,7 +13,7 @@ function Search() {
 	const [modalOpened, setModalOpened] = useState(false);
 	const [isLoadingPodcast, setIsLoadingPodcast] = useState(false);
 
-	const { podcastId } = useParams<{ podcastId: string }>();
+	const { podcastId } = useParams<{ podcastId: string; }>();
 	const navigate = useNavigate();
 	const location = useLocation();
 	const [searchParams] = useSearchParams();
@@ -25,7 +25,7 @@ function Search() {
 	useEffect(() => {
 		if (podcastId) {
 			const id = parseInt(podcastId);
-			
+
 			// First check if the podcast is in the current search results
 			const podcastFromResults = searchResults.find(p => p.id === id);
 
@@ -58,7 +58,7 @@ function Search() {
 				setSelectedPodcast(null);
 			}
 		}
-		
+
 		// Reset the navigation flag
 		isNavigatingRef.current = false;
 	}, [podcastId, location.pathname]);
@@ -128,7 +128,6 @@ function Search() {
 					</ScrollArea>
 				) : (
 					<Card
-						withBorder
 						style={{
 							flex: 1,
 							display: 'flex',

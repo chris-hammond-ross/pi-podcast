@@ -64,6 +64,14 @@
 	width: 50px !important;
 }
 
+.mantine-Tabs-tab:active {
+	background-color: unset;
+}
+
+.mantine-Tabs-tab:focus-visible {
+	outline: unset;
+}
+
 /* Spin animation for download in progress icon */
 @keyframes spin {
 	from {
