@@ -245,6 +245,7 @@ function Podcasts() {
 					}}
 				>
 					<Tabs.Panel
+						pb="md"
 						value="podcasts"
 						style={{
 							flex: 1,
@@ -293,6 +294,7 @@ function Podcasts() {
 						)}
 					</Tabs.Panel>
 					<Tabs.Panel
+						pb="md"
 						value="queue"
 						style={{
 							flex: 1,
@@ -360,6 +362,7 @@ function Podcasts() {
 					</Tabs.Panel>
 					<Tabs.Panel
 						value="episodes"
+						pb="md"
 						style={{
 							flex: 1,
 							display: 'flex',
