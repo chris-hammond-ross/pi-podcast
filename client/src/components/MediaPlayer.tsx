@@ -213,7 +213,7 @@ function MediaPlayer() {
 				</Text>*/}
 
 				{/* Progress slider with time display */}
-				<Group gap="xs" w="100%" wrap="nowrap">
+				<Group gap="xs" w="100%" wrap="nowrap" px="0.3rem">
 					<Text size="xs" c="dimmed" ta="right" ff="Roboto Mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
 						{formatTime(displayPosition)}
 					</Text>

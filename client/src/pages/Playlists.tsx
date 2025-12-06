@@ -154,7 +154,6 @@ function Playlists() {
 							<Stack gap="sm">
 								{playlists.map((playlist) => (
 									<Card
-										withBorder
 										p="sm"
 										key={playlist.id}
 									>
@@ -167,7 +166,7 @@ function Playlists() {
 												>
 													{playlist.subscription_name}
 												</Text>
-												<Text span c="dimmed" size="xs" style={{ flexShrink: 0 }}>
+												<Text span c="dimmed" size="xs" ff="Roboto Mono" style={{ flexShrink: 0 }}>
 													({playlist.episode_count})
 												</Text>
 											</Group>
