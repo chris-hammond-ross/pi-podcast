@@ -208,7 +208,6 @@ function EpisodeRow({
 	return (
 		<>
 			<Card
-				withBorder
 				p="sm"
 				onClick={handleCardClick}
 				style={{ cursor: 'pointer' }}

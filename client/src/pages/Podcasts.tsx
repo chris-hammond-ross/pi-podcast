@@ -329,7 +329,6 @@ function Podcasts() {
 
 										return (
 											<Card
-												withBorder
 												p="sm"
 												style={{ cursor: 'pointer' }}
 												key={index}
@@ -348,8 +347,8 @@ function Podcasts() {
 															</Text>
 														</Group>
 														<Text size="xs" c="dimmed" truncate>
-															{getSubscriptionByIdHook(item.subscription_id)?.name}
-															{item.pub_date && ` • ${formatDate(item.pub_date)}`}
+															{formatDate(item.pub_date)}
+															{item.subscription_id && ` • ${getSubscriptionByIdHook(item.subscription_id)?.name}`}
 														</Text>
 													</div>
 												</Group>
