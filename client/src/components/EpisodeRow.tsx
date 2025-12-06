@@ -6,7 +6,7 @@ import { useLocation } from 'react-router-dom';
 import { useEpisodesContext, useDownloadContext, useMediaPlayer } from '../contexts';
 import { deleteEpisodeDownload } from '../services';
 import EpisodeDetailModal from './EpisodeDetailModal';
-import { secondsToHms, formatDate } from '../utilities';
+import { secondsToHms, formatDate, formatDuration } from '../utilities';
 import type { EpisodeRecord } from '../services';
 
 interface EpisodeRowProps {
@@ -216,7 +216,7 @@ function EpisodeRow({
 					<div style={{ flex: 1, minWidth: 0 }}>
 						<Group gap="xs" wrap="nowrap">
 							<Text size="sm" truncate style={{ flex: 1 }}>
-								{episode.title} <Text span c="dimmed" size='xs'>{episode.duration && ` - ${secondsToHms(Number(episode.duration))}`}</Text>
+								{episode.title} <Text span c="dimmed" size='xs'>{episode.duration && ` - ${formatDuration(episode.duration)}`}</Text>
 							</Text>
 							{showDownloadStatus && (
 								<>
