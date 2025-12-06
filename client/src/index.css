@@ -1,3 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Reddit+Mono:wght@200..900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap');
+
+.roboto-mono {
+	font-family: "Roboto Mono", monospace;
+	font-optical-sizing: auto;
+	font-weight: 200;
+	font-style: normal;
+}
+
 :root {
 	--header-height: 60px;
 	--media-control-height: 96px;
