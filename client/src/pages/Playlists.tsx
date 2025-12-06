@@ -156,15 +156,15 @@ function Playlists() {
 										key={playlist.id}
 									>
 										<Group justify="space-between" align="center" wrap="nowrap">
-											<Group gap="xs" style={{ minWidth: 0, flex: 1 }}>
+											<Group gap={4} wrap="nowrap">
 												<Text
 													size="sm"
 													truncate
-													style={{ flex: 1 }}
+													style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
 												>
 													{playlist.subscription_name}
 												</Text>
-												<Text span c="dimmed" size="xs" ff="Roboto Mono" style={{ flexShrink: 0 }}>
+												<Text span c="dimmed" size="xs" ff="Roboto Mono" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
 													({playlist.episode_count})
 												</Text>
 											</Group>

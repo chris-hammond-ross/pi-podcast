@@ -214,10 +214,19 @@ function EpisodeRow({
 			>
 				<Group justify="space-between" align="center" wrap="nowrap">
 					<div style={{ flex: 1, minWidth: 0 }}>
-						<Group gap="xs" wrap="nowrap">
-							<Text size="sm" truncate style={{ flex: 1 }}>
-								{episode.title} <Text span c="dimmed" size='xs'>{episode.duration && ` - ${formatDuration(episode.duration)}`}</Text>
+						<Group gap={4} wrap="nowrap">
+							<Text
+								size="sm"
+								truncate
+								style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
+							>
+								{episode.title}
 							</Text>
+							{episode.duration && (
+								<Text span c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+									• {formatDuration(episode.duration)}
+								</Text>
+							)}
 							{showDownloadStatus && (
 								<>
 									{isCurrentlyPlaying && (
@@ -234,8 +243,8 @@ function EpisodeRow({
 							)}
 						</Group>
 						<Text size="xs" c="dimmed" truncate>
-							{subscriptionName && `${subscriptionName} • `}
-							{episode.pub_date && formatDate(episode.pub_date)}
+							{episode.pub_date && `${formatDate(episode.pub_date)} • `}
+							{subscriptionName && subscriptionName}
 						</Text>
 					</div>
 
