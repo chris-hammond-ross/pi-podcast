@@ -21,6 +21,7 @@ import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord } from 
 import { useDownloadContext } from '../contexts';
 import { useMediaPlayer } from '../contexts';
 import EpisodeDetailModal from './EpisodeDetailModal';
+import { formatDuration, formatDate } from '../utilities';
 
 interface PodcastDetailModalProps {
 	subscription: Subscription | null;
@@ -31,34 +32,6 @@ interface PodcastDetailModalProps {
 	initialEpisodeId?: number | null;
 	onEpisodeOpen?: (episodeId: number) => void;
 	onEpisodeClose?: () => void;
-}
-
-function formatDate(dateString: string | null): string {
-	if (!dateString) return '';
-	try {
-		const date = new Date(dateString);
-		return date.toLocaleDateString(undefined, {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	} catch {
-		return dateString;
-	}
-}
-
-function formatDuration(duration: string | null): string {
-	if (!duration) return '';
-	// Handle HH:MM:SS or seconds format
-	if (duration.includes(':')) return duration;
-	const seconds = parseInt(duration);
-	if (isNaN(seconds)) return duration;
-	const hours = Math.floor(seconds / 3600);
-	const minutes = Math.floor((seconds % 3600) / 60);
-	if (hours > 0) {
-		return `${hours}h ${minutes}m`;
-	}
-	return `${minutes}m`;
 }
 
 function PodcastDetailModal({
@@ -473,7 +446,7 @@ function PodcastDetailModal({
 													<Text size="sm" fw={500} lineClamp={2}>
 														{episode.title}
 													</Text>
-													<Group gap="xs">
+													<Group gap={4}>
 														<Text size="xs" c="dimmed">
 															{formatDate(episode.pub_date)}
 														</Text>

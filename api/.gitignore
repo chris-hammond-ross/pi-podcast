@@ -27,3 +27,7 @@ dist-ssr
 *.db
 *.db-wal
 *.db-shm
+
+# Playlist directory and files
+/playlists
+*.m3u

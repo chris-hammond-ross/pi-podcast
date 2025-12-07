@@ -30,7 +30,7 @@ export function secondsToHms(totalSeconds: number) {
 
 export function formatDuration(duration: string | null): string {
 	if (!duration) return '';
-	if (duration.includes(':')) return duration;
+	if (duration.includes(':')) return formatEdgeCaseDuration(duration);
 	const seconds = parseInt(duration);
 	if (isNaN(seconds)) return duration;
 	const hours = Math.floor(seconds / 3600);
@@ -39,4 +39,32 @@ export function formatDuration(duration: string | null): string {
 		return `${hours}h ${minutes}m`;
 	}
 	return `${minutes}m`;
+}
+
+// Deals with duration values that look like "01:00:18" instead of "3618"
+function formatEdgeCaseDuration(duration: string): string {
+	const parts = duration.split(/[:,.]/).map(Number);
+
+	let hours = 0, minutes = 0, seconds = 0;
+
+	if (parts.length === 3) {
+		[hours, minutes, seconds] = parts;
+	} else if (parts.length === 2) {
+		[minutes, seconds] = parts;
+	}
+
+	// Only round up if seconds > 30 (not >=)
+	if (seconds > 30) {
+		minutes++;
+		if (minutes >= 60) {
+			hours++;
+			minutes = 0;
+		}
+	}
+
+	let result = '';
+	if (hours > 0) result += `${hours}h `;
+	if (minutes > 0) result += `${minutes}m`;
+
+	return result.trim() || '0m';
 }
