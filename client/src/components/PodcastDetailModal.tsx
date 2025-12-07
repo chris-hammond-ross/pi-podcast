@@ -18,18 +18,15 @@ import { notifications } from '@mantine/notifications';
 import {
 	AlertCircle,
 	Download,
-	CheckCircle,
 	ArrowLeft,
 	Ellipsis,
 	X,
 	Clock,
-	LoaderCircle,
-	ListPlus
+	LoaderCircle
 } from 'lucide-react';
 import type { Subscription } from '../services';
 import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord } from '../services';
 import { useDownloadContext } from '../contexts';
-import { useMediaPlayer } from '../contexts';
 import EpisodeDetailModal from './EpisodeDetailModal';
 import EpisodeActionsModal from './EpisodeActionsModal';
 import { formatDuration, formatDate } from '../utilities';
@@ -49,7 +46,6 @@ function PodcastDetailModal({
 	subscription,
 	opened,
 	onClose,
-	onSubscriptionUpdate,
 	initialEpisodeId,
 	onEpisodeOpen,
 	onEpisodeClose
@@ -59,8 +55,6 @@ function PodcastDetailModal({
 	const [error, setError] = useState<string | null>(null);
 	const [selectedEpisode, setSelectedEpisode] = useState<EpisodeRecord | null>(null);
 	const [episodeModalOpened, setEpisodeModalOpened] = useState(false);
-
-	const { addToQueue: addMediaToQueue, removeFromQueue } = useMediaPlayer();
 
 	// Track previous initialEpisodeId to detect changes (for back navigation)
 	const prevInitialEpisodeIdRef = useRef<number | null | undefined>(undefined);
@@ -242,17 +236,6 @@ function PodcastDetailModal({
 		setEpisodes(prev =>
 			prev.map(e => e.id === updatedEpisode.id ? updatedEpisode : e)
 		);
-	};
-
-	const handleAddToQueue = async (episode: EpisodeRecord, e: React.MouseEvent) => {
-		e.stopPropagation();
-		await addMediaToQueue(episode.id);
-		notifications.show({
-			color: 'cyan',
-			message: `Added ${episode.title} to queue`,
-			position: 'top-right',
-			autoClose: 1200
-		});
 	};
 
 	const renderEpisodeStatus = (episode: EpisodeRecord) => {

@@ -336,20 +336,21 @@ function Podcasts() {
 											>
 												<Group justify="space-between" align="center" wrap="nowrap">
 													<div style={{ flex: 1, minWidth: 0 }}>
-														<Group gap="xs" wrap="nowrap">
+														<Group gap={4} wrap="nowrap">
 															<Text
 																size="sm"
 																c={isCurrentEpisode ? "var(--mantine-color-teal-light-color)" : undefined}
 																truncate
-																style={{ flex: 1 }}
+																style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
 															>
-																{item.title} <Text span c="dimmed" size='xs'>{item.duration && ` - ${secondsToHms(Number(item.duration))}`}</Text>
+																{item.title}
 															</Text>
+															{item.duration && (
+																<Text c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+																	• {secondsToHms(Number(item.duration))}
+																</Text>
+															)}
 														</Group>
-														<Text size="xs" c="dimmed" truncate>
-															{formatDate(item.pub_date)}
-															{item.subscription_id && ` • ${getSubscriptionByIdHook(item.subscription_id)?.name}`}
-														</Text>
 													</div>
 												</Group>
 											</Card>
