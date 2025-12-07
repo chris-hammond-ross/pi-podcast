@@ -15,12 +15,23 @@ import {
 	ThemeIcon
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { AlertCircle, Download, CheckCircle, ArrowLeft, Ellipsis, X, Clock, LoaderCircle, ListPlus } from 'lucide-react';
+import {
+	AlertCircle,
+	Download,
+	CheckCircle,
+	ArrowLeft,
+	Ellipsis,
+	X,
+	Clock,
+	LoaderCircle,
+	ListPlus
+} from 'lucide-react';
 import type { Subscription } from '../services';
 import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord } from '../services';
 import { useDownloadContext } from '../contexts';
 import { useMediaPlayer } from '../contexts';
 import EpisodeDetailModal from './EpisodeDetailModal';
+import EpisodeActionsModal from './EpisodeActionsModal';
 import { formatDuration, formatDate } from '../utilities';
 
 interface PodcastDetailModalProps {
@@ -247,19 +258,7 @@ function PodcastDetailModal({
 	const renderEpisodeStatus = (episode: EpisodeRecord) => {
 		if (episode.downloaded_at) {
 			return (
-				<Stack gap="xs">
-					<ThemeIcon variant="light" color="teal" title="Downloaded">
-						<CheckCircle size={16} />
-					</ThemeIcon>
-					<ActionIcon
-						variant="light"
-						color="cyan"
-						onClick={(e) => handleAddToQueue(episode, e)}
-						title="Add to Queue"
-					>
-						<ListPlus size={16} />
-					</ActionIcon>
-				</Stack>
+				<EpisodeActionsModal episodeId={episode.id} subscriptionName={subscription?.name} />
 			);
 		}
 
