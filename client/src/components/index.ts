@@ -10,3 +10,4 @@ export { default as PodcastDetailModal } from './PodcastDetailModal';
 export { default as EpisodeDetailModal } from './EpisodeDetailModal';
 export { default as MediaPlayer } from './MediaPlayer';
 export { default as EpisodeRow } from './EpisodeRow';
+export { default as EpisodeActionsModal } from './EpisodeActionsModal';
