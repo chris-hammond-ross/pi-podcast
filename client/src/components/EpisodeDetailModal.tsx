@@ -66,8 +66,7 @@ function EpisodeDetailModal({
 		pause,
 		currentEpisode,
 		isPlaying,
-		isPaused,
-		error: mediaError
+		isPaused
 	} = useMediaPlayer();
 
 	// Check if this episode is currently downloading

@@ -156,7 +156,7 @@ function Playlists() {
 										key={playlist.id}
 									>
 										<Group justify="space-between" align="center" wrap="nowrap">
-											<Group gap={4} wrap="nowrap">
+											<Group gap={4} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
 												<Text
 													size="sm"
 													truncate
@@ -164,7 +164,7 @@ function Playlists() {
 												>
 													{playlist.subscription_name}
 												</Text>
-												<Text span c="dimmed" size="xs" ff="Roboto Mono" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+												<Text c="dimmed" size="xs" ff="Roboto Mono" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
 													({playlist.episode_count})
 												</Text>
 											</Group>
