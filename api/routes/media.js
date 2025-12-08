@@ -292,6 +292,42 @@ router.post('/queue/move', async (req, res) => {
 });
 
 /**
+ * POST /api/media/queue/shuffle
+ * Shuffle the queue (keeps currently playing item at position 0)
+ */
+router.post('/queue/shuffle', async (req, res) => {
+	try {
+		const result = await mediaPlayerService.shuffleQueue();
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error shuffling queue:', error);
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
+ * POST /api/media/queue/sort
+ * Sort the queue by specified field and order
+ * Body: { sortBy: 'pub_date' | 'downloaded_at', order: 'asc' | 'desc' }
+ */
+router.post('/queue/sort', async (req, res) => {
+	try {
+		const { sortBy = 'pub_date', order = 'asc' } = req.body;
+
+		const result = await mediaPlayerService.sortQueue(sortBy, order);
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error sorting queue:', error);
+
+		if (error.message.includes('Invalid')) {
+			return res.status(400).json({ error: error.message });
+		}
+
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
  * POST /api/media/queue/play/:index
  * Jump to specific position in queue
  */

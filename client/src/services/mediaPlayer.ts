@@ -56,6 +56,23 @@ export interface AddToQueueResult {
 	errors?: Array<{ episodeId: number; error: string }>;
 }
 
+export interface ShuffleQueueResult {
+	success: boolean;
+	queueLength: number;
+	message?: string;
+}
+
+export interface SortQueueResult {
+	success: boolean;
+	queueLength: number;
+	sortBy?: string;
+	order?: string;
+	message?: string;
+}
+
+export type SortField = 'pub_date' | 'downloaded_at';
+export type SortOrder = 'asc' | 'desc';
+
 export interface RecentlyPlayedEpisode {
 	id: number;
 	subscription_id: number;
@@ -315,6 +332,41 @@ export async function moveInQueue(from: number, to: number): Promise<{ success: 
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.error || 'Failed to move in queue');
+	}
+
+	return response.json();
+}
+
+/**
+ * Shuffle the queue (keeps currently playing at position 0)
+ */
+export async function shuffleQueue(): Promise<ShuffleQueueResult> {
+	const response = await fetch(`${API_BASE_URL}/api/media/queue/shuffle`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to shuffle queue');
+	}
+
+	return response.json();
+}
+
+/**
+ * Sort the queue by specified field and order
+ */
+export async function sortQueue(sortBy: SortField, order: SortOrder): Promise<SortQueueResult> {
+	const response = await fetch(`${API_BASE_URL}/api/media/queue/sort`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ sortBy, order })
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to sort queue');
 	}
 
 	return response.json();

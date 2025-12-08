@@ -7,6 +7,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { getWebSocketService, type ServerMessage, type MediaCurrentEpisode, type MediaQueueItem } from '../services/websocket';
 import * as mediaApi from '../services/mediaPlayer';
+import type { SortField, SortOrder } from '../services/mediaPlayer';
 
 export interface MediaPlayerContextValue {
 	// Playback State
@@ -49,6 +50,8 @@ export interface MediaPlayerContextValue {
 	playQueueIndex: (index: number) => Promise<void>;
 	playNext: () => Promise<void>;
 	playPrevious: () => Promise<void>;
+	shuffleQueue: () => Promise<void>;
+	sortQueue: (sortBy: SortField, order: SortOrder) => Promise<void>;
 
 	// Utility
 	refreshStatus: () => Promise<void>;
@@ -285,11 +288,9 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		setError(null);
 		try {
 			await mediaApi.playEpisode(episodeId);
-			// Status will be updated via WebSocket
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to play episode';
 			setError(message);
-			// Refresh status to resync with server
 			await refreshStatus();
 			throw err;
 		}
@@ -302,7 +303,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to pause';
 			setError(message);
-			// Refresh status to resync with server
 			await refreshStatus();
 			throw err;
 		}
@@ -315,7 +315,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to resume';
 			setError(message);
-			// Refresh status to resync with server
 			await refreshStatus();
 			throw err;
 		}
@@ -328,7 +327,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to toggle playback';
 			setError(message);
-			// Refresh status to resync with server
 			await refreshStatus();
 			throw err;
 		}
@@ -341,7 +339,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to stop';
 			setError(message);
-			// Refresh status to resync with server
 			await refreshStatus();
 			throw err;
 		}
@@ -351,11 +348,10 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		setError(null);
 		try {
 			await mediaApi.seekTo(pos);
-			setPosition(pos); // Optimistic update
+			setPosition(pos);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to seek';
 			setError(message);
-			// Refresh status to resync with server
 			await refreshStatus();
 			throw err;
 		}
@@ -369,7 +365,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to seek';
 			setError(message);
-			// Refresh status to resync with server
 			await refreshStatus();
 			throw err;
 		}
@@ -379,11 +374,10 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		setError(null);
 		try {
 			await mediaApi.setVolume(vol);
-			setVolumeState(vol); // Optimistic update
+			setVolumeState(vol);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to set volume';
 			setError(message);
-			// Refresh status to resync with server
 			await refreshStatus();
 			throw err;
 		}
@@ -394,11 +388,9 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		setError(null);
 		try {
 			await mediaApi.addToQueue(episodeId);
-			// Queue will be updated via WebSocket
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to add to queue';
 			setError(message);
-			// Refresh queue to resync with server
 			await refreshQueue();
 			throw err;
 		}
@@ -411,7 +403,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to add to queue';
 			setError(message);
-			// Refresh queue to resync with server
 			await refreshQueue();
 			throw err;
 		}
@@ -424,7 +415,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to remove from queue';
 			setError(message);
-			// Refresh queue to resync with server
 			await refreshQueue();
 			throw err;
 		}
@@ -437,7 +427,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to clear queue';
 			setError(message);
-			// Refresh both status and queue to resync with server
 			await refreshStatus();
 			await refreshQueue();
 			throw err;
@@ -451,7 +440,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to reorder queue';
 			setError(message);
-			// Refresh queue to resync with server
 			await refreshQueue();
 			throw err;
 		}
@@ -464,7 +452,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to play queue item';
 			setError(message);
-			// Refresh both status and queue to resync with server
 			await refreshStatus();
 			await refreshQueue();
 			throw err;
@@ -478,7 +465,6 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to play next';
 			setError(message);
-			// Refresh both status and queue to resync with server
 			await refreshStatus();
 			await refreshQueue();
 			throw err;
@@ -492,12 +478,35 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Failed to play previous';
 			setError(message);
-			// Refresh both status and queue to resync with server
 			await refreshStatus();
 			await refreshQueue();
 			throw err;
 		}
 	}, [refreshStatus, refreshQueue]);
+
+	const shuffleQueue = useCallback(async () => {
+		setError(null);
+		try {
+			await mediaApi.shuffleQueue();
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to shuffle queue';
+			setError(message);
+			await refreshQueue();
+			throw err;
+		}
+	}, [refreshQueue]);
+
+	const sortQueue = useCallback(async (sortBy: SortField, order: SortOrder) => {
+		setError(null);
+		try {
+			await mediaApi.sortQueue(sortBy, order);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to sort queue';
+			setError(message);
+			await refreshQueue();
+			throw err;
+		}
+	}, [refreshQueue]);
 
 	const value: MediaPlayerContextValue = {
 		// Playback State
@@ -540,6 +549,8 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		playQueueIndex,
 		playNext,
 		playPrevious,
+		shuffleQueue,
+		sortQueue,
 
 		// Utility
 		refreshStatus,
