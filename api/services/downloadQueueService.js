@@ -255,6 +255,8 @@ class DownloadQueueService {
 
 	/**
 	 * Get all queue items with optional status filter
+	 * Orders by priority (highest first), then by episode pub_date (oldest first)
+	 * This matches the actual download processing order
 	 * @param {string|null} status - Filter by status
 	 * @param {number} limit - Max items
 	 * @returns {Array} Queue items
@@ -276,7 +278,7 @@ class DownloadQueueService {
 			params.push(status);
 		}
 
-		sql += ' ORDER BY dq.created_at DESC LIMIT ?';
+		sql += ' ORDER BY dq.priority DESC, e.pub_date ASC LIMIT ?';
 		params.push(limit);
 
 		return db.prepare(sql).all(...params);
