@@ -12,6 +12,7 @@ import {
 	Modal,
 	Button
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useLocation } from 'react-router-dom';
 import { useHover, useMove } from '@mantine/hooks';
 import {
@@ -30,8 +31,7 @@ import {
 	CalendarArrowUp
 } from 'lucide-react';
 import { useMediaPlayer } from '../contexts';
-
-type SortingTypes = "desc-pub" | "asc-pub" | "desc-download" | "asc-download";
+import type { SortField, SortOrder } from '../services/mediaPlayer';
 
 /**
  * Format seconds into MM:SS or HH:MM:SS format
@@ -138,6 +138,7 @@ function MediaPlayer() {
 		volume,
 		currentEpisode,
 		mpvConnected,
+		queueLength,
 
 		// Computed
 		progress,
@@ -150,11 +151,16 @@ function MediaPlayer() {
 		setVolume,
 		playNext,
 		playPrevious,
+		shuffleQueue,
+		sortQueue,
 	} = useMediaPlayer();
 
 	// Determine if we have an active playback session
 	const hasPlayback = currentEpisode !== null;
 	const showPlayButton = !isPlaying || isPaused;
+	
+	// Determine if queue operations make sense (need at least 2 items to shuffle/sort)
+	const canModifyQueue = queueLength >= 2;
 
 	// Handle seek slider change (while dragging)
 	const handleSeekChange = useCallback((value: number) => {
@@ -204,7 +210,7 @@ function MediaPlayer() {
 		}
 	}, [volume, previousVolume, setVolume]);
 
-	// Handle opening
+	// Handle opening sort modal
 	const openSortModal = () => {
 		// Add history state for modal
 		window.history.pushState(null, '', location.pathname + location.search);
@@ -219,8 +225,25 @@ function MediaPlayer() {
 		}
 	};
 
-	const handleShuffle = () => {
-		// TODO: add shuffle logic
+	// Handle shuffle
+	const handleShuffle = async () => {
+		try {
+			await shuffleQueue();
+			notifications.show({
+				color: 'teal',
+				message: 'Queue shuffled',
+				position: 'top-right',
+				autoClose: 1500
+			});
+			closeSortModal();
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to shuffle queue',
+				position: 'top-right',
+				autoClose: 3000
+			});
+		}
 	};
 
 	// Handle browser back button to close modals
@@ -235,21 +258,29 @@ function MediaPlayer() {
 		return () => window.removeEventListener('popstate', handlePopState);
 	}, [sortModalOpened]);
 
-	const handleSort = (type: SortingTypes) => {
-		// TODO: add actual sorting logic
-		switch (type) {
-			case 'desc-pub':
-				console.log(type);
-				break;
-			case 'asc-pub':
-				console.log(type);
-				break;
-			case 'desc-download':
-				console.log(type);
-				break;
-			case 'asc-download':
-				console.log(type);
-				break;
+	// Handle sort
+	const handleSort = async (sortBy: SortField, order: SortOrder) => {
+		try {
+			await sortQueue(sortBy, order);
+			
+			// Build user-friendly message
+			const fieldLabel = sortBy === 'pub_date' ? 'publish date' : 'download date';
+			const orderLabel = order === 'asc' ? 'oldest first' : 'newest first';
+			
+			notifications.show({
+				color: 'teal',
+				message: `Queue sorted by ${fieldLabel} (${orderLabel})`,
+				position: 'top-right',
+				autoClose: 1500
+			});
+			closeSortModal();
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to sort queue',
+				position: 'top-right',
+				autoClose: 3000
+			});
 		}
 	};
 
@@ -351,7 +382,6 @@ function MediaPlayer() {
 						color="teal"
 						size="lg"
 						aria-label="Sort"
-						// disabled={(!hasNext && !hasPrevious) || !mpvConnected}
 						onClick={openSortModal}
 					>
 						<ArrowUpDown size={18} />
@@ -424,7 +454,7 @@ function MediaPlayer() {
 								Sorting Action
 							</Text>
 							<Text size="sm" c="dimmed" lineClamp={1} mt={4}>
-								Sort or shuffle the current queue
+								Sort or shuffle the current queue ({queueLength} items)
 							</Text>
 						</div>
 					</Group>
@@ -436,6 +466,7 @@ function MediaPlayer() {
 							color="teal"
 							leftSection={<Shuffle size={16} />}
 							onClick={handleShuffle}
+							disabled={!canModifyQueue}
 							fullWidth
 						>
 							Shuffle Queue
@@ -444,7 +475,8 @@ function MediaPlayer() {
 							variant="light"
 							color="violet"
 							leftSection={<ArrowDownWideNarrow size={16} />}
-							onClick={() => { handleSort('desc-pub'); }}
+							onClick={() => handleSort('pub_date', 'desc')}
+							disabled={!canModifyQueue}
 							fullWidth
 						>
 							Published - Newest First
@@ -453,7 +485,8 @@ function MediaPlayer() {
 							variant="light"
 							color="violet"
 							leftSection={<ArrowUpNarrowWide size={16} />}
-							onClick={() => { handleSort('asc-pub'); }}
+							onClick={() => handleSort('pub_date', 'asc')}
+							disabled={!canModifyQueue}
 							fullWidth
 						>
 							Published - Oldest First
@@ -462,7 +495,8 @@ function MediaPlayer() {
 							variant="light"
 							color="pink"
 							leftSection={<CalendarArrowDown size={16} />}
-							onClick={() => { handleSort('desc-download'); }}
+							onClick={() => handleSort('downloaded_at', 'desc')}
+							disabled={!canModifyQueue}
 							fullWidth
 						>
 							Downloaded - Newest First
@@ -471,7 +505,8 @@ function MediaPlayer() {
 							variant="light"
 							color="pink"
 							leftSection={<CalendarArrowUp size={16} />}
-							onClick={() => { handleSort('asc-download'); }}
+							onClick={() => handleSort('downloaded_at', 'asc')}
+							disabled={!canModifyQueue}
 							fullWidth
 						>
 							Downloaded - Oldest First

@@ -962,6 +962,155 @@ class MediaPlayerService extends EventEmitter {
 	}
 
 	/**
+	 * Shuffle the queue (excluding currently playing item)
+	 * Uses Fisher-Yates shuffle algorithm
+	 * @returns {Promise<Object>} Result
+	 */
+	async shuffleQueue() {
+		if (this.queue.length <= 1) {
+			return { success: true, queueLength: this.queue.length, message: 'Queue too short to shuffle' };
+		}
+
+		console.log('[media] Shuffling queue');
+
+		// If something is playing, we'll shuffle everything except the current item
+		// The current item stays at its position
+		const currentlyPlayingIndex = this.queuePosition;
+		const hasCurrentlyPlaying = currentlyPlayingIndex >= 0 && currentlyPlayingIndex < this.queue.length;
+
+		// Extract the currently playing item if any
+		let currentItem = null;
+		let itemsToShuffle = [...this.queue];
+		
+		if (hasCurrentlyPlaying) {
+			currentItem = itemsToShuffle.splice(currentlyPlayingIndex, 1)[0];
+		}
+
+		// Fisher-Yates shuffle
+		for (let i = itemsToShuffle.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[itemsToShuffle[i], itemsToShuffle[j]] = [itemsToShuffle[j], itemsToShuffle[i]];
+		}
+
+		// Rebuild the queue with current item at position 0 (if playing)
+		if (hasCurrentlyPlaying && currentItem) {
+			this.queue = [currentItem, ...itemsToShuffle];
+			this.queuePosition = 0;
+		} else {
+			this.queue = itemsToShuffle;
+		}
+
+		// Rebuild MPV playlist to match
+		await this.rebuildMpvPlaylist();
+
+		this.broadcastQueue();
+
+		return { success: true, queueLength: this.queue.length };
+	}
+
+	/**
+	 * Sort the queue by a specified field and order
+	 * Currently playing item moves to its new sorted position
+	 * @param {string} sortBy - Field to sort by: 'pub_date' or 'downloaded_at'
+	 * @param {string} order - Sort order: 'asc' or 'desc'
+	 * @returns {Promise<Object>} Result
+	 */
+	async sortQueue(sortBy = 'pub_date', order = 'asc') {
+		if (this.queue.length <= 1) {
+			return { success: true, queueLength: this.queue.length, message: 'Queue too short to sort' };
+		}
+
+		// Validate sortBy
+		const validSortFields = ['pub_date', 'downloaded_at'];
+		if (!validSortFields.includes(sortBy)) {
+			throw new Error(`Invalid sort field. Must be one of: ${validSortFields.join(', ')}`);
+		}
+
+		// Validate order
+		const validOrders = ['asc', 'desc'];
+		if (!validOrders.includes(order.toLowerCase())) {
+			throw new Error(`Invalid sort order. Must be one of: ${validOrders.join(', ')}`);
+		}
+
+		console.log(`[media] Sorting queue by ${sortBy} ${order}`);
+
+		const isAsc = order.toLowerCase() === 'asc';
+
+		// Sort the queue
+		this.queue.sort((a, b) => {
+			let valueA, valueB;
+
+			if (sortBy === 'pub_date') {
+				// pub_date is stored as ISO string
+				valueA = a.episode.pub_date ? new Date(a.episode.pub_date).getTime() : 0;
+				valueB = b.episode.pub_date ? new Date(b.episode.pub_date).getTime() : 0;
+			} else if (sortBy === 'downloaded_at') {
+				// downloaded_at is stored as unix timestamp
+				valueA = a.episode.downloaded_at || 0;
+				valueB = b.episode.downloaded_at || 0;
+			}
+
+			if (isAsc) {
+				return valueA - valueB;
+			} else {
+				return valueB - valueA;
+			}
+		});
+
+		// Find the new position of the currently playing episode
+		if (this.currentEpisode) {
+			const newPosition = this.queue.findIndex(item => item.episodeId === this.currentEpisode.id);
+			if (newPosition !== -1) {
+				this.queuePosition = newPosition;
+			}
+		}
+
+		// Rebuild MPV playlist to match
+		await this.rebuildMpvPlaylist();
+
+		this.broadcastQueue();
+
+		return { success: true, queueLength: this.queue.length, sortBy, order };
+	}
+
+	/**
+	 * Rebuild the MPV playlist to match our internal queue
+	 * Used after shuffle/sort operations
+	 */
+	async rebuildMpvPlaylist() {
+		// Clear MPV playlist
+		await this.sendCommand(['playlist-clear']);
+
+		// Add all items back in new order
+		for (let i = 0; i < this.queue.length; i++) {
+			const item = this.queue[i];
+			const mode = i === 0 ? 'append' : 'append';
+			await this.sendCommand(['loadfile', item.filePath, mode]);
+		}
+
+		// If we have a current position, jump to it
+		if (this.queuePosition >= 0 && this.queuePosition < this.queue.length) {
+			// Set the playlist position
+			await this.setProperty('playlist-pos', this.queuePosition);
+			
+			// Restore playback position within the episode
+			if (this.position > 0) {
+				await new Promise(resolve => setTimeout(resolve, 300));
+				try {
+					await this.seek(this.position);
+				} catch (err) {
+					console.warn('[media] Could not restore position after rebuild:', err.message);
+				}
+			}
+
+			// Restore pause state
+			if (this.isPaused) {
+				await this.setProperty('pause', true);
+			}
+		}
+	}
+
+	/**
 	 * Get the current queue
 	 * @returns {Object} Queue information
 	 */
