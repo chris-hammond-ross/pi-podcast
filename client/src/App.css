@@ -72,6 +72,10 @@
 	outline: unset;
 }
 
+button:focus-visible {
+	outline: none !important;
+}
+
 /* Spin animation for download in progress icon */
 @keyframes spin {
 	from {

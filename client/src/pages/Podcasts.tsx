@@ -11,14 +11,18 @@ import {
 	Loader,
 	Group,
 	Tabs,
-	ScrollArea
+	ScrollArea,
+	Button,
+	Modal,
+	TextInput
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { AlertCircle } from 'lucide-react';
+import { notifications } from '@mantine/notifications';
+import { AlertCircle, X, Save } from 'lucide-react';
 import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
-import { getSubscriptionById, getAllDownloadedEpisodes } from '../services';
+import { getSubscriptionById, getAllDownloadedEpisodes, createUserPlaylist, addEpisodeToPlaylist } from '../services';
 import { formatDuration } from '../utilities';
 import type { Subscription, DownloadedEpisodeRecord } from '../services';
 
@@ -36,11 +40,17 @@ function Podcasts() {
 	const [episodesError, setEpisodesError] = useState<string | null>(null);
 	const [episodesLoaded, setEpisodesLoaded] = useState(false);
 
+	// Save Playlist modal state
+	const [savePlaylistModalOpened, setSavePlaylistModalOpened] = useState(false);
+	const [playlistName, setPlaylistName] = useState('');
+	const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
+	const [savePlaylistError, setSavePlaylistError] = useState<string | null>(null);
+
 	const { subscriptionId, episodeId } = useParams<{ subscriptionId: string; episodeId: string; }>();
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const { queue, currentEpisode } = useMediaPlayer();
+	const { queue, currentEpisode, clearQueue } = useMediaPlayer();
 
 	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
@@ -163,6 +173,73 @@ function Podcasts() {
 			navigate(`/podcasts/${selectedSubscription.id}`, { replace: false });
 		}
 	}, [navigate, selectedSubscription]);
+
+	const openSavePlaylistModal = () => {
+		setPlaylistName('');
+		setSavePlaylistError(null);
+		setSavePlaylistModalOpened(true);
+	};
+
+	const closeSavePlaylistModal = () => {
+		setSavePlaylistModalOpened(false);
+		setPlaylistName('');
+		setSavePlaylistError(null);
+	};
+
+	const handleSavePlaylist = async () => {
+		const trimmedName = playlistName.trim();
+
+		if (!trimmedName) {
+			setSavePlaylistError('Please enter a playlist name');
+			return;
+		}
+
+		if (queue.length === 0) {
+			setSavePlaylistError('No episodes in queue to save');
+			return;
+		}
+
+		setIsSavingPlaylist(true);
+		setSavePlaylistError(null);
+
+		try {
+			// Create the playlist
+			const { playlist } = await createUserPlaylist(trimmedName);
+
+			// Add all episodes from the queue to the playlist
+			for (const item of queue) {
+				await addEpisodeToPlaylist(playlist.id, item.episodeId);
+			}
+
+			// Show success notification
+			notifications.show({
+				color: 'teal',
+				message: (
+					<Text size="xs" c="dimmed" lineClamp={2}>
+						Playlist <Text span c="var(--mantine-color-text)">{trimmedName}</Text> saved with {queue.length} episode{queue.length !== 1 ? 's' : ''}
+					</Text>
+				),
+				position: 'top-right',
+				autoClose: 2000
+			});
+
+			// Close the modal
+			closeSavePlaylistModal();
+		} catch (err) {
+			console.error('Failed to save playlist:', err);
+			setSavePlaylistError(err instanceof Error ? err.message : 'Failed to save playlist');
+		} finally {
+			setIsSavingPlaylist(false);
+		}
+	};
+
+	const handleClearQueue = async () => {
+		try {
+			await clearQueue();
+		} catch (err) {
+			console.error('Failed to clear queue:', err);
+		}
+	};
 
 	// Loading state
 	if (isLoading) {
@@ -302,6 +379,27 @@ function Podcasts() {
 							flexDirection: 'column'
 						}}
 					>
+						{queue.length > 0 && (
+							<Group grow pb="md" gap="sm">
+								<Button
+									variant='light'
+									color='cyan'
+									leftSection={<Save size={16} />}
+									onClick={openSavePlaylistModal}
+								>
+									Save Playlist
+								</Button>
+								<Button
+									variant='light'
+									color='pink'
+									leftSection={<X size={16} />}
+									onClick={handleClearQueue}
+								>
+									Clear Queue
+								</Button>
+							</Group>
+						)}
+
 						<Stack
 							gap="xs"
 							style={{
@@ -421,6 +519,54 @@ function Podcasts() {
 						onEpisodeOpen={handleEpisodeOpen}
 						onEpisodeClose={handleEpisodeClose}
 					/>
+
+					{/* Save Playlist Modal */}
+					<Modal
+						opened={savePlaylistModalOpened}
+						onClose={closeSavePlaylistModal}
+						title="Save Playlist"
+						withCloseButton={false}
+						centered
+						overlayProps={{
+							blur: 5,
+						}}
+					>
+						<Stack gap="sm">
+							<TextInput
+								placeholder="Enter a name for your playlist"
+								value={playlistName}
+								onChange={(e) => setPlaylistName(e.currentTarget.value)}
+								error={savePlaylistError}
+								disabled={isSavingPlaylist}
+								data-autofocus
+							/>
+
+							<Text size="xs" c="dimmed">
+								{queue.length} episode{queue.length !== 1 ? 's' : ''} will be added to this playlist
+							</Text>
+
+							<Group justify="flex-end" gap="sm" mt="sm" grow>
+								<Button
+									variant="light"
+									color='red'
+									onClick={closeSavePlaylistModal}
+									disabled={isSavingPlaylist}
+									leftSection={<X size={16} />}
+								>
+									Cancel
+								</Button>
+								<Button
+									variant='light'
+									color="cyan"
+									onClick={handleSavePlaylist}
+									loading={isSavingPlaylist}
+									leftSection={<Save size={16} />}
+								>
+									Save
+								</Button>
+							</Group>
+						</Stack>
+					</Modal>
 				</Container>
 			</ScrollArea>
 		</Tabs>
