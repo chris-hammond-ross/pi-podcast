@@ -93,7 +93,12 @@ function SortableQueueItem({ item, isCurrentEpisode }: SortableQueueItemProps) {
 				<div
 					{...attributes}
 					{...listeners}
-					style={{ cursor: 'grab', touchAction: 'none' }}
+					style={{
+						display: "flex",
+						alignItems: "center",
+						cursor: "grab",
+						touchAction: "none"
+					}}
 				>
 					<GripHorizontal size={20} />
 				</div>
