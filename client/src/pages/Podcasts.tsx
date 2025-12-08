@@ -19,7 +19,7 @@ import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
 import { getSubscriptionById, getAllDownloadedEpisodes } from '../services';
-import { secondsToHms, formatDate } from '../utilities';
+import { formatDuration } from '../utilities';
 import type { Subscription, DownloadedEpisodeRecord } from '../services';
 
 function Podcasts() {
@@ -347,7 +347,7 @@ function Podcasts() {
 															</Text>
 															{item.duration && (
 																<Text c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-																	• {secondsToHms(Number(item.duration))}
+																	• {formatDuration(item.duration)}
 																</Text>
 															)}
 														</Group>
