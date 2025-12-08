@@ -3,6 +3,8 @@ const { getDatabase } = require('../config/database');
 /**
  * Download Queue Service
  * Manages the download queue - adding, removing, updating status, querying
+ * 
+ * Note: Uses pub_date_unix (Unix timestamp) for reliable date sorting
  */
 class DownloadQueueService {
 	/**
@@ -131,19 +133,19 @@ class DownloadQueueService {
 
 	/**
 	 * Get next pending item to download
-	 * Downloads in order: highest priority first, then oldest episode (by pub_date) first
+	 * Downloads in order: highest priority first, then oldest episode (by pub_date_unix) first
 	 * @returns {Object|null} Queue item with episode data
 	 */
 	getNextPending() {
 		const db = getDatabase();
 		return db.prepare(`
 			SELECT dq.*, e.title as episode_title, e.audio_url, e.audio_length,
-				   e.subscription_id, e.pub_date, s.name as subscription_name
+				   e.subscription_id, e.pub_date, e.pub_date_unix, s.name as subscription_name
 			FROM download_queue dq
 			JOIN episodes e ON dq.episode_id = e.id
 			JOIN subscriptions s ON e.subscription_id = s.id
 			WHERE dq.status = 'pending'
-			ORDER BY dq.priority DESC, e.pub_date ASC
+			ORDER BY dq.priority DESC, e.pub_date_unix ASC
 			LIMIT 1
 		`).get() || null;
 	}
@@ -235,7 +237,7 @@ class DownloadQueueService {
 
 		const activeItems = db.prepare(`
 			SELECT dq.*, e.title as episode_title, e.audio_url, e.audio_length,
-				   e.subscription_id, e.pub_date, s.name as subscription_name
+				   e.subscription_id, e.pub_date, e.pub_date_unix, s.name as subscription_name
 			FROM download_queue dq
 			JOIN episodes e ON dq.episode_id = e.id
 			JOIN subscriptions s ON e.subscription_id = s.id
@@ -243,7 +245,7 @@ class DownloadQueueService {
 			ORDER BY 
 				CASE WHEN dq.status = 'downloading' THEN 0 ELSE 1 END,
 				dq.priority DESC, 
-				e.pub_date ASC
+				e.pub_date_unix ASC
 		`).all();
 
 		return {
@@ -255,7 +257,7 @@ class DownloadQueueService {
 
 	/**
 	 * Get all queue items with optional status filter
-	 * Orders by priority (highest first), then by episode pub_date (oldest first)
+	 * Orders by priority (highest first), then by episode pub_date_unix (oldest first)
 	 * This matches the actual download processing order
 	 * @param {string|null} status - Filter by status
 	 * @param {number} limit - Max items
@@ -266,7 +268,7 @@ class DownloadQueueService {
 		
 		let sql = `
 			SELECT dq.*, e.title as episode_title, e.audio_url, e.audio_length,
-				   e.subscription_id, e.pub_date, s.name as subscription_name
+				   e.subscription_id, e.pub_date, e.pub_date_unix, s.name as subscription_name
 			FROM download_queue dq
 			JOIN episodes e ON dq.episode_id = e.id
 			JOIN subscriptions s ON e.subscription_id = s.id
@@ -278,7 +280,7 @@ class DownloadQueueService {
 			params.push(status);
 		}
 
-		sql += ' ORDER BY dq.priority DESC, e.pub_date ASC LIMIT ?';
+		sql += ' ORDER BY dq.priority DESC, e.pub_date_unix ASC LIMIT ?';
 		params.push(limit);
 
 		return db.prepare(sql).all(...params);

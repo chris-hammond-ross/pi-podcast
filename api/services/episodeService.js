@@ -1,4 +1,4 @@
-const { getDatabase } = require('../config/database');
+const { getDatabase, parseRssDate } = require('../config/database');
 const subscriptionService = require('./subscriptionService');
 
 /**
@@ -29,9 +29,20 @@ class EpisodeService {
 			order = 'DESC'
 		} = options;
 
+		// Map pub_date to pub_date_unix for proper sorting
+		const columnMap = {
+			'pub_date': 'pub_date_unix'
+		};
+
 		// Validate orderBy to prevent SQL injection
-		const allowedColumns = ['pub_date', 'title', 'created_at', 'downloaded_at', 'last_played_at'];
-		const safeOrderBy = allowedColumns.includes(orderBy) ? orderBy : 'pub_date';
+		const allowedColumns = ['pub_date', 'pub_date_unix', 'title', 'created_at', 'downloaded_at', 'last_played_at'];
+		let safeOrderBy = allowedColumns.includes(orderBy) ? orderBy : 'pub_date_unix';
+		
+		// Use pub_date_unix when pub_date is requested for proper sorting
+		if (safeOrderBy === 'pub_date') {
+			safeOrderBy = 'pub_date_unix';
+		}
+		
 		const safeOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
 		let sql = 'SELECT * FROM episodes WHERE subscription_id = ?';
@@ -119,8 +130,14 @@ class EpisodeService {
 		} = options;
 
 		// Validate orderBy to prevent SQL injection
-		const allowedColumns = ['pub_date', 'title', 'created_at', 'downloaded_at', 'last_played_at'];
-		const safeOrderBy = allowedColumns.includes(orderBy) ? orderBy : 'pub_date';
+		const allowedColumns = ['pub_date', 'pub_date_unix', 'title', 'created_at', 'downloaded_at', 'last_played_at'];
+		let safeOrderBy = allowedColumns.includes(orderBy) ? orderBy : 'pub_date_unix';
+		
+		// Use pub_date_unix when pub_date is requested for proper sorting
+		if (safeOrderBy === 'pub_date') {
+			safeOrderBy = 'pub_date_unix';
+		}
+		
 		const safeOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
 		let sql = `
@@ -165,14 +182,14 @@ class EpisodeService {
 
 		const insertStmt = db.prepare(`
 			INSERT INTO episodes (
-				subscription_id, guid, title, description, pub_date,
+				subscription_id, guid, title, description, pub_date, pub_date_unix,
 				duration, audio_url, audio_type, audio_length, image_url, created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 
 		const updateStmt = db.prepare(`
 			UPDATE episodes SET
-				title = ?, description = ?, pub_date = ?, duration = ?,
+				title = ?, description = ?, pub_date = ?, pub_date_unix = ?, duration = ?,
 				audio_url = ?, audio_type = ?, audio_length = ?, image_url = ?
 			WHERE subscription_id = ? AND guid = ?
 		`);
@@ -184,6 +201,9 @@ class EpisodeService {
 				continue;
 			}
 
+			// Parse pub_date to Unix timestamp for reliable sorting
+			const pubDateUnix = parseRssDate(episode.pubDate);
+
 			const existing = this.getEpisodeByGuid(subscriptionId, episode.guid);
 
 			if (existing) {
@@ -192,6 +212,7 @@ class EpisodeService {
 					episode.title,
 					episode.description,
 					episode.pubDate,
+					pubDateUnix,
 					episode.duration,
 					episode.audioUrl,
 					episode.audioType,
@@ -209,6 +230,7 @@ class EpisodeService {
 					episode.title,
 					episode.description,
 					episode.pubDate,
+					pubDateUnix,
 					episode.duration,
 					episode.audioUrl,
 					episode.audioType,
