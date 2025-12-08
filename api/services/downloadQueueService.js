@@ -131,18 +131,19 @@ class DownloadQueueService {
 
 	/**
 	 * Get next pending item to download
+	 * Downloads in order: highest priority first, then oldest episode (by pub_date) first
 	 * @returns {Object|null} Queue item with episode data
 	 */
 	getNextPending() {
 		const db = getDatabase();
 		return db.prepare(`
 			SELECT dq.*, e.title as episode_title, e.audio_url, e.audio_length,
-				   e.subscription_id, s.name as subscription_name
+				   e.subscription_id, e.pub_date, s.name as subscription_name
 			FROM download_queue dq
 			JOIN episodes e ON dq.episode_id = e.id
 			JOIN subscriptions s ON e.subscription_id = s.id
 			WHERE dq.status = 'pending'
-			ORDER BY dq.priority DESC, dq.created_at ASC
+			ORDER BY dq.priority DESC, e.pub_date ASC
 			LIMIT 1
 		`).get() || null;
 	}
@@ -234,7 +235,7 @@ class DownloadQueueService {
 
 		const activeItems = db.prepare(`
 			SELECT dq.*, e.title as episode_title, e.audio_url, e.audio_length,
-				   e.subscription_id, s.name as subscription_name
+				   e.subscription_id, e.pub_date, s.name as subscription_name
 			FROM download_queue dq
 			JOIN episodes e ON dq.episode_id = e.id
 			JOIN subscriptions s ON e.subscription_id = s.id
@@ -242,7 +243,7 @@ class DownloadQueueService {
 			ORDER BY 
 				CASE WHEN dq.status = 'downloading' THEN 0 ELSE 1 END,
 				dq.priority DESC, 
-				dq.created_at ASC
+				e.pub_date ASC
 		`).all();
 
 		return {
@@ -263,7 +264,7 @@ class DownloadQueueService {
 		
 		let sql = `
 			SELECT dq.*, e.title as episode_title, e.audio_url, e.audio_length,
-				   e.subscription_id, s.name as subscription_name
+				   e.subscription_id, e.pub_date, s.name as subscription_name
 			FROM download_queue dq
 			JOIN episodes e ON dq.episode_id = e.id
 			JOIN subscriptions s ON e.subscription_id = s.id
