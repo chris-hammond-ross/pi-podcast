@@ -4,6 +4,28 @@ const path = require('path');
 let db = null;
 
 /**
+ * Parse RFC 822/2822 date string to Unix timestamp
+ * Handles various date formats commonly found in RSS feeds
+ * @param {string} dateStr - Date string from RSS feed
+ * @returns {number|null} Unix timestamp or null if parsing fails
+ */
+function parseRssDate(dateStr) {
+	if (!dateStr) return null;
+	
+	try {
+		// JavaScript's Date.parse can handle RFC 2822 dates
+		const timestamp = Date.parse(dateStr);
+		if (!isNaN(timestamp)) {
+			return Math.floor(timestamp / 1000);
+		}
+	} catch (e) {
+		// Fall through to return null
+	}
+	
+	return null;
+}
+
+/**
  * Create database tables if they don't exist
  * @param {Database} database - The database instance
  */
@@ -147,6 +169,38 @@ function runMigrations(database) {
 		console.log('[database] Added auto_download_limit column to subscriptions');
 	}
 
+	// === Episode migrations ===
+
+	// Add pub_date_unix column for proper date sorting
+	// This stores the pub_date as a Unix timestamp for reliable sorting
+	if (!columnExists('episodes', 'pub_date_unix')) {
+		database.exec('ALTER TABLE episodes ADD COLUMN pub_date_unix INTEGER');
+		console.log('[database] Added pub_date_unix column to episodes');
+		
+		// Migrate existing pub_date values to pub_date_unix
+		const episodes = database.prepare('SELECT id, pub_date FROM episodes WHERE pub_date IS NOT NULL').all();
+		const updateStmt = database.prepare('UPDATE episodes SET pub_date_unix = ? WHERE id = ?');
+		
+		let migrated = 0;
+		for (const episode of episodes) {
+			const unixTimestamp = parseRssDate(episode.pub_date);
+			if (unixTimestamp) {
+				updateStmt.run(unixTimestamp, episode.id);
+				migrated++;
+			}
+		}
+		
+		if (migrated > 0) {
+			console.log(`[database] Migrated ${migrated} episodes with pub_date_unix timestamps`);
+		}
+	}
+
+	// Create index for pub_date_unix for efficient sorting
+	if (!indexExists('idx_episodes_pub_date_unix')) {
+		database.exec('CREATE INDEX idx_episodes_pub_date_unix ON episodes(pub_date_unix)');
+		console.log('[database] Added index idx_episodes_pub_date_unix');
+	}
+
 	// === Episode playback migrations ===
 
 	// Add playback_position column for resume functionality
@@ -280,5 +334,6 @@ module.exports = {
 	initializeDatabase,
 	getDatabase,
 	closeDatabase,
-	getHealth
+	getHealth,
+	parseRssDate
 };

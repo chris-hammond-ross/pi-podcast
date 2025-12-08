@@ -10,6 +10,8 @@ const { PLAYLIST_DIR } = require('../config/constants');
  * Playlist types:
  * - 'auto': Auto-generated playlists linked to subscriptions, updated when episodes are downloaded/deleted
  * - 'user': User-created playlists with manually added episodes
+ * 
+ * Note: Uses pub_date_unix (Unix timestamp) for reliable date sorting
  */
 class PlaylistService {
 	constructor() {
@@ -179,7 +181,7 @@ class PlaylistService {
 
 	/**
 	 * Regenerate M3U file for an auto playlist
-	 * Gets all downloaded episodes for the subscription, sorted by pub_date DESC (newest first)
+	 * Gets all downloaded episodes for the subscription, sorted by pub_date_unix DESC (newest first)
 	 * This ensures the latest episodes appear at the top of the playlist
 	 * @param {number} subscriptionId - Subscription ID
 	 */
@@ -189,7 +191,7 @@ class PlaylistService {
 		// Ensure playlist exists
 		const playlist = this.getOrCreateAutoPlaylist(subscriptionId);
 
-		// Get all downloaded episodes for this subscription, sorted by pub_date DESC (newest first)
+		// Get all downloaded episodes for this subscription, sorted by pub_date_unix DESC (newest first)
 		// This ensures the latest episodes appear at the top of the playlist
 		const episodes = db.prepare(`
 			SELECT e.*, s.name as subscription_name
@@ -198,7 +200,7 @@ class PlaylistService {
 			WHERE e.subscription_id = ?
 			  AND e.downloaded_at IS NOT NULL
 			  AND e.file_path IS NOT NULL
-			ORDER BY e.pub_date DESC
+			ORDER BY e.pub_date_unix DESC
 		`).all(subscriptionId);
 
 		// Generate and write M3U
