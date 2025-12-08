@@ -1,6 +1,23 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
+	DndContext,
+	closestCenter,
+	KeyboardSensor,
+	PointerSensor,
+	useSensor,
+	useSensors,
+} from '@dnd-kit/core';
+import {
+	arrayMove,
+	SortableContext,
+	sortableKeyboardCoordinates,
+	useSortable,
+	verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+import {
 	Container,
 	Text,
 	SimpleGrid,
@@ -18,13 +35,72 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { AlertCircle, X, Save } from 'lucide-react';
+import { AlertCircle, X, Save, GripHorizontal } from 'lucide-react';
 import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
 import { getSubscriptionById, getAllDownloadedEpisodes, createUserPlaylist, addEpisodeToPlaylist } from '../services';
 import { formatDuration } from '../utilities';
 import type { Subscription, DownloadedEpisodeRecord } from '../services';
+
+interface SortableQueueItemProps {
+	item: typeof queue[number];
+	isCurrentEpisode: boolean;
+}
+
+function SortableQueueItem({ item, isCurrentEpisode }: SortableQueueItemProps) {
+	const {
+		attributes,
+		listeners,
+		setNodeRef,
+		transform,
+		transition,
+		isDragging,
+	} = useSortable({ id: item.episodeId });
+
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition,
+		opacity: isDragging ? 0.5 : 1,
+		cursor: 'default',
+	};
+
+	return (
+		<Card
+			ref={setNodeRef}
+			style={style}
+			p="sm"
+			bg={isCurrentEpisode ? "var(--mantine-color-teal-light)" : undefined}
+		>
+			<Group justify="space-between" align="center" wrap="nowrap">
+				<div style={{ flex: 1, minWidth: 0 }}>
+					<Group gap={4} wrap="nowrap">
+						<Text
+							size="sm"
+							c={isCurrentEpisode ? "var(--mantine-color-teal-light-color)" : undefined}
+							truncate
+							style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
+						>
+							{item.title}
+						</Text>
+						{item.duration && (
+							<Text c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+								• {formatDuration(item.duration)}
+							</Text>
+						)}
+					</Group>
+				</div>
+				<div
+					{...attributes}
+					{...listeners}
+					style={{ cursor: 'grab', touchAction: 'none' }}
+				>
+					<GripHorizontal size={20} />
+				</div>
+			</Group>
+		</Card>
+	);
+}
 
 function Podcasts() {
 	const { subscriptions, isLoading, error, refresh, getSubscriptionById: getSubscriptionByIdHook } = useSubscriptions();
@@ -241,6 +317,25 @@ function Podcasts() {
 		}
 	};
 
+	const sensors = useSensors(
+		useSensor(PointerSensor),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		})
+	);
+
+	const handleDragEnd = (event: DragEndEvent) => {
+		const { active, over } = event;
+
+		if (over && active.id !== over.id) {
+			const oldIndex = queue.findIndex(item => item.episodeId === active.id);
+			const newIndex = queue.findIndex(item => item.episodeId === over.id);
+			console.log('Reorder:', { oldIndex, newIndex, activeId: active.id, overId: over.id });
+			// Later: call your reorder function here
+			// const newQueue = arrayMove(queue, oldIndex, newIndex);
+		}
+	};
+
 	// Loading state
 	if (isLoading) {
 		return (
@@ -408,54 +503,24 @@ function Podcasts() {
 								flexDirection: 'column'
 							}}
 						>
-							{queue.length === 0 ? (
-								<Card
-									mb="-1rem"
-									style={{
-										flex: 1,
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center'
-									}}
+							<DndContext
+								sensors={sensors}
+								collisionDetection={closestCenter}
+								onDragEnd={handleDragEnd}
+							>
+								<SortableContext
+									items={queue.map(item => item.episodeId)}
+									strategy={verticalListSortingStrategy}
 								>
-									<Text c="dimmed">No episodes in the queue</Text>
-								</Card>
-							) : (
-								<>
-									{queue.map((item, index) => {
-										const isCurrentEpisode = currentEpisode?.id === item.episodeId;
-
-										return (
-											<Card
-												p="sm"
-												style={{ cursor: 'pointer' }}
-												key={index}
-												bg={isCurrentEpisode ? "var(--mantine-color-teal-light)" : undefined}
-											>
-												<Group justify="space-between" align="center" wrap="nowrap">
-													<div style={{ flex: 1, minWidth: 0 }}>
-														<Group gap={4} wrap="nowrap">
-															<Text
-																size="sm"
-																c={isCurrentEpisode ? "var(--mantine-color-teal-light-color)" : undefined}
-																truncate
-																style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
-															>
-																{item.title}
-															</Text>
-															{item.duration && (
-																<Text c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-																	• {formatDuration(item.duration)}
-																</Text>
-															)}
-														</Group>
-													</div>
-												</Group>
-											</Card>
-										);
-									})}
-								</>
-							)}
+									{queue.map((item) => (
+										<SortableQueueItem
+											key={item.episodeId}
+											item={item}
+											isCurrentEpisode={currentEpisode?.id === item.episodeId}
+										/>
+									))}
+								</SortableContext>
+							</DndContext>
 						</Stack>
 					</Tabs.Panel>
 					<Tabs.Panel
