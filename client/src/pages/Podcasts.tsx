@@ -488,26 +488,26 @@ function Podcasts() {
 							flexDirection: 'column'
 						}}
 					>
-						{queue.length > 0 && (
-							<Group grow pb="md" gap="sm">
-								<Button
-									variant='light'
-									color='cyan'
-									leftSection={<Save size={16} />}
-									onClick={openSavePlaylistModal}
-								>
-									Save Playlist
-								</Button>
-								<Button
-									variant='light'
-									color='pink'
-									leftSection={<X size={16} />}
-									onClick={handleClearQueue}
-								>
-									Clear Queue
-								</Button>
-							</Group>
-						)}
+						<Group grow pb="md" gap="sm">
+							<Button
+								variant='light'
+								color='cyan'
+								leftSection={<Save size={16} />}
+								onClick={openSavePlaylistModal}
+								disabled={queue.length === 0}
+							>
+								Save Playlist
+							</Button>
+							<Button
+								variant='light'
+								color='pink'
+								leftSection={<X size={16} />}
+								onClick={handleClearQueue}
+								disabled={queue.length === 0}
+							>
+								Clear Queue
+							</Button>
+						</Group>
 
 						<Stack
 							gap="xs"
