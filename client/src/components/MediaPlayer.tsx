@@ -158,7 +158,7 @@ function MediaPlayer() {
 	// Determine if we have an active playback session
 	const hasPlayback = currentEpisode !== null;
 	const showPlayButton = !isPlaying || isPaused;
-	
+
 	// Determine if queue operations make sense (need at least 2 items to shuffle/sort)
 	const canModifyQueue = queueLength >= 2;
 
@@ -243,6 +243,7 @@ function MediaPlayer() {
 				position: 'top-right',
 				autoClose: 3000
 			});
+			closeSortModal();
 		}
 	};
 
@@ -262,11 +263,11 @@ function MediaPlayer() {
 	const handleSort = async (sortBy: SortField, order: SortOrder) => {
 		try {
 			await sortQueue(sortBy, order);
-			
+
 			// Build user-friendly message
 			const fieldLabel = sortBy === 'pub_date' ? 'publish date' : 'download date';
 			const orderLabel = order === 'asc' ? 'oldest first' : 'newest first';
-			
+
 			notifications.show({
 				color: 'teal',
 				message: `Queue sorted by ${fieldLabel} (${orderLabel})`,
@@ -281,6 +282,7 @@ function MediaPlayer() {
 				position: 'top-right',
 				autoClose: 3000
 			});
+			closeSortModal();
 		}
 	};
 
