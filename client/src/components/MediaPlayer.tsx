@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
 	Container,
 	Group,
@@ -8,8 +8,11 @@ import {
 	Text,
 	Popover,
 	Box,
-	Loader
+	Loader,
+	Modal,
+	Button
 } from '@mantine/core';
+import { useLocation } from 'react-router-dom';
 import { useHover, useMove } from '@mantine/hooks';
 import {
 	Play,
@@ -18,9 +21,17 @@ import {
 	SkipForward,
 	Volume2,
 	Volume1,
-	VolumeX
+	VolumeX,
+	ArrowUpDown,
+	Shuffle,
+	ArrowDownWideNarrow,
+	ArrowUpNarrowWide,
+	CalendarArrowDown,
+	CalendarArrowUp
 } from 'lucide-react';
 import { useMediaPlayer } from '../contexts';
+
+type SortingTypes = "desc-pub" | "asc-pub" | "desc-download" | "asc-download";
 
 /**
  * Format seconds into MM:SS or HH:MM:SS format
@@ -114,6 +125,8 @@ function MediaPlayer() {
 	const [previousVolume, setPreviousVolume] = useState(100);
 	const [isSeeking, setIsSeeking] = useState(false);
 	const [seekValue, setSeekValue] = useState(0);
+	const [sortModalOpened, setSortModalOpened] = useState(false);
+	const location = useLocation();
 
 	const {
 		// State
@@ -190,6 +203,55 @@ function MediaPlayer() {
 			await setVolume(previousVolume > 0 ? previousVolume : 100);
 		}
 	}, [volume, previousVolume, setVolume]);
+
+	// Handle opening
+	const openSortModal = () => {
+		// Add history state for modal
+		window.history.pushState(null, '', location.pathname + location.search);
+		setSortModalOpened(true);
+	};
+
+	const closeSortModal = () => {
+		setSortModalOpened(false);
+		// Go back if we pushed a state
+		if (window.history.state !== null) {
+			window.history.back();
+		}
+	};
+
+	const handleShuffle = () => {
+		// TODO: add shuffle logic
+	};
+
+	// Handle browser back button to close modals
+	useEffect(() => {
+		const handlePopState = () => {
+			if (sortModalOpened) {
+				setSortModalOpened(false);
+			}
+		};
+
+		window.addEventListener('popstate', handlePopState);
+		return () => window.removeEventListener('popstate', handlePopState);
+	}, [sortModalOpened]);
+
+	const handleSort = (type: SortingTypes) => {
+		// TODO: add actual sorting logic
+		switch (type) {
+			case 'desc-pub':
+				console.log(type);
+				break;
+			case 'asc-pub':
+				console.log(type);
+				break;
+			case 'desc-download':
+				console.log(type);
+				break;
+			case 'asc-download':
+				console.log(type);
+				break;
+		}
+	};
 
 	// Get volume icon based on current volume level
 	const VolumeIcon = volume === 0 ? VolumeX : volume < 50 ? Volume1 : Volume2;
@@ -283,6 +345,18 @@ function MediaPlayer() {
 						<SkipForward size={18} />
 					</ActionIcon>
 
+					{/* Sort button */}
+					<ActionIcon
+						variant="light"
+						color="teal"
+						size="lg"
+						aria-label="Sort"
+						// disabled={(!hasNext && !hasPrevious) || !mpvConnected}
+						onClick={openSortModal}
+					>
+						<ArrowUpDown size={18} />
+					</ActionIcon>
+
 					{/* Volume control */}
 					<Popover
 						opened={volumeOpen}
@@ -331,6 +405,80 @@ function MediaPlayer() {
 					</Popover>
 				</Group>
 			</Stack>
+			{/* Actions Modal */}
+			<Modal
+				opened={sortModalOpened}
+				onClose={closeSortModal}
+				withCloseButton={false}
+				size="sm"
+				centered
+				overlayProps={{
+					blur: 5
+				}}
+			>
+				<Stack gap="md">
+					{/* Header */}
+					<Group justify="space-between" align="flex-start">
+						<div style={{ flex: 1, minWidth: 0 }}>
+							<Text fw={600} size="lg" lineClamp={2}>
+								Sorting Action
+							</Text>
+							<Text size="sm" c="dimmed" lineClamp={1} mt={4}>
+								Sort or shuffle the current queue
+							</Text>
+						</div>
+					</Group>
+
+					{/* Action Buttons */}
+					<Stack gap="xs">
+						<Button
+							variant="light"
+							color="teal"
+							leftSection={<Shuffle size={16} />}
+							onClick={handleShuffle}
+							fullWidth
+						>
+							Shuffle Queue
+						</Button>
+						<Button
+							variant="light"
+							color="violet"
+							leftSection={<ArrowDownWideNarrow size={16} />}
+							onClick={() => { handleSort('desc-pub'); }}
+							fullWidth
+						>
+							Published - Newest First
+						</Button>
+						<Button
+							variant="light"
+							color="violet"
+							leftSection={<ArrowUpNarrowWide size={16} />}
+							onClick={() => { handleSort('asc-pub'); }}
+							fullWidth
+						>
+							Published - Oldest First
+						</Button>
+						<Button
+							variant="light"
+							color="pink"
+							leftSection={<CalendarArrowDown size={16} />}
+							onClick={() => { handleSort('desc-download'); }}
+							fullWidth
+						>
+							Downloaded - Newest First
+						</Button>
+						<Button
+							variant="light"
+							color="pink"
+							leftSection={<CalendarArrowUp size={16} />}
+							onClick={() => { handleSort('asc-download'); }}
+							fullWidth
+						>
+							Downloaded - Oldest First
+						</Button>
+					</Stack>
+				</Stack>
+			</Modal>
 		</Container>
 	);
 }
