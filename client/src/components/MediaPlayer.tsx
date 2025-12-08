@@ -384,6 +384,7 @@ function MediaPlayer() {
 						color="teal"
 						size="lg"
 						aria-label="Sort"
+						disabled={!canModifyQueue || !mpvConnected}
 						onClick={openSortModal}
 					>
 						<ArrowUpDown size={18} />

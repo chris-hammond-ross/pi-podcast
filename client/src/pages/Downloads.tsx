@@ -422,7 +422,8 @@ function Downloads() {
 										<>
 											<Group justify="flex-end">
 												<Button
-													variant="subtle"
+													fullWidth
+													variant="light"
 													color="red"
 													size="xs"
 													onClick={cancelAll}
