@@ -57,11 +57,11 @@ function Playlists() {
 		>
 			<Container size="sm" style={{ width: '100%' }}>
 				<Tabs.List justify='flex-start'>
-					<Tabs.Tab value="playlists">
-						Saved Playlists
-					</Tabs.Tab>
 					<Tabs.Tab value="auto">
 						Auto Playlists
+					</Tabs.Tab>
+					<Tabs.Tab value="playlists">
+						Saved Playlists
 					</Tabs.Tab>
 				</Tabs.List>
 				<div
@@ -142,7 +142,7 @@ function Playlists() {
 													truncate
 													style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
 												>
-													{playlist.subscription_name}
+													{playlist.name}
 												</Text>
 												<Text c="dimmed" size="xs" ff="Roboto Mono" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
 													({playlist.episode_count})
