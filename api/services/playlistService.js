@@ -179,8 +179,8 @@ class PlaylistService {
 
 	/**
 	 * Regenerate M3U file for an auto playlist
-	 * Gets all downloaded episodes for the subscription, sorted by pub_date ASC (oldest first)
-	 * This ensures playback order is chronological - oldest episodes play first
+	 * Gets all downloaded episodes for the subscription, sorted by pub_date DESC (newest first)
+	 * This ensures the latest episodes appear at the top of the playlist
 	 * @param {number} subscriptionId - Subscription ID
 	 */
 	regenerateAutoPlaylist(subscriptionId) {
@@ -189,8 +189,8 @@ class PlaylistService {
 		// Ensure playlist exists
 		const playlist = this.getOrCreateAutoPlaylist(subscriptionId);
 
-		// Get all downloaded episodes for this subscription, sorted by pub_date ASC (oldest first)
-		// This ensures playback is in chronological order - start with oldest episode
+		// Get all downloaded episodes for this subscription, sorted by pub_date DESC (newest first)
+		// This ensures the latest episodes appear at the top of the playlist
 		const episodes = db.prepare(`
 			SELECT e.*, s.name as subscription_name
 			FROM episodes e
@@ -198,7 +198,7 @@ class PlaylistService {
 			WHERE e.subscription_id = ?
 			  AND e.downloaded_at IS NOT NULL
 			  AND e.file_path IS NOT NULL
-			ORDER BY e.pub_date ASC
+			ORDER BY e.pub_date DESC
 		`).all(subscriptionId);
 
 		// Generate and write M3U
