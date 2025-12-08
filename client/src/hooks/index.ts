@@ -1,6 +1,6 @@
 /**
  * Hooks index - export all custom hooks
- * 
+ *
  * In demo mode (VITE_DEMO_MODE=true), the hooks automatically return mock data
  * to simulate Bluetooth functionality without requiring a Raspberry Pi connection.
  */
@@ -22,6 +22,7 @@ export type { UseBluetoothWebSocketReturn } from './useBluetoothWebSocket';
 export type { UseBluetoothPowerReturn } from './useBluetoothPower';
 export type { UseSubscriptionsReturn } from './useSubscriptions';
 export type { UseAutoPlaylistsReturn } from './useAutoPlaylists';
+export type { UseUserPlaylistsReturn } from './useUserPlaylists';
 
 // Check demo mode
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
@@ -41,4 +42,5 @@ export { useBluetoothStatus } from './useBluetoothStatus';
 export { useApiHealth } from './useApiHealth';
 export { useSubscriptions } from './useSubscriptions';
 export { useAutoPlaylists } from './useAutoPlaylists';
+export { useUserPlaylists } from './useUserPlaylists';
 export const useBluetoothPower = useBluetoothPowerReal;

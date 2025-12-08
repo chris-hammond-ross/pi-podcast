@@ -11,11 +11,12 @@ import {
 	Center
 } from '@mantine/core';
 import { Play } from 'lucide-react';
-import { useAutoPlaylists } from '../hooks';
+import { useAutoPlaylists, useUserPlaylists } from '../hooks';
 import { getEpisodes, addMultipleToQueue, playEpisode } from '../services';
 
 function Playlists() {
-	const { playlists, isLoading, error } = useAutoPlaylists();
+	const { playlists: autoPlaylists, isLoading: autoIsLoading, error: autoError } = useAutoPlaylists();
+	const { playlists: userPlaylists, isLoading: userIsLoading, error: userError } = useUserPlaylists();
 
 	const handlePlayPlaylist = async (subscriptionId: number) => {
 		try {
@@ -101,17 +102,66 @@ function Playlists() {
 							flexDirection: 'column'
 						}}
 					>
-						<Card
-							mb="-1rem"
-							style={{
-								flex: 1,
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center'
-							}}
-						>
-							<Text c="dimmed">Saved playlists coming soon!</Text>
-						</Card>
+						{userIsLoading ? (
+							<Center style={{ flex: 1 }}>
+								<Loader size="sm" />
+							</Center>
+						) : userError ? (
+							<Card
+								style={{
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center'
+								}}
+							>
+								<Text c="red">{userError}</Text>
+							</Card>
+						) : userPlaylists.length === 0 ? (
+							<Card
+								mb="-1rem"
+								style={{
+									flex: 1,
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center'
+								}}
+							>
+								<Text c="dimmed">No saved playlists</Text>
+							</Card>
+						) : (
+							<Stack gap="sm">
+								{userPlaylists.map((playlist) => (
+									<Card
+										p="sm"
+										key={playlist.id}
+									>
+										<Group justify="space-between" align="center" wrap="nowrap">
+											<Group gap={4} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+												<Text
+													size="sm"
+													truncate
+													style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
+												>
+													{playlist.subscription_name}
+												</Text>
+												<Text c="dimmed" size="xs" ff="Roboto Mono" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+													({playlist.episode_count})
+												</Text>
+											</Group>
+											<ActionIcon
+												variant="light"
+												color="cyan"
+												onClick={() => handlePlayPlaylist(playlist.subscription_id)}
+												title="Play Playlist"
+												disabled={playlist.episode_count === 0}
+											>
+												<Play size={16} />
+											</ActionIcon>
+										</Group>
+									</Card>
+								))}
+							</Stack>
+						)}
 					</Tabs.Panel>
 					<Tabs.Panel
 						pb="md"
@@ -122,11 +172,11 @@ function Playlists() {
 							flexDirection: 'column'
 						}}
 					>
-						{isLoading ? (
+						{autoIsLoading ? (
 							<Center style={{ flex: 1 }}>
 								<Loader size="sm" />
 							</Center>
-						) : error ? (
+						) : autoError ? (
 							<Card
 								style={{
 									display: 'flex',
@@ -134,9 +184,9 @@ function Playlists() {
 									justifyContent: 'center'
 								}}
 							>
-								<Text c="red">{error}</Text>
+								<Text c="red">{autoError}</Text>
 							</Card>
-						) : playlists.length === 0 ? (
+						) : autoPlaylists.length === 0 ? (
 							<Card
 								mb="-1rem"
 								style={{
@@ -150,7 +200,7 @@ function Playlists() {
 							</Card>
 						) : (
 							<Stack gap="sm">
-								{playlists.map((playlist) => (
+								{autoPlaylists.map((playlist) => (
 									<Card
 										p="sm"
 										key={playlist.id}

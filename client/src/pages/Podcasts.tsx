@@ -220,7 +220,7 @@ function Podcasts() {
 					</Text>
 				),
 				position: 'top-right',
-				autoClose: 2000
+				autoClose: 1500
 			});
 
 			// Close the modal
