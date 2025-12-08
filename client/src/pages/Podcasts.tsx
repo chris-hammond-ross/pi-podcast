@@ -9,7 +9,6 @@ import {
 	useSensors,
 } from '@dnd-kit/core';
 import {
-	arrayMove,
 	SortableContext,
 	sortableKeyboardCoordinates,
 	useSortable,
@@ -131,7 +130,7 @@ function Podcasts() {
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const { queue, currentEpisode, clearQueue } = useMediaPlayer();
+	const { queue, currentEpisode, clearQueue, moveInQueue } = useMediaPlayer();
 
 	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
@@ -329,15 +328,25 @@ function Podcasts() {
 		})
 	);
 
-	const handleDragEnd = (event: DragEndEvent) => {
+	const handleDragEnd = async (event: DragEndEvent) => {
 		const { active, over } = event;
 
 		if (over && active.id !== over.id) {
 			const oldIndex = queue.findIndex(item => item.episodeId === active.id);
 			const newIndex = queue.findIndex(item => item.episodeId === over.id);
-			console.log('Reorder:', { oldIndex, newIndex, activeId: active.id, overId: over.id });
-			// Later: call your reorder function here
-			// const newQueue = arrayMove(queue, oldIndex, newIndex);
+
+			if (oldIndex !== -1 && newIndex !== -1) {
+				try {
+					await moveInQueue(oldIndex, newIndex);
+				} catch (err) {
+					notifications.show({
+						color: 'red',
+						message: err instanceof Error ? err.message : 'Failed to shuffle queue',
+						position: 'top-right',
+						autoClose: 3000
+					});
+				}
+			}
 		}
 	};
 
