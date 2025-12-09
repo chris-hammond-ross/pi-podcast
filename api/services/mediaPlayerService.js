@@ -718,9 +718,10 @@ class MediaPlayerService extends EventEmitter {
 	/**
 	 * Add an episode to the end of the queue
 	 * @param {number} episodeId - Episode ID to add
+	 * @param {boolean} autoPlay - Whether to auto-start playback if queue was empty (default: false)
 	 * @returns {Promise<Object>} Result with queue info
 	 */
-	async addToQueue(episodeId) {
+	async addToQueue(episodeId, autoPlay = false) {
 		const episode = this.validateEpisodeForQueue(episodeId);
 
 		// Check if already in queue
@@ -738,13 +739,13 @@ class MediaPlayerService extends EventEmitter {
 		});
 
 		// Add to MPV playlist
-		// If nothing is playing, use 'append-play' to start playback
-		const isIdle = this.queue.length === 1 && !this.isPlaying;
-		const mode = isIdle ? 'append-play' : 'append';
+		// Only use 'append-play' if autoPlay is true and queue was empty
+		const wasEmpty = this.queue.length === 1 && !this.isPlaying;
+		const mode = (autoPlay && wasEmpty) ? 'append-play' : 'append';
 		
 		await this.sendCommand(['loadfile', episode.file_path, mode]);
 
-		if (isIdle) {
+		if (autoPlay && wasEmpty) {
 			this.queuePosition = 0;
 		}
 
@@ -760,15 +761,16 @@ class MediaPlayerService extends EventEmitter {
 	/**
 	 * Add multiple episodes to the queue
 	 * @param {number[]} episodeIds - Array of episode IDs to add
+	 * @param {boolean} autoPlay - Whether to auto-start playback if queue was empty (default: false)
 	 * @returns {Promise<Object>} Result with queue info
 	 */
-	async addMultipleToQueue(episodeIds) {
+	async addMultipleToQueue(episodeIds, autoPlay = false) {
 		const added = [];
 		const errors = [];
 
 		for (const episodeId of episodeIds) {
 			try {
-				await this.addToQueue(episodeId);
+				await this.addToQueue(episodeId, autoPlay);
 				added.push(episodeId);
 			} catch (err) {
 				errors.push({ episodeId, error: err.message });
@@ -832,7 +834,7 @@ class MediaPlayerService extends EventEmitter {
 	}
 
 	/**
-	 * Jump to a specific position in the queue
+	 * Jump to a specific position in the queue and start playing
 	 * @param {number} index - Queue index to play
 	 * @returns {Promise<Object>} Result
 	 */
@@ -846,8 +848,17 @@ class MediaPlayerService extends EventEmitter {
 			await this.saveCurrentPosition();
 		}
 
+		console.log(`[media] Playing queue index ${index}`);
+
 		// Set MPV playlist position
 		await this.setProperty('playlist-pos', index);
+
+		// Wait a moment for MPV to process the playlist change
+		await new Promise(resolve => setTimeout(resolve, 300));
+
+		// Ensure playback is not paused - this is critical for starting playback
+		// when switching playlists or when MPV was in an idle/paused state
+		await this.setProperty('pause', false);
 
 		return { success: true };
 	}
