@@ -527,7 +527,7 @@ function Podcasts() {
 						>
 							<Container
 								size="sm"
-								py="md"
+								pb="md"
 								px={0}
 								style={{
 									display: 'flex',
