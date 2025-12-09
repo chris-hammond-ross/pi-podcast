@@ -120,7 +120,7 @@ function TrashDropZone() {
 	return (
 		<Group
 			ref={setNodeRef}
-			mt="md"
+			my="md"
 			h={36}
 			justify='center'
 			style={{
@@ -496,7 +496,7 @@ function Podcasts() {
 						onDragCancel={handleDragCancel}
 					>
 						{!isDragging ? (
-							<Group grow pt="md" gap="sm">
+							<Group grow py="md" gap="sm">
 								<Button
 									variant='light'
 									color='cyan'
