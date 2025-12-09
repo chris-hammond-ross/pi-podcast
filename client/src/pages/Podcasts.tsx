@@ -527,11 +527,12 @@ function Podcasts() {
 						>
 							<Container
 								size="sm"
-								py={0}
+								py="md"
+								px={0}
 								style={{
 									display: 'flex',
 									flexDirection: 'column',
-									height: 'var(--main-content-with-tabs-height)'
+									height: 'var(--main-content-with-tabs-buttons-height)'
 								}}
 							>
 								<Tabs.Panel
