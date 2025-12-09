@@ -189,9 +189,9 @@ class EpisodeService {
 
 		const updateStmt = db.prepare(`
 			UPDATE episodes SET
-				title = ?, description = ?, pub_date = ?, pub_date_unix = ?, duration = ?,
+				title = ?, description = ?, pub_date = ?, pub_date_unix = ?,
 				audio_url = ?, audio_type = ?, audio_length = ?, image_url = ?
-			WHERE subscription_id = ? AND guid = ?
+			WHERE subscription_id = ? AND guid = ? AND downloaded_at IS NULL
 		`);
 
 		// Process each episode from feed
@@ -207,13 +207,13 @@ class EpisodeService {
 			const existing = this.getEpisodeByGuid(subscriptionId, episode.guid);
 
 			if (existing) {
-				// Update existing episode (but preserve download info)
+				// Update existing episode (but preserve download info and duration if downloaded)
+				// Only update duration if the episode hasn't been downloaded yet
 				updateStmt.run(
 					episode.title,
 					episode.description,
 					episode.pubDate,
 					pubDateUnix,
-					episode.duration,
 					episode.audioUrl,
 					episode.audioType,
 					episode.audioLength ? parseInt(episode.audioLength) : null,
@@ -263,17 +263,29 @@ class EpisodeService {
 	 * @param {number} episodeId - Episode ID
 	 * @param {string} filePath - Path to downloaded file
 	 * @param {number} fileSize - Size of file in bytes
+	 * @param {string|null} duration - Duration in seconds (as string) extracted from the file, or null to keep existing
 	 */
-	markAsDownloaded(episodeId, filePath, fileSize) {
+	markAsDownloaded(episodeId, filePath, fileSize, duration = null) {
 		const db = getDatabase();
 		const now = Math.floor(Date.now() / 1000);
 		
-		db.prepare(`
-			UPDATE episodes SET file_path = ?, file_size = ?, downloaded_at = ?
-			WHERE id = ?
-		`).run(filePath, fileSize, now, episodeId);
+		if (duration !== null) {
+			// Update with new duration from the actual file
+			db.prepare(`
+				UPDATE episodes SET file_path = ?, file_size = ?, downloaded_at = ?, duration = ?
+				WHERE id = ?
+			`).run(filePath, fileSize, now, duration, episodeId);
+			
+			console.log(`[episode] Marked episode ${episodeId} as downloaded (duration: ${duration}s)`);
+		} else {
+			// Keep existing duration
+			db.prepare(`
+				UPDATE episodes SET file_path = ?, file_size = ?, downloaded_at = ?
+				WHERE id = ?
+			`).run(filePath, fileSize, now, episodeId);
 
-		console.log(`[episode] Marked episode ${episodeId} as downloaded`);
+			console.log(`[episode] Marked episode ${episodeId} as downloaded`);
+		}
 	}
 
 	/**

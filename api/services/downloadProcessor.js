@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const { spawn } = require('child_process');
 const { EventEmitter } = require('events');
 const downloadQueueService = require('./downloadQueueService');
 const episodeService = require('./episodeService');
@@ -97,6 +98,71 @@ class DownloadProcessor extends EventEmitter {
 			clearTimeout(this.pollTimeoutId);
 			this.pollTimeoutId = null;
 		}
+	}
+
+	/**
+	 * Extract duration from an audio file using ffprobe
+	 * @param {string} filePath - Path to the audio file
+	 * @returns {Promise<string|null>} Duration in seconds as a string, or null if extraction fails
+	 */
+	_extractDuration(filePath) {
+		return new Promise((resolve) => {
+			// Use ffprobe to get duration in seconds
+			// -v error: suppress warnings
+			// -show_entries format=duration: only show duration
+			// -of default=noprint_wrappers=1:nokey=1: output just the value
+			const ffprobe = spawn('ffprobe', [
+				'-v', 'error',
+				'-show_entries', 'format=duration',
+				'-of', 'default=noprint_wrappers=1:nokey=1',
+				filePath
+			]);
+
+			let stdout = '';
+			let stderr = '';
+
+			ffprobe.stdout.on('data', (data) => {
+				stdout += data.toString();
+			});
+
+			ffprobe.stderr.on('data', (data) => {
+				stderr += data.toString();
+			});
+
+			ffprobe.on('close', (code) => {
+				if (code === 0 && stdout.trim()) {
+					// Parse the duration (comes as floating point seconds)
+					const durationFloat = parseFloat(stdout.trim());
+					if (!isNaN(durationFloat)) {
+						// Round to whole seconds and return as string
+						const durationSeconds = Math.round(durationFloat);
+						console.log(`[download] Extracted duration: ${durationSeconds}s from ${path.basename(filePath)}`);
+						resolve(String(durationSeconds));
+						return;
+					}
+				}
+				
+				// Log error but don't fail the download
+				if (stderr) {
+					console.warn(`[download] ffprobe stderr: ${stderr}`);
+				}
+				console.warn(`[download] Could not extract duration from ${path.basename(filePath)} (exit code: ${code})`);
+				resolve(null);
+			});
+
+			ffprobe.on('error', (err) => {
+				// ffprobe might not be installed - log and continue
+				console.warn(`[download] ffprobe not available: ${err.message}`);
+				resolve(null);
+			});
+
+			// Timeout after 10 seconds
+			setTimeout(() => {
+				ffprobe.kill();
+				console.warn(`[download] ffprobe timed out for ${path.basename(filePath)}`);
+				resolve(null);
+			}, 10000);
+		});
 	}
 
 	/**
@@ -239,8 +305,11 @@ class DownloadProcessor extends EventEmitter {
 
 			fs.renameSync(tempPath, finalPath);
 
+			// Extract actual duration from the downloaded file
+			const duration = await this._extractDuration(finalPath);
+
 			downloadQueueService.updateStatus(queueItem.id, 'completed');
-			episodeService.markAsDownloaded(queueItem.episode_id, finalPath, fileSize);
+			episodeService.markAsDownloaded(queueItem.episode_id, finalPath, fileSize, duration);
 
 			console.log(`[download] Completed: ${queueItem.episode_title} (${fileSize} bytes)`);
 
@@ -249,7 +318,8 @@ class DownloadProcessor extends EventEmitter {
 				episodeId: queueItem.episode_id,
 				title: queueItem.episode_title,
 				filePath: finalPath,
-				fileSize
+				fileSize,
+				duration
 			});
 
 			// Update auto playlist for this subscription
