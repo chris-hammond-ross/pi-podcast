@@ -335,7 +335,7 @@ remove_install_directory() {
     if [ -d "$INSTALL_DIR" ]; then
         # Remove the entire installation directory including database and downloads
         rm -rf "$INSTALL_DIR"
-        
+
         # Verify removal
         if [ -d "$INSTALL_DIR" ]; then
             print_error "Failed to remove installation directory: $INSTALL_DIR"
@@ -398,9 +398,10 @@ print_uninstall_summary() {
     echo "  - pulseaudio / pulseaudio-module-bluetooth"
     echo "  - mpv"
     echo "  - avahi-daemon"
+    echo "  - ffmpeg"
     echo ""
     echo "To remove these packages manually (if not needed by other applications):"
-    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3 pulseaudio pulseaudio-module-bluetooth mpv avahi-daemon${NC}"
+    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3 pulseaudio pulseaudio-module-bluetooth mpv avahi-daemon ffmpeg${NC}"
     echo ""
 }
 

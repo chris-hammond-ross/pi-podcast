@@ -207,7 +207,8 @@ install_dependencies() {
         sqlite3 \
         pulseaudio \
         pulseaudio-module-bluetooth \
-        mpv
+        mpv \
+        ffmpeg
 
     print_success "Dependencies installed (including MPV)"
 
@@ -227,7 +228,7 @@ disable_user_pulseaudio() {
 
     # Stop and disable PulseAudio for all logged-in users to prevent conflicts
     # The pi-podcast service will run its own PulseAudio instance
-    
+
     # Kill any running PulseAudio instances
     pkill -9 pulseaudio 2>/dev/null || true
     sleep 1
@@ -267,38 +268,38 @@ EOF
     # Stop, disable, and mask PulseAudio for all currently logged-in users
     # This handles users who already have PulseAudio running in their session
     print_info "Disabling PulseAudio for logged-in users..."
-    
+
     # Get list of logged-in users (excluding root and system users)
     local logged_in_users=$(who | awk '{print $1}' | sort -u)
-    
+
     for username in $logged_in_users; do
         # Skip if user doesn't exist or is a system user (UID < 1000)
         local uid=$(id -u "$username" 2>/dev/null) || continue
         if [ "$uid" -lt 1000 ]; then
             continue
         fi
-        
+
         print_info "Disabling PulseAudio for user: $username"
-        
+
         # Get the user's XDG_RUNTIME_DIR
         local user_runtime_dir="/run/user/$uid"
-        
+
         if [ -d "$user_runtime_dir" ]; then
             # Stop PulseAudio services for this user
             sudo -u "$username" XDG_RUNTIME_DIR="$user_runtime_dir" \
                 systemctl --user stop pulseaudio.socket pulseaudio.service 2>/dev/null || true
-            
+
             # Disable PulseAudio services for this user
             sudo -u "$username" XDG_RUNTIME_DIR="$user_runtime_dir" \
                 systemctl --user disable pulseaudio.socket pulseaudio.service 2>/dev/null || true
-            
+
             # Mask PulseAudio services to prevent them from starting
             sudo -u "$username" XDG_RUNTIME_DIR="$user_runtime_dir" \
                 systemctl --user mask pulseaudio.socket pulseaudio.service 2>/dev/null || true
-            
+
             print_success "Disabled PulseAudio for user: $username"
         fi
-        
+
         # Kill any remaining PulseAudio processes for this user
         pkill -u "$username" pulseaudio 2>/dev/null || true
     done
@@ -430,7 +431,7 @@ EOF
         sleep 3
         if systemctl is-active --quiet pulseaudio-pi-podcast; then
             print_success "PulseAudio service started for $SERVICE_USER"
-            
+
             # Verify socket was created
             if [ -S "$PULSE_SOCKET" ]; then
                 print_success "PulseAudio socket created at $PULSE_SOCKET"
