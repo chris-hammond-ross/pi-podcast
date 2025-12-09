@@ -440,6 +440,7 @@ class MediaPlayerService extends EventEmitter {
 				console.log(`[media] Now playing: ${this.currentEpisode.title} (queue position ${pos})`);
 				
 				this.broadcastStatus();
+				this.broadcastQueue();
 				this.broadcast({
 					type: 'media:track-changed',
 					episode: {
@@ -843,12 +844,23 @@ class MediaPlayerService extends EventEmitter {
 			throw new Error('Invalid queue index');
 		}
 
-		// Save current position
+		// Save current position of previous episode
 		if (this.currentEpisode) {
 			await this.saveCurrentPosition();
 		}
 
 		console.log(`[media] Playing queue index ${index}`);
+
+		// Get the episode we're about to play
+		const queueItem = this.queue[index];
+		const episode = queueItem.episode;
+
+		// Update internal state immediately (don't wait for MPV events)
+		this.queuePosition = index;
+		this.currentEpisode = episode;
+		this.position = 0;
+		this.isPlaying = true;
+		this.isPaused = false;
 
 		// Set MPV playlist position
 		await this.setProperty('playlist-pos', index);
@@ -859,6 +871,37 @@ class MediaPlayerService extends EventEmitter {
 		// Ensure playback is not paused - this is critical for starting playback
 		// when switching playlists or when MPV was in an idle/paused state
 		await this.setProperty('pause', false);
+
+		// Get duration
+		try {
+			this.duration = await this.getProperty('duration') || 0;
+		} catch (err) {
+			console.warn('[media] Could not get duration:', err.message);
+		}
+
+		// Resume from saved position if available
+		if (episode.playback_position > 0 && !episode.playback_completed) {
+			console.log(`[media] Resuming from position: ${episode.playback_position}s`);
+			await this.seek(episode.playback_position);
+		}
+
+		// Start position save timer
+		this.startPositionSaveTimer();
+
+		// Broadcast all updates to clients
+		this.broadcastStatus();
+		this.broadcastQueue();
+		this.broadcast({
+			type: 'media:track-changed',
+			episode: {
+				id: episode.id,
+				title: episode.title,
+				subscription_id: episode.subscription_id,
+				duration: this.duration
+			},
+			queuePosition: this.queuePosition,
+			queueLength: this.queue.length
+		});
 
 		return { success: true };
 	}
