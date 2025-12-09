@@ -7,6 +7,10 @@ import {
 	PointerSensor,
 	useSensor,
 	useSensors,
+	useDroppable,
+	DragOverlay,
+	rectIntersection,
+	pointerWithin,
 } from '@dnd-kit/core';
 import {
 	SortableContext,
@@ -14,7 +18,7 @@ import {
 	useSortable,
 	verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import type { DragEndEvent } from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent, UniqueIdentifier } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import {
 	Container,
@@ -34,13 +38,15 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { AlertCircle, X, Save, GripHorizontal } from 'lucide-react';
+import { AlertCircle, X, Save, GripHorizontal, Trash } from 'lucide-react';
 import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
 import { getSubscriptionById, getAllDownloadedEpisodes, createUserPlaylist, addEpisodeToPlaylist } from '../services';
 import { formatDuration } from '../utilities';
 import type { Subscription, DownloadedEpisodeRecord } from '../services';
+
+const TRASH_DROP_ID = 'trash-drop-zone';
 
 interface SortableQueueItemProps {
 	item: typeof queue[number];
@@ -106,12 +112,41 @@ function SortableQueueItem({ item, isCurrentEpisode }: SortableQueueItemProps) {
 	);
 }
 
+function TrashDropZone() {
+	const { isOver, setNodeRef } = useDroppable({
+		id: TRASH_DROP_ID,
+	});
+
+	return (
+		<Group
+			ref={setNodeRef}
+			mt="md"
+			p="md"
+			justify='center'
+			style={{
+				border: `2px dashed ${isOver ? 'var(--mantine-color-red-filled)' : 'var(--mantine-color-red-text)'}`,
+				borderRadius: 'var(--mantine-radius-md)',
+				backgroundColor: isOver ? 'var(--mantine-color-red-light)' : 'transparent',
+				transition: 'all 150ms ease',
+			}}
+		>
+			<Trash size={20} color={isOver ? 'var(--mantine-color-red-filled)' : 'var(--mantine-color-red-text)'} />
+			<Text c={isOver ? 'var(--mantine-color-red-filled)' : 'red'} fw={isOver ? 600 : 400}>
+				Drop here to remove episode
+			</Text>
+		</Group>
+	);
+}
+
 function Podcasts() {
 	const { subscriptions, isLoading, error, refresh, getSubscriptionById: getSubscriptionByIdHook } = useSubscriptions();
 	const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
 	const [modalOpened, setModalOpened] = useState(false);
 	const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
 	const [currentEpisodeId, setCurrentEpisodeId] = useState<number | null>(null);
+	const [activeTab, setActiveTab] = useState<string | null>('podcasts');
+	const [isDragging, setIsDragging] = useState(false);
+	const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null);
 	const isMobile = useMediaQuery('(max-width: 768px)');
 
 	// Downloaded episodes state
@@ -130,7 +165,7 @@ function Podcasts() {
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const { queue, currentEpisode, clearQueue, moveInQueue } = useMediaPlayer();
+	const { queue, currentEpisode, clearQueue, moveInQueue, removeFromQueue } = useMediaPlayer();
 
 	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
@@ -328,10 +363,39 @@ function Podcasts() {
 		})
 	);
 
+	const handleDragStart = (event: DragStartEvent) => {
+		setIsDragging(true);
+		setActiveDragId(event.active.id);
+	};
+
 	const handleDragEnd = async (event: DragEndEvent) => {
 		const { active, over } = event;
 
-		if (over && active.id !== over.id) {
+		setIsDragging(false);
+		setActiveDragId(null);
+
+		if (!over) return;
+
+		// Check if dropped on trash zone
+		if (over.id === TRASH_DROP_ID) {
+			const index = queue.findIndex(item => item.episodeId === active.id);
+			if (index !== -1) {
+				try {
+					await removeFromQueue(index);
+				} catch (err) {
+					notifications.show({
+						color: 'red',
+						message: err instanceof Error ? err.message : 'Failed to remove from queue',
+						position: 'top-right',
+						autoClose: 3000
+					});
+				}
+			}
+			return;
+		}
+
+		// Handle reordering within the queue
+		if (active.id !== over.id) {
 			const oldIndex = queue.findIndex(item => item.episodeId === active.id);
 			const newIndex = queue.findIndex(item => item.episodeId === over.id);
 
@@ -341,7 +405,7 @@ function Podcasts() {
 				} catch (err) {
 					notifications.show({
 						color: 'red',
-						message: err instanceof Error ? err.message : 'Failed to shuffle queue',
+						message: err instanceof Error ? err.message : 'Failed to reorder queue',
 						position: 'top-right',
 						autoClose: 3000
 					});
@@ -349,6 +413,14 @@ function Podcasts() {
 			}
 		}
 	};
+
+	const handleDragCancel = () => {
+		setIsDragging(false);
+		setActiveDragId(null);
+	};
+
+	// Get the currently dragged item for the overlay
+	const activeDragItem = activeDragId ? queue.find(item => item.episodeId === activeDragId) : null;
 
 	// Loading state
 	if (isLoading) {
@@ -382,7 +454,8 @@ function Podcasts() {
 
 	return (
 		<Tabs
-			defaultValue="podcasts"
+			value={activeTab}
+			onChange={setActiveTab}
 			style={{
 				display: 'flex',
 				flexDirection: 'column',
@@ -414,240 +487,295 @@ function Podcasts() {
 				>
 					&nbsp;
 				</div>
-			</Container>
-
-			<ScrollArea
-				style={{ flex: 1 }}
-				scrollbars="y"
-				scrollbarSize={4}
-			>
-				<Container
-					size="sm"
-					py="md"
-					style={{
-						display: 'flex',
-						flexDirection: 'column',
-						height: 'var(--main-content-with-tabs-height)'
-					}}
-				>
-					<Tabs.Panel
-						pb="md"
-						value="podcasts"
-						style={{
-							flex: 1,
-							display: 'flex',
-							flexDirection: 'column'
-						}}
+				{activeTab === 'queue' && (
+					<DndContext
+						sensors={sensors}
+						collisionDetection={pointerWithin}
+						onDragStart={handleDragStart}
+						onDragEnd={handleDragEnd}
+						onDragCancel={handleDragCancel}
 					>
-						{subscriptions.length === 0 ? (
-							<Card
-								mb="-1rem"
+						{!isDragging ? (
+							<Group grow pt="md" gap="sm">
+								<Button
+									variant='light'
+									color='cyan'
+									leftSection={<Save size={16} />}
+									onClick={openSavePlaylistModal}
+									disabled={queue.length === 0}
+								>
+									Save Playlist
+								</Button>
+								<Button
+									variant='light'
+									color='pink'
+									leftSection={<X size={16} />}
+									onClick={handleClearQueue}
+									disabled={queue.length === 0}
+								>
+									Clear Queue
+								</Button>
+							</Group>
+						) : (
+							<TrashDropZone />
+						)}
+
+						<ScrollArea
+							style={{ flex: 1 }}
+							scrollbars="y"
+							scrollbarSize={4}
+						>
+							<Container
+								size="sm"
+								py="md"
 								style={{
-									flex: 1,
 									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center'
+									flexDirection: 'column',
+									height: 'var(--main-content-with-tabs-height)'
 								}}
 							>
-								<Text c="dimmed">No podcast subscriptions</Text>
-							</Card>
-						) : (
-							<>
-								<PodcastResults
-									podcasts={subscriptions}
-									onPodcastClick={handlePodcastClick}
-								/>
-
-								{/* Loading state when fetching subscription directly from URL */}
-								{isLoadingSubscription && !selectedSubscription && (
-									<Group
-										justify="center"
-										align="center"
+								<Tabs.Panel
+									pb="md"
+									value="queue"
+									style={{
+										flex: 1,
+										display: 'flex',
+										flexDirection: 'column'
+									}}
+								>
+									<Stack
+										gap="xs"
 										style={{
-											position: 'fixed',
-											top: 0,
-											left: 0,
-											right: 0,
-											bottom: 0,
-											backgroundColor: 'rgba(0, 0, 0, 0.5)',
-											zIndex: 1000
+											flex: 1,
+											display: 'flex',
+											flexDirection: 'column'
 										}}
 									>
-										<Loader size="lg" />
+										<SortableContext
+											items={queue.map(item => item.episodeId)}
+											strategy={verticalListSortingStrategy}
+										>
+											{queue.map((item) => (
+												<SortableQueueItem
+													key={item.episodeId}
+													item={item}
+													isCurrentEpisode={currentEpisode?.id === item.episodeId}
+												/>
+											))}
+										</SortableContext>
+									</Stack>
+								</Tabs.Panel>
+							</Container>
+						</ScrollArea>
+
+						<DragOverlay>
+							{activeDragItem ? (
+								<Card p="sm" shadow="lg" style={{ cursor: 'grabbing' }}>
+									<Group justify="space-between" align="center" wrap="nowrap">
+										<div style={{ flex: 1, minWidth: 0 }}>
+											<Group gap={4} wrap="nowrap">
+												<Text
+													size="sm"
+													truncate
+													style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
+												>
+													{activeDragItem.title}
+												</Text>
+												{activeDragItem.duration && (
+													<Text c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+														• {formatDuration(activeDragItem.duration)}
+													</Text>
+												)}
+											</Group>
+										</div>
+										<div style={{ display: "flex", alignItems: "center" }}>
+											<GripHorizontal size={20} />
+										</div>
 									</Group>
-								)}
-							</>
-						)}
-					</Tabs.Panel>
-					<Tabs.Panel
-						pb="md"
-						value="queue"
+								</Card>
+							) : null}
+						</DragOverlay>
+					</DndContext>
+				)}
+			</Container>
+
+			{activeTab !== 'queue' && (
+				<ScrollArea
+					style={{ flex: 1 }}
+					scrollbars="y"
+					scrollbarSize={4}
+				>
+					<Container
+						size="sm"
+						py="md"
 						style={{
-							flex: 1,
 							display: 'flex',
-							flexDirection: 'column'
+							flexDirection: 'column',
+							height: 'var(--main-content-with-tabs-height)'
 						}}
 					>
-						<Group grow pb="md" gap="sm">
-							<Button
-								variant='light'
-								color='cyan'
-								leftSection={<Save size={16} />}
-								onClick={openSavePlaylistModal}
-								disabled={queue.length === 0}
-							>
-								Save Playlist
-							</Button>
-							<Button
-								variant='light'
-								color='pink'
-								leftSection={<X size={16} />}
-								onClick={handleClearQueue}
-								disabled={queue.length === 0}
-							>
-								Clear Queue
-							</Button>
-						</Group>
-
-						<Stack
-							gap="xs"
+						<Tabs.Panel
+							pb="md"
+							value="podcasts"
 							style={{
 								flex: 1,
 								display: 'flex',
 								flexDirection: 'column'
 							}}
 						>
-							<DndContext
-								sensors={sensors}
-								collisionDetection={closestCenter}
-								onDragEnd={handleDragEnd}
-							>
-								<SortableContext
-									items={queue.map(item => item.episodeId)}
-									strategy={verticalListSortingStrategy}
+							{subscriptions.length === 0 ? (
+								<Card
+									mb="-1rem"
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center'
+									}}
 								>
-									{queue.map((item) => (
-										<SortableQueueItem
-											key={item.episodeId}
-											item={item}
-											isCurrentEpisode={currentEpisode?.id === item.episodeId}
+									<Text c="dimmed">No podcast subscriptions</Text>
+								</Card>
+							) : (
+								<>
+									<PodcastResults
+										podcasts={subscriptions}
+										onPodcastClick={handlePodcastClick}
+									/>
+
+									{/* Loading state when fetching subscription directly from URL */}
+									{isLoadingSubscription && !selectedSubscription && (
+										<Group
+											justify="center"
+											align="center"
+											style={{
+												position: 'fixed',
+												top: 0,
+												left: 0,
+												right: 0,
+												bottom: 0,
+												backgroundColor: 'rgba(0, 0, 0, 0.5)',
+												zIndex: 1000
+											}}
+										>
+											<Loader size="lg" />
+										</Group>
+									)}
+								</>
+							)}
+						</Tabs.Panel>
+						<Tabs.Panel
+							value="episodes"
+							pb="md"
+							style={{
+								flex: 1,
+								display: 'flex',
+								flexDirection: 'column'
+							}}
+						>
+							{isLoadingEpisodes ? (
+								<Stack gap="sm">
+									{[...Array(6).keys()].map(i => (
+										<Card key={i} withBorder p="sm">
+											<Group justify="space-between" align="center" wrap="nowrap">
+												<div style={{ flex: 1, minWidth: 0 }}>
+													<Skeleton height={16} width="70%" mb={8} />
+													<Skeleton height={12} width="50%" />
+												</div>
+												<Skeleton height={28} width={28} circle />
+											</Group>
+										</Card>
+									))}
+								</Stack>
+							) : episodesError ? (
+								<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
+									{episodesError}
+								</Alert>
+							) : downloadedEpisodes.length === 0 ? (
+								<Card
+									mb="-1rem"
+									style={{
+										flex: 1,
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center'
+									}}
+								>
+									<Text c="dimmed">No episodes have been downloaded</Text>
+								</Card>
+							) : (
+								<Stack gap="xs">
+									{downloadedEpisodes.map(episode => (
+										<EpisodeRow
+											key={episode.id}
+											episodeId={episode.id}
+											subscriptionName={episode.subscription_name}
+											showDownloadStatus={false}
 										/>
 									))}
-								</SortableContext>
-							</DndContext>
-						</Stack>
-					</Tabs.Panel>
-					<Tabs.Panel
-						value="episodes"
-						pb="md"
-						style={{
-							flex: 1,
-							display: 'flex',
-							flexDirection: 'column'
-						}}
-					>
-						{isLoadingEpisodes ? (
-							<Stack gap="sm">
-								{[...Array(6).keys()].map(i => (
-									<Card key={i} withBorder p="sm">
-										<Group justify="space-between" align="center" wrap="nowrap">
-											<div style={{ flex: 1, minWidth: 0 }}>
-												<Skeleton height={16} width="70%" mb={8} />
-												<Skeleton height={12} width="50%" />
-											</div>
-											<Skeleton height={28} width={28} circle />
-										</Group>
-									</Card>
-								))}
-							</Stack>
-						) : episodesError ? (
-							<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
-								{episodesError}
-							</Alert>
-						) : downloadedEpisodes.length === 0 ? (
-							<Card
-								mb="-1rem"
-								style={{
-									flex: 1,
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center'
-								}}
-							>
-								<Text c="dimmed">No episodes have been downloaded</Text>
-							</Card>
-						) : (
-							<Stack gap="xs">
-								{downloadedEpisodes.map(episode => (
-									<EpisodeRow
-										key={episode.id}
-										episodeId={episode.id}
-										subscriptionName={episode.subscription_name}
-										showDownloadStatus={false}
-									/>
-								))}
-							</Stack>
-						)}
-					</Tabs.Panel>
-					<PodcastDetailModal
-						subscription={selectedSubscription}
-						opened={modalOpened}
-						onClose={handleModalClose}
-						onSubscriptionUpdate={handleSubscriptionUpdate}
-						initialEpisodeId={currentEpisodeId}
-						onEpisodeOpen={handleEpisodeOpen}
-						onEpisodeClose={handleEpisodeClose}
+								</Stack>
+							)}
+						</Tabs.Panel>
+					</Container>
+				</ScrollArea>
+			)}
+
+			<PodcastDetailModal
+				subscription={selectedSubscription}
+				opened={modalOpened}
+				onClose={handleModalClose}
+				onSubscriptionUpdate={handleSubscriptionUpdate}
+				initialEpisodeId={currentEpisodeId}
+				onEpisodeOpen={handleEpisodeOpen}
+				onEpisodeClose={handleEpisodeClose}
+			/>
+
+			{/* Save Playlist Modal */}
+			<Modal
+				opened={savePlaylistModalOpened}
+				onClose={closeSavePlaylistModal}
+				title="Save Playlist"
+				withCloseButton={false}
+				centered
+				overlayProps={{
+					blur: 5,
+				}}
+			>
+				<Stack gap="sm">
+					<TextInput
+						placeholder="Enter a name for your playlist"
+						value={playlistName}
+						onChange={(e) => setPlaylistName(e.currentTarget.value)}
+						error={savePlaylistError}
+						disabled={isSavingPlaylist}
+						data-autofocus
 					/>
 
-					{/* Save Playlist Modal */}
-					<Modal
-						opened={savePlaylistModalOpened}
-						onClose={closeSavePlaylistModal}
-						title="Save Playlist"
-						withCloseButton={false}
-						centered
-						overlayProps={{
-							blur: 5,
-						}}
-					>
-						<Stack gap="sm">
-							<TextInput
-								placeholder="Enter a name for your playlist"
-								value={playlistName}
-								onChange={(e) => setPlaylistName(e.currentTarget.value)}
-								error={savePlaylistError}
-								disabled={isSavingPlaylist}
-								data-autofocus
-							/>
+					<Text size="xs" c="dimmed">
+						{queue.length} episode{queue.length !== 1 ? 's' : ''} will be added to this playlist
+					</Text>
 
-							<Text size="xs" c="dimmed">
-								{queue.length} episode{queue.length !== 1 ? 's' : ''} will be added to this playlist
-							</Text>
-
-							<Group justify="flex-end" gap="sm" mt="sm" grow>
-								<Button
-									variant="light"
-									color='red'
-									onClick={closeSavePlaylistModal}
-									disabled={isSavingPlaylist}
-									leftSection={<X size={16} />}
-								>
-									Cancel
-								</Button>
-								<Button
-									variant='light'
-									color="cyan"
-									onClick={handleSavePlaylist}
-									loading={isSavingPlaylist}
-									leftSection={<Save size={16} />}
-								>
-									Save
-								</Button>
-							</Group>
-						</Stack>
-					</Modal>
-				</Container>
-			</ScrollArea>
+					<Group justify="flex-end" gap="sm" mt="sm" grow>
+						<Button
+							variant="light"
+							color='red'
+							onClick={closeSavePlaylistModal}
+							disabled={isSavingPlaylist}
+							leftSection={<X size={16} />}
+						>
+							Cancel
+						</Button>
+						<Button
+							variant='light'
+							color="cyan"
+							onClick={handleSavePlaylist}
+							loading={isSavingPlaylist}
+							leftSection={<Save size={16} />}
+						>
+							Save
+						</Button>
+					</Group>
+				</Stack>
+			</Modal>
 		</Tabs>
 	);
 }
