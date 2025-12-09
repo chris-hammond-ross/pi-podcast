@@ -72,6 +72,15 @@
 	outline: unset;
 }
 
+.trash-drop {
+	height: 52px;
+	background-color: var(--mantine-color-red-light);
+}
+
+.trash-drop:hover {
+	background-color: var(--mantine-color-red-light-hover);
+}
+
 button:focus-visible {
 	outline: none !important;
 }

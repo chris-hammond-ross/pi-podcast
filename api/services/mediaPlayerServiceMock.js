@@ -8,6 +8,7 @@ const episodeService = require('./episodeService');
 /**
  * Mock Media Player Service
  * Simulates MPV playback for development on non-Pi machines
+ * Includes full queue management support
  */
 class MediaPlayerServiceMock extends EventEmitter {
 	constructor() {
@@ -20,6 +21,11 @@ class MediaPlayerServiceMock extends EventEmitter {
 		this.position = 0;
 		this.duration = 0;
 		this.volume = 100;
+
+		// Queue state - mirrors real service
+		// Each item: { episodeId, episode (full data), filePath }
+		this.queue = [];
+		this.queuePosition = -1; // Current position in queue (-1 = nothing playing)
 
 		// Simulation timer
 		this.playbackTimer = null;
@@ -56,11 +62,11 @@ class MediaPlayerServiceMock extends EventEmitter {
 	}
 
 	/**
-	 * Play an episode by ID (simulated)
-	 * @param {number} episodeId - Episode ID to play
-	 * @returns {Promise<Object>} Playback result
+	 * Validate and get episode for queue operations
+	 * @param {number} episodeId - Episode ID
+	 * @returns {Object} Episode data with file path validation
 	 */
-	async playEpisode(episodeId) {
+	validateEpisodeForQueue(episodeId) {
 		const episode = episodeService.getEpisodeById(episodeId);
 
 		if (!episode) {
@@ -71,6 +77,17 @@ class MediaPlayerServiceMock extends EventEmitter {
 			throw new Error('Episode not downloaded');
 		}
 
+		return episode;
+	}
+
+	/**
+	 * Play an episode by ID (replaces queue with single episode)
+	 * @param {number} episodeId - Episode ID to play
+	 * @returns {Promise<Object>} Playback result
+	 */
+	async playEpisode(episodeId) {
+		const episode = this.validateEpisodeForQueue(episodeId);
+
 		console.log(`[media-mock] Simulating playback: ${episode.title}`);
 
 		// Stop current playback if any
@@ -78,6 +95,14 @@ class MediaPlayerServiceMock extends EventEmitter {
 			await this.saveCurrentPosition();
 			this.stopPlaybackTimer();
 		}
+
+		// Clear queue and add this episode
+		this.queue = [{
+			episodeId: episode.id,
+			episode: episode,
+			filePath: episode.file_path
+		}];
+		this.queuePosition = 0;
 
 		// Set current episode
 		this.currentEpisode = episode;
@@ -99,8 +124,9 @@ class MediaPlayerServiceMock extends EventEmitter {
 		this.startPlaybackTimer();
 		this.startPositionSaveTimer();
 
-		// Broadcast status
+		// Broadcast status and queue update
 		this.broadcastStatus();
+		this.broadcastQueue();
 		this.broadcast({
 			type: 'media:track-changed',
 			episode: {
@@ -108,7 +134,9 @@ class MediaPlayerServiceMock extends EventEmitter {
 				title: episode.title,
 				subscription_id: episode.subscription_id,
 				duration: this.duration
-			}
+			},
+			queuePosition: 0,
+			queueLength: 1
 		});
 
 		return {
@@ -184,22 +212,282 @@ class MediaPlayerServiceMock extends EventEmitter {
 	/**
 	 * Handle playback completion
 	 */
-	handlePlaybackComplete() {
+	async handlePlaybackComplete() {
 		console.log('[media-mock] Playback complete');
 
 		if (this.currentEpisode) {
 			episodeService.markAsCompleted(this.currentEpisode.id);
 
 			this.broadcast({
-				type: 'media:completed',
+				type: 'media:episode-completed',
 				episodeId: this.currentEpisode.id
 			});
 
 			this.emit('playback-complete', { episodeId: this.currentEpisode.id });
 		}
 
+		// Check if there's a next item in the queue
+		if (this.queuePosition < this.queue.length - 1) {
+			// Play next in queue
+			console.log('[media-mock] Playing next in queue');
+			this.queuePosition++;
+			await this.playQueueItem(this.queuePosition);
+		} else {
+			// Queue finished
+			this.stopPlaybackTimer();
+			this.stopPositionSaveTimer();
+			this.currentEpisode = null;
+			this.isPlaying = false;
+			this.isPaused = false;
+			this.position = 0;
+			this.duration = 0;
+			this.queuePosition = -1;
+
+			this.broadcastStatus();
+			this.broadcast({
+				type: 'media:queue-finished'
+			});
+		}
+	}
+
+	/**
+	 * Play a specific item in the queue (internal helper)
+	 * @param {number} index - Queue index to play
+	 */
+	async playQueueItem(index) {
+		if (index < 0 || index >= this.queue.length) {
+			return;
+		}
+
+		const queueItem = this.queue[index];
+		const episode = queueItem.episode;
+
+		console.log(`[media-mock] Playing queue item ${index}: ${episode.title}`);
+
+		this.currentEpisode = episode;
+		this.queuePosition = index;
+		this.isPlaying = true;
+		this.isPaused = false;
+
+		// Parse duration
+		this.duration = this.parseDuration(episode.duration) || 3600;
+
+		// Resume from saved position if available
+		if (episode.playback_position > 0 && !episode.playback_completed) {
+			this.position = episode.playback_position;
+		} else {
+			this.position = 0;
+		}
+
+		// Start simulated playback
+		this.startPlaybackTimer();
+		this.startPositionSaveTimer();
+
+		// Broadcast
+		this.broadcastStatus();
+		this.broadcast({
+			type: 'media:track-changed',
+			episode: {
+				id: episode.id,
+				title: episode.title,
+				subscription_id: episode.subscription_id,
+				duration: this.duration
+			},
+			queuePosition: this.queuePosition,
+			queueLength: this.queue.length
+		});
+	}
+
+	// ===== Queue Management Methods =====
+
+	/**
+	 * Add an episode to the end of the queue
+	 * @param {number} episodeId - Episode ID to add
+	 * @returns {Promise<Object>} Result with queue info
+	 */
+	async addToQueue(episodeId) {
+		const episode = this.validateEpisodeForQueue(episodeId);
+
+		// Check if already in queue
+		if (this.queue.some(item => item.episodeId === episodeId)) {
+			throw new Error('Episode already in queue');
+		}
+
+		console.log(`[media-mock] Adding to queue: ${episode.title}`);
+
+		// Add to queue
+		this.queue.push({
+			episodeId: episode.id,
+			episode: episode,
+			filePath: episode.file_path
+		});
+
+		// If nothing is playing, start playback
+		const isIdle = this.queue.length === 1 && !this.isPlaying;
+		if (isIdle) {
+			this.queuePosition = 0;
+			await this.playQueueItem(0);
+		}
+
+		this.broadcastQueue();
+
+		return {
+			success: true,
+			queuePosition: this.queue.length - 1,
+			queueLength: this.queue.length
+		};
+	}
+
+	/**
+	 * Add multiple episodes to the queue
+	 * @param {number[]} episodeIds - Array of episode IDs to add
+	 * @returns {Promise<Object>} Result with queue info
+	 */
+	async addMultipleToQueue(episodeIds) {
+		const added = [];
+		const errors = [];
+
+		for (const episodeId of episodeIds) {
+			try {
+				await this.addToQueue(episodeId);
+				added.push(episodeId);
+			} catch (err) {
+				errors.push({ episodeId, error: err.message });
+			}
+		}
+
+		return {
+			success: true,
+			added: added.length,
+			errors: errors.length > 0 ? errors : undefined,
+			queueLength: this.queue.length
+		};
+	}
+
+	/**
+	 * Play next episode in queue
+	 * @returns {Promise<Object>} Result
+	 */
+	async playNext() {
+		if (this.queue.length === 0) {
+			throw new Error('Queue is empty');
+		}
+
+		if (this.queuePosition >= this.queue.length - 1) {
+			throw new Error('Already at end of queue');
+		}
+
+		// Save current position
+		if (this.currentEpisode) {
+			await this.saveCurrentPosition();
+		}
+
+		this.stopPlaybackTimer();
+		this.queuePosition++;
+		await this.playQueueItem(this.queuePosition);
+
+		return { success: true };
+	}
+
+	/**
+	 * Play previous episode in queue
+	 * @returns {Promise<Object>} Result
+	 */
+	async playPrevious() {
+		if (this.queue.length === 0) {
+			throw new Error('Queue is empty');
+		}
+
+		if (this.queuePosition <= 0) {
+			throw new Error('Already at start of queue');
+		}
+
+		// Save current position
+		if (this.currentEpisode) {
+			await this.saveCurrentPosition();
+		}
+
+		this.stopPlaybackTimer();
+		this.queuePosition--;
+		await this.playQueueItem(this.queuePosition);
+
+		return { success: true };
+	}
+
+	/**
+	 * Jump to a specific position in the queue
+	 * @param {number} index - Queue index to play
+	 * @returns {Promise<Object>} Result
+	 */
+	async playQueueIndex(index) {
+		if (index < 0 || index >= this.queue.length) {
+			throw new Error('Invalid queue index');
+		}
+
+		// Save current position
+		if (this.currentEpisode) {
+			await this.saveCurrentPosition();
+		}
+
+		this.stopPlaybackTimer();
+		await this.playQueueItem(index);
+
+		return { success: true };
+	}
+
+	/**
+	 * Remove an episode from the queue by index
+	 * @param {number} index - Queue index to remove
+	 * @returns {Promise<Object>} Result
+	 */
+	async removeFromQueue(index) {
+		if (index < 0 || index >= this.queue.length) {
+			throw new Error('Invalid queue index');
+		}
+
+		// Don't allow removing currently playing item
+		if (index === this.queuePosition) {
+			throw new Error('Cannot remove currently playing episode. Use skip or stop instead.');
+		}
+
+		const removed = this.queue[index];
+		console.log(`[media-mock] Removing from queue: ${removed.episode.title}`);
+
+		// Remove from queue
+		this.queue.splice(index, 1);
+
+		// Adjust queue position if needed
+		if (index < this.queuePosition) {
+			this.queuePosition--;
+		}
+
+		this.broadcastQueue();
+
+		return {
+			success: true,
+			removed: removed.episodeId,
+			queueLength: this.queue.length
+		};
+	}
+
+	/**
+	 * Clear the entire queue and stop playback
+	 * @returns {Promise<Object>} Result
+	 */
+	async clearQueue() {
+		console.log('[media-mock] Clearing queue');
+
+		// Save current position
+		if (this.currentEpisode) {
+			await this.saveCurrentPosition();
+		}
+
 		this.stopPlaybackTimer();
 		this.stopPositionSaveTimer();
+
+		// Clear queue
+		this.queue = [];
+		this.queuePosition = -1;
 		this.currentEpisode = null;
 		this.isPlaying = false;
 		this.isPaused = false;
@@ -207,7 +495,179 @@ class MediaPlayerServiceMock extends EventEmitter {
 		this.duration = 0;
 
 		this.broadcastStatus();
+		this.broadcastQueue();
+
+		return { success: true };
 	}
+
+	/**
+	 * Move an item in the queue
+	 * @param {number} fromIndex - Current index
+	 * @param {number} toIndex - Target index
+	 * @returns {Promise<Object>} Result
+	 */
+	async moveInQueue(fromIndex, toIndex) {
+		if (fromIndex < 0 || fromIndex >= this.queue.length) {
+			throw new Error('Invalid from index');
+		}
+		if (toIndex < 0 || toIndex >= this.queue.length) {
+			throw new Error('Invalid to index');
+		}
+		if (fromIndex === toIndex) {
+			return { success: true, queueLength: this.queue.length };
+		}
+
+		console.log(`[media-mock] Moving queue item from ${fromIndex} to ${toIndex}`);
+
+		// Move in queue
+		const [item] = this.queue.splice(fromIndex, 1);
+		this.queue.splice(toIndex, 0, item);
+
+		// Adjust queue position
+		if (fromIndex === this.queuePosition) {
+			this.queuePosition = toIndex;
+		} else if (fromIndex < this.queuePosition && toIndex >= this.queuePosition) {
+			this.queuePosition--;
+		} else if (fromIndex > this.queuePosition && toIndex <= this.queuePosition) {
+			this.queuePosition++;
+		}
+
+		this.broadcastQueue();
+
+		return { success: true, queueLength: this.queue.length };
+	}
+
+	/**
+	 * Shuffle the queue (excluding currently playing item)
+	 * @returns {Promise<Object>} Result
+	 */
+	async shuffleQueue() {
+		if (this.queue.length <= 1) {
+			return { success: true, queueLength: this.queue.length, message: 'Queue too short to shuffle' };
+		}
+
+		console.log('[media-mock] Shuffling queue');
+
+		const currentlyPlayingIndex = this.queuePosition;
+		const hasCurrentlyPlaying = currentlyPlayingIndex >= 0 && currentlyPlayingIndex < this.queue.length;
+
+		// Extract the currently playing item if any
+		let currentItem = null;
+		let itemsToShuffle = [...this.queue];
+
+		if (hasCurrentlyPlaying) {
+			currentItem = itemsToShuffle.splice(currentlyPlayingIndex, 1)[0];
+		}
+
+		// Fisher-Yates shuffle
+		for (let i = itemsToShuffle.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[itemsToShuffle[i], itemsToShuffle[j]] = [itemsToShuffle[j], itemsToShuffle[i]];
+		}
+
+		// Rebuild the queue with current item at position 0 (if playing)
+		if (hasCurrentlyPlaying && currentItem) {
+			this.queue = [currentItem, ...itemsToShuffle];
+			this.queuePosition = 0;
+		} else {
+			this.queue = itemsToShuffle;
+		}
+
+		this.broadcastQueue();
+
+		return { success: true, queueLength: this.queue.length };
+	}
+
+	/**
+	 * Sort the queue by a specified field and order
+	 * @param {string} sortBy - Field to sort by: 'pub_date' or 'downloaded_at'
+	 * @param {string} order - Sort order: 'asc' or 'desc'
+	 * @returns {Promise<Object>} Result
+	 */
+	async sortQueue(sortBy = 'pub_date', order = 'asc') {
+		if (this.queue.length <= 1) {
+			return { success: true, queueLength: this.queue.length, message: 'Queue too short to sort' };
+		}
+
+		// Validate sortBy
+		const validSortFields = ['pub_date', 'downloaded_at'];
+		if (!validSortFields.includes(sortBy)) {
+			throw new Error(`Invalid sort field. Must be one of: ${validSortFields.join(', ')}`);
+		}
+
+		// Validate order
+		const validOrders = ['asc', 'desc'];
+		if (!validOrders.includes(order.toLowerCase())) {
+			throw new Error(`Invalid sort order. Must be one of: ${validOrders.join(', ')}`);
+		}
+
+		console.log(`[media-mock] Sorting queue by ${sortBy} ${order}`);
+
+		const isAsc = order.toLowerCase() === 'asc';
+
+		// Sort the queue
+		this.queue.sort((a, b) => {
+			let valueA, valueB;
+
+			if (sortBy === 'pub_date') {
+				valueA = a.episode.pub_date ? new Date(a.episode.pub_date).getTime() : 0;
+				valueB = b.episode.pub_date ? new Date(b.episode.pub_date).getTime() : 0;
+			} else if (sortBy === 'downloaded_at') {
+				valueA = a.episode.downloaded_at || 0;
+				valueB = b.episode.downloaded_at || 0;
+			}
+
+			if (isAsc) {
+				return valueA - valueB;
+			} else {
+				return valueB - valueA;
+			}
+		});
+
+		// Find the new position of the currently playing episode
+		if (this.currentEpisode) {
+			const newPosition = this.queue.findIndex(item => item.episodeId === this.currentEpisode.id);
+			if (newPosition !== -1) {
+				this.queuePosition = newPosition;
+			}
+		}
+
+		this.broadcastQueue();
+
+		return { success: true, queueLength: this.queue.length, sortBy, order };
+	}
+
+	/**
+	 * Get the current queue
+	 * @returns {Object} Queue information
+	 */
+	getQueue() {
+		return {
+			items: this.queue.map((item, index) => ({
+				index,
+				episodeId: item.episodeId,
+				title: item.episode.title,
+				subscription_id: item.episode.subscription_id,
+				pub_date: item.episode.pub_date,
+				duration: item.episode.duration,
+				isPlaying: index === this.queuePosition
+			})),
+			currentIndex: this.queuePosition,
+			length: this.queue.length
+		};
+	}
+
+	/**
+	 * Broadcast current queue to all clients
+	 */
+	broadcastQueue() {
+		this.broadcast({
+			type: 'media:queue-update',
+			...this.getQueue()
+		});
+	}
+
+	// ===== Playback Control Methods =====
 
 	/**
 	 * Pause or resume playback
@@ -256,7 +716,7 @@ class MediaPlayerServiceMock extends EventEmitter {
 	}
 
 	/**
-	 * Stop playback completely
+	 * Stop playback completely (keeps queue intact)
 	 */
 	async stop() {
 		if (this.currentEpisode) {
@@ -270,6 +730,7 @@ class MediaPlayerServiceMock extends EventEmitter {
 		this.isPaused = false;
 		this.position = 0;
 		this.duration = 0;
+		// Note: We keep the queue intact, just stop playback
 
 		console.log('[media-mock] Stopped');
 		this.broadcastStatus();
@@ -345,6 +806,8 @@ class MediaPlayerServiceMock extends EventEmitter {
 				title: this.currentEpisode.title,
 				subscription_id: this.currentEpisode.subscription_id
 			} : null,
+			queuePosition: this.queuePosition,
+			queueLength: this.queue.length,
 			mpvConnected: true, // Always "connected" in mock mode
 			mockMode: true
 		};
@@ -424,6 +887,8 @@ class MediaPlayerServiceMock extends EventEmitter {
 		this.currentEpisode = null;
 		this.isPlaying = false;
 		this.isPaused = false;
+		this.queue = [];
+		this.queuePosition = -1;
 
 		console.log('[media-mock] Mock media player service cleaned up');
 	}
