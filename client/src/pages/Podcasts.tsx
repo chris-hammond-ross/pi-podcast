@@ -121,7 +121,7 @@ function TrashDropZone() {
 		<Group
 			ref={setNodeRef}
 			mt="md"
-			p="md"
+			h={36}
 			justify='center'
 			style={{
 				border: `2px dashed ${isOver ? 'var(--mantine-color-red-filled)' : 'var(--mantine-color-red-text)'}`,
@@ -527,7 +527,7 @@ function Podcasts() {
 						>
 							<Container
 								size="sm"
-								py="md"
+								py={0}
 								style={{
 									display: 'flex',
 									flexDirection: 'column',
