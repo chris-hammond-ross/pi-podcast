@@ -12,13 +12,13 @@ import {
 } from '@mantine/core';
 import { Play } from 'lucide-react';
 import { useAutoPlaylists, useUserPlaylists } from '../hooks';
-import { getEpisodes, clearQueue, addMultipleToQueue, playQueueIndex } from '../services';
+import { getEpisodes, getPlaylistEpisodes, clearQueue, addMultipleToQueue, playQueueIndex } from '../services';
 
 function Playlists() {
 	const { playlists: autoPlaylists, isLoading: autoIsLoading, error: autoError } = useAutoPlaylists();
 	const { playlists: userPlaylists, isLoading: userIsLoading, error: userError } = useUserPlaylists();
 
-	const handlePlayPlaylist = async (subscriptionId: number) => {
+	const handlePlayAutoPlaylist = async (subscriptionId: number) => {
 		try {
 			// Get all downloaded episodes for this subscription, sorted by pub_date DESC
 			const response = await getEpisodes(subscriptionId, {
@@ -41,7 +41,28 @@ function Playlists() {
 			await addMultipleToQueue(episodeIds);
 			await playQueueIndex(0);
 		} catch (err) {
-			console.error('[Playlists] Failed to play playlist:', err);
+			console.error('[Playlists] Failed to play auto playlist:', err);
+		}
+	};
+
+	const handlePlayUserPlaylist = async (playlistId: number) => {
+		try {
+			// Get all episodes in this user playlist (already in playlist order)
+			const response = await getPlaylistEpisodes(playlistId);
+
+			if (response.episodes.length === 0) {
+				console.warn('[Playlists] No episodes in playlist to play');
+				return;
+			}
+
+			const episodeIds = response.episodes.map(ep => ep.id);
+
+			// Clear the queue first, then add all episodes, then play the first one
+			await clearQueue();
+			await addMultipleToQueue(episodeIds);
+			await playQueueIndex(0);
+		} catch (err) {
+			console.error('[Playlists] Failed to play user playlist:', err);
 		}
 	};
 
@@ -150,7 +171,7 @@ function Playlists() {
 											<ActionIcon
 												variant="light"
 												color="cyan"
-												onClick={() => handlePlayPlaylist(playlist.subscription_id)}
+												onClick={() => handlePlayUserPlaylist(playlist.id)}
 												title="Play Playlist"
 												disabled={playlist.episode_count === 0}
 											>
@@ -220,7 +241,7 @@ function Playlists() {
 											<ActionIcon
 												variant="light"
 												color="cyan"
-												onClick={() => handlePlayPlaylist(playlist.subscription_id)}
+												onClick={() => handlePlayAutoPlaylist(playlist.subscription_id)}
 												title="Play Playlist"
 												disabled={playlist.episode_count === 0}
 											>
