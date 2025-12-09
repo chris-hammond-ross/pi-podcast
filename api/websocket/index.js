@@ -56,8 +56,9 @@ function initializeWebSocket(server) {
 		// Send current download status to new client
 		sendDownloadStatus(ws);
 
-		// Send current media player status to new client
+		// Send current media player status and queue to new client
 		sendMediaStatus(ws);
+		sendMediaQueue(ws);
 
 		ws.on('message', (message) => {
 			try {
@@ -92,14 +93,16 @@ function initializeWebSocket(server) {
 					// Also send download status
 					sendDownloadStatus(ws);
 
-					// Also send media status
+					// Also send media status and queue
 					sendMediaStatus(ws);
+					sendMediaQueue(ws);
 				} else if (data.type === 'request-download-status') {
 					// Client specifically requesting download status
 					sendDownloadStatus(ws);
 				} else if (data.type === 'request-media-status') {
 					// Client specifically requesting media player status
 					sendMediaStatus(ws);
+					sendMediaQueue(ws);
 				}
 			} catch (err) {
 				console.error('[websocket] Parse error:', err.message);
@@ -255,6 +258,18 @@ function sendMediaStatus(ws) {
 	sendToClient(ws, {
 		type: 'media:status',
 		...status
+	});
+}
+
+/**
+ * Send media player queue to a specific client
+ * @param {WebSocket} ws - The WebSocket client
+ */
+function sendMediaQueue(ws) {
+	const queue = mediaPlayerService.getQueue();
+	sendToClient(ws, {
+		type: 'media:queue-update',
+		...queue
 	});
 }
 

@@ -12,7 +12,7 @@ import {
 } from '@mantine/core';
 import { Play } from 'lucide-react';
 import { useAutoPlaylists, useUserPlaylists } from '../hooks';
-import { getEpisodes, addMultipleToQueue, playEpisode } from '../services';
+import { getEpisodes, clearQueue, addMultipleToQueue, playQueueIndex } from '../services';
 
 function Playlists() {
 	const { playlists: autoPlaylists, isLoading: autoIsLoading, error: autoError } = useAutoPlaylists();
@@ -34,13 +34,12 @@ function Playlists() {
 
 			const episodeIds = response.episodes.map(ep => ep.id);
 
-			// Play the first episode immediately
-			await playEpisode(episodeIds[0]);
-
-			// Queue the rest if there are more
-			if (episodeIds.length > 1) {
-				await addMultipleToQueue(episodeIds.slice(1));
-			}
+			// Clear the queue first, then add all episodes, then play the first one
+			// This avoids the race condition where playEpisode + addMultipleToQueue
+			// can conflict when MPV hasn't fully loaded the first file yet
+			await clearQueue();
+			await addMultipleToQueue(episodeIds);
+			await playQueueIndex(0);
 		} catch (err) {
 			console.error('[Playlists] Failed to play playlist:', err);
 		}
