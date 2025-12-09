@@ -52,6 +52,39 @@ class MediaPlayerService extends EventEmitter {
 
 		// Observed properties mapping (for property change events)
 		this.observedProperties = new Map();
+
+		// Operation lock to prevent race conditions
+		this.operationLock = false;
+		this.operationQueue = [];
+	}
+
+	/**
+	 * Acquire the operation lock, waiting if necessary
+	 * @param {string} operationName - Name of the operation (for logging)
+	 * @returns {Promise<Function>} Release function to call when done
+	 */
+	async acquireLock(operationName) {
+		return new Promise((resolve) => {
+			const tryAcquire = () => {
+				if (!this.operationLock) {
+					this.operationLock = true;
+					console.log(`[media] Lock acquired for: ${operationName}`);
+					resolve(() => {
+						this.operationLock = false;
+						console.log(`[media] Lock released for: ${operationName}`);
+						// Process next queued operation if any
+						if (this.operationQueue.length > 0) {
+							const next = this.operationQueue.shift();
+							next();
+						}
+					});
+				} else {
+					console.log(`[media] Waiting for lock: ${operationName}`);
+					this.operationQueue.push(tryAcquire);
+				}
+			};
+			tryAcquire();
+		});
 	}
 
 	/**
@@ -643,77 +676,83 @@ class MediaPlayerService extends EventEmitter {
 	 * @returns {Promise<Object>} Playback result
 	 */
 	async playEpisode(episodeId) {
-		const episode = this.validateEpisodeForQueue(episodeId);
-
-		console.log(`[media] Playing episode: ${episode.title}`);
-
-		// Save current position before changing
-		if (this.currentEpisode) {
-			await this.saveCurrentPosition();
-		}
-
-		// Clear queue and add this episode
-		this.queue = [{
-			episodeId: episode.id,
-			episode: episode,
-			filePath: episode.file_path
-		}];
-		this.queuePosition = 0;
-
-		// Load the file (replace mode clears MPV playlist and plays)
-		await this.sendCommand(['loadfile', episode.file_path, 'replace']);
-
-		// Set current episode
-		this.currentEpisode = episode;
-		this.isPlaying = true;
-		this.isPaused = false;
-
-		// Wait a moment for file to load
-		await new Promise(resolve => setTimeout(resolve, 500));
-
-		// Ensure playback is not paused (MPV can preserve pause state from previous playback)
-		await this.setProperty('pause', false);
-
-		// Get duration
+		const releaseLock = await this.acquireLock('playEpisode');
+		
 		try {
-			this.duration = await this.getProperty('duration') || 0;
-		} catch (err) {
-			console.warn('[media] Could not get duration:', err.message);
-		}
+			const episode = this.validateEpisodeForQueue(episodeId);
 
-		// Resume from saved position if available
-		if (episode.playback_position > 0 && !episode.playback_completed) {
-			console.log(`[media] Resuming from position: ${episode.playback_position}s`);
-			await this.seek(episode.playback_position);
-		}
+			console.log(`[media] Playing episode: ${episode.title}`);
 
-		// Start position save timer
-		this.startPositionSaveTimer();
-
-		// Broadcast status and queue update
-		this.broadcastStatus();
-		this.broadcastQueue();
-		this.broadcast({
-			type: 'media:track-changed',
-			episode: {
-				id: episode.id,
-				title: episode.title,
-				subscription_id: episode.subscription_id,
-				duration: this.duration
-			},
-			queuePosition: 0,
-			queueLength: 1
-		});
-
-		return {
-			success: true,
-			episode: {
-				id: episode.id,
-				title: episode.title,
-				duration: this.duration,
-				resumedFrom: episode.playback_position > 0 ? episode.playback_position : 0
+			// Save current position before changing
+			if (this.currentEpisode) {
+				await this.saveCurrentPosition();
 			}
-		};
+
+			// Clear queue and add this episode
+			this.queue = [{
+				episodeId: episode.id,
+				episode: episode,
+				filePath: episode.file_path
+			}];
+			this.queuePosition = 0;
+
+			// Load the file (replace mode clears MPV playlist and plays)
+			await this.sendCommand(['loadfile', episode.file_path, 'replace']);
+
+			// Set current episode
+			this.currentEpisode = episode;
+			this.isPlaying = true;
+			this.isPaused = false;
+
+			// Wait a moment for file to load
+			await new Promise(resolve => setTimeout(resolve, 500));
+
+			// Ensure playback is not paused (MPV can preserve pause state from previous playback)
+			await this.setProperty('pause', false);
+
+			// Get duration
+			try {
+				this.duration = await this.getProperty('duration') || 0;
+			} catch (err) {
+				console.warn('[media] Could not get duration:', err.message);
+			}
+
+			// Resume from saved position if available
+			if (episode.playback_position > 0 && !episode.playback_completed) {
+				console.log(`[media] Resuming from position: ${episode.playback_position}s`);
+				await this.seek(episode.playback_position);
+			}
+
+			// Start position save timer
+			this.startPositionSaveTimer();
+
+			// Broadcast status and queue update
+			this.broadcastStatus();
+			this.broadcastQueue();
+			this.broadcast({
+				type: 'media:track-changed',
+				episode: {
+					id: episode.id,
+					title: episode.title,
+					subscription_id: episode.subscription_id,
+					duration: this.duration
+				},
+				queuePosition: 0,
+				queueLength: 1
+			});
+
+			return {
+				success: true,
+				episode: {
+					id: episode.id,
+					title: episode.title,
+					duration: this.duration,
+					resumedFrom: episode.playback_position > 0 ? episode.playback_position : 0
+				}
+			};
+		} finally {
+			releaseLock();
+		}
 	}
 
 	/**
@@ -791,23 +830,32 @@ class MediaPlayerService extends EventEmitter {
 	 * @returns {Promise<Object>} Result
 	 */
 	async playNext() {
-		if (this.queue.length === 0) {
-			throw new Error('Queue is empty');
+		const releaseLock = await this.acquireLock('playNext');
+		
+		try {
+			if (this.queue.length === 0) {
+				throw new Error('Queue is empty');
+			}
+
+			if (this.queuePosition >= this.queue.length - 1) {
+				throw new Error('Already at end of queue');
+			}
+
+			// Save current position
+			if (this.currentEpisode) {
+				await this.saveCurrentPosition();
+			}
+
+			// Tell MPV to play next
+			await this.sendCommand(['playlist-next']);
+
+			// Wait for MPV to process and update state
+			await new Promise(resolve => setTimeout(resolve, 200));
+
+			return { success: true };
+		} finally {
+			releaseLock();
 		}
-
-		if (this.queuePosition >= this.queue.length - 1) {
-			throw new Error('Already at end of queue');
-		}
-
-		// Save current position
-		if (this.currentEpisode) {
-			await this.saveCurrentPosition();
-		}
-
-		// Tell MPV to play next
-		await this.sendCommand(['playlist-next']);
-
-		return { success: true };
 	}
 
 	/**
@@ -815,23 +863,32 @@ class MediaPlayerService extends EventEmitter {
 	 * @returns {Promise<Object>} Result
 	 */
 	async playPrevious() {
-		if (this.queue.length === 0) {
-			throw new Error('Queue is empty');
+		const releaseLock = await this.acquireLock('playPrevious');
+		
+		try {
+			if (this.queue.length === 0) {
+				throw new Error('Queue is empty');
+			}
+
+			if (this.queuePosition <= 0) {
+				throw new Error('Already at start of queue');
+			}
+
+			// Save current position
+			if (this.currentEpisode) {
+				await this.saveCurrentPosition();
+			}
+
+			// Tell MPV to play previous
+			await this.sendCommand(['playlist-prev']);
+
+			// Wait for MPV to process and update state
+			await new Promise(resolve => setTimeout(resolve, 200));
+
+			return { success: true };
+		} finally {
+			releaseLock();
 		}
-
-		if (this.queuePosition <= 0) {
-			throw new Error('Already at start of queue');
-		}
-
-		// Save current position
-		if (this.currentEpisode) {
-			await this.saveCurrentPosition();
-		}
-
-		// Tell MPV to play previous
-		await this.sendCommand(['playlist-prev']);
-
-		return { success: true };
 	}
 
 	/**
@@ -840,70 +897,76 @@ class MediaPlayerService extends EventEmitter {
 	 * @returns {Promise<Object>} Result
 	 */
 	async playQueueIndex(index) {
-		if (index < 0 || index >= this.queue.length) {
-			throw new Error('Invalid queue index');
-		}
-
-		// Save current position of previous episode
-		if (this.currentEpisode) {
-			await this.saveCurrentPosition();
-		}
-
-		console.log(`[media] Playing queue index ${index}`);
-
-		// Get the episode we're about to play
-		const queueItem = this.queue[index];
-		const episode = queueItem.episode;
-
-		// Update internal state immediately (don't wait for MPV events)
-		this.queuePosition = index;
-		this.currentEpisode = episode;
-		this.position = 0;
-		this.isPlaying = true;
-		this.isPaused = false;
-
-		// Set MPV playlist position
-		await this.setProperty('playlist-pos', index);
-
-		// Wait a moment for MPV to process the playlist change
-		await new Promise(resolve => setTimeout(resolve, 300));
-
-		// Ensure playback is not paused - this is critical for starting playback
-		// when switching playlists or when MPV was in an idle/paused state
-		await this.setProperty('pause', false);
-
-		// Get duration
+		const releaseLock = await this.acquireLock('playQueueIndex');
+		
 		try {
-			this.duration = await this.getProperty('duration') || 0;
-		} catch (err) {
-			console.warn('[media] Could not get duration:', err.message);
+			if (index < 0 || index >= this.queue.length) {
+				throw new Error('Invalid queue index');
+			}
+
+			// Save current position of previous episode
+			if (this.currentEpisode) {
+				await this.saveCurrentPosition();
+			}
+
+			console.log(`[media] Playing queue index ${index}`);
+
+			// Get the episode we're about to play
+			const queueItem = this.queue[index];
+			const episode = queueItem.episode;
+
+			// Update internal state immediately (don't wait for MPV events)
+			this.queuePosition = index;
+			this.currentEpisode = episode;
+			this.position = 0;
+			this.isPlaying = true;
+			this.isPaused = false;
+
+			// Set MPV playlist position
+			await this.setProperty('playlist-pos', index);
+
+			// Wait a moment for MPV to process the playlist change
+			await new Promise(resolve => setTimeout(resolve, 300));
+
+			// Ensure playback is not paused - this is critical for starting playback
+			// when switching playlists or when MPV was in an idle/paused state
+			await this.setProperty('pause', false);
+
+			// Get duration
+			try {
+				this.duration = await this.getProperty('duration') || 0;
+			} catch (err) {
+				console.warn('[media] Could not get duration:', err.message);
+			}
+
+			// Resume from saved position if available
+			if (episode.playback_position > 0 && !episode.playback_completed) {
+				console.log(`[media] Resuming from position: ${episode.playback_position}s`);
+				await this.seek(episode.playback_position);
+			}
+
+			// Start position save timer
+			this.startPositionSaveTimer();
+
+			// Broadcast all updates to clients
+			this.broadcastStatus();
+			this.broadcastQueue();
+			this.broadcast({
+				type: 'media:track-changed',
+				episode: {
+					id: episode.id,
+					title: episode.title,
+					subscription_id: episode.subscription_id,
+					duration: this.duration
+				},
+				queuePosition: this.queuePosition,
+				queueLength: this.queue.length
+			});
+
+			return { success: true };
+		} finally {
+			releaseLock();
 		}
-
-		// Resume from saved position if available
-		if (episode.playback_position > 0 && !episode.playback_completed) {
-			console.log(`[media] Resuming from position: ${episode.playback_position}s`);
-			await this.seek(episode.playback_position);
-		}
-
-		// Start position save timer
-		this.startPositionSaveTimer();
-
-		// Broadcast all updates to clients
-		this.broadcastStatus();
-		this.broadcastQueue();
-		this.broadcast({
-			type: 'media:track-changed',
-			episode: {
-				id: episode.id,
-				title: episode.title,
-				subscription_id: episode.subscription_id,
-				duration: this.duration
-			},
-			queuePosition: this.queuePosition,
-			queueLength: this.queue.length
-		});
-
-		return { success: true };
 	}
 
 	/**
@@ -949,30 +1012,43 @@ class MediaPlayerService extends EventEmitter {
 	 * @returns {Promise<Object>} Result
 	 */
 	async clearQueue() {
-		console.log('[media] Clearing queue');
+		const releaseLock = await this.acquireLock('clearQueue');
+		
+		try {
+			console.log('[media] Clearing queue');
 
-		// Save current position
-		if (this.currentEpisode) {
-			await this.saveCurrentPosition();
+			// Save current position
+			if (this.currentEpisode) {
+				await this.saveCurrentPosition();
+			}
+
+			// Stop playback first (this is important - playlist-clear alone doesn't stop the current file)
+			try {
+				await this.sendCommand(['stop']);
+			} catch (err) {
+				console.warn('[media] Could not stop playback:', err.message);
+			}
+
+			// Clear MPV playlist
+			await this.sendCommand(['playlist-clear']);
+
+			// Clear our queue
+			this.queue = [];
+			this.queuePosition = -1;
+			this.currentEpisode = null;
+			this.isPlaying = false;
+			this.isPaused = false;
+			this.position = 0;
+			this.duration = 0;
+
+			this.stopPositionSaveTimer();
+			this.broadcastStatus();
+			this.broadcastQueue();
+
+			return { success: true };
+		} finally {
+			releaseLock();
 		}
-
-		// Clear MPV playlist
-		await this.sendCommand(['playlist-clear']);
-
-		// Clear our queue
-		this.queue = [];
-		this.queuePosition = -1;
-		this.currentEpisode = null;
-		this.isPlaying = false;
-		this.isPaused = false;
-		this.position = 0;
-		this.duration = 0;
-
-		this.stopPositionSaveTimer();
-		this.broadcastStatus();
-		this.broadcastQueue();
-
-		return { success: true };
 	}
 
 	/**
@@ -1021,45 +1097,51 @@ class MediaPlayerService extends EventEmitter {
 	 * @returns {Promise<Object>} Result
 	 */
 	async shuffleQueue() {
-		if (this.queue.length <= 1) {
-			return { success: true, queueLength: this.queue.length, message: 'Queue too short to shuffle' };
-		}
-
-		console.log('[media] Shuffling queue');
-
-		// If something is playing, we'll shuffle everything except the current item
-		// The current item stays at its position
-		const currentlyPlayingIndex = this.queuePosition;
-		const hasCurrentlyPlaying = currentlyPlayingIndex >= 0 && currentlyPlayingIndex < this.queue.length;
-
-		// Extract the currently playing item if any
-		let currentItem = null;
-		let itemsToShuffle = [...this.queue];
+		const releaseLock = await this.acquireLock('shuffleQueue');
 		
-		if (hasCurrentlyPlaying) {
-			currentItem = itemsToShuffle.splice(currentlyPlayingIndex, 1)[0];
+		try {
+			if (this.queue.length <= 1) {
+				return { success: true, queueLength: this.queue.length, message: 'Queue too short to shuffle' };
+			}
+
+			console.log('[media] Shuffling queue');
+
+			// If something is playing, we'll shuffle everything except the current item
+			// The current item stays at its position
+			const currentlyPlayingIndex = this.queuePosition;
+			const hasCurrentlyPlaying = currentlyPlayingIndex >= 0 && currentlyPlayingIndex < this.queue.length;
+
+			// Extract the currently playing item if any
+			let currentItem = null;
+			let itemsToShuffle = [...this.queue];
+			
+			if (hasCurrentlyPlaying) {
+				currentItem = itemsToShuffle.splice(currentlyPlayingIndex, 1)[0];
+			}
+
+			// Fisher-Yates shuffle
+			for (let i = itemsToShuffle.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[itemsToShuffle[i], itemsToShuffle[j]] = [itemsToShuffle[j], itemsToShuffle[i]];
+			}
+
+			// Rebuild the queue with current item at position 0 (if playing)
+			if (hasCurrentlyPlaying && currentItem) {
+				this.queue = [currentItem, ...itemsToShuffle];
+				this.queuePosition = 0;
+			} else {
+				this.queue = itemsToShuffle;
+			}
+
+			// Rebuild MPV playlist to match
+			await this.rebuildMpvPlaylist();
+
+			this.broadcastQueue();
+
+			return { success: true, queueLength: this.queue.length };
+		} finally {
+			releaseLock();
 		}
-
-		// Fisher-Yates shuffle
-		for (let i = itemsToShuffle.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[itemsToShuffle[i], itemsToShuffle[j]] = [itemsToShuffle[j], itemsToShuffle[i]];
-		}
-
-		// Rebuild the queue with current item at position 0 (if playing)
-		if (hasCurrentlyPlaying && currentItem) {
-			this.queue = [currentItem, ...itemsToShuffle];
-			this.queuePosition = 0;
-		} else {
-			this.queue = itemsToShuffle;
-		}
-
-		// Rebuild MPV playlist to match
-		await this.rebuildMpvPlaylist();
-
-		this.broadcastQueue();
-
-		return { success: true, queueLength: this.queue.length };
 	}
 
 	/**
@@ -1070,61 +1152,67 @@ class MediaPlayerService extends EventEmitter {
 	 * @returns {Promise<Object>} Result
 	 */
 	async sortQueue(sortBy = 'pub_date', order = 'asc') {
-		if (this.queue.length <= 1) {
-			return { success: true, queueLength: this.queue.length, message: 'Queue too short to sort' };
-		}
-
-		// Validate sortBy
-		const validSortFields = ['pub_date', 'downloaded_at'];
-		if (!validSortFields.includes(sortBy)) {
-			throw new Error(`Invalid sort field. Must be one of: ${validSortFields.join(', ')}`);
-		}
-
-		// Validate order
-		const validOrders = ['asc', 'desc'];
-		if (!validOrders.includes(order.toLowerCase())) {
-			throw new Error(`Invalid sort order. Must be one of: ${validOrders.join(', ')}`);
-		}
-
-		console.log(`[media] Sorting queue by ${sortBy} ${order}`);
-
-		const isAsc = order.toLowerCase() === 'asc';
-
-		// Sort the queue
-		this.queue.sort((a, b) => {
-			let valueA, valueB;
-
-			if (sortBy === 'pub_date') {
-				// pub_date is stored as ISO string
-				valueA = a.episode.pub_date ? new Date(a.episode.pub_date).getTime() : 0;
-				valueB = b.episode.pub_date ? new Date(b.episode.pub_date).getTime() : 0;
-			} else if (sortBy === 'downloaded_at') {
-				// downloaded_at is stored as unix timestamp
-				valueA = a.episode.downloaded_at || 0;
-				valueB = b.episode.downloaded_at || 0;
+		const releaseLock = await this.acquireLock('sortQueue');
+		
+		try {
+			if (this.queue.length <= 1) {
+				return { success: true, queueLength: this.queue.length, message: 'Queue too short to sort' };
 			}
 
-			if (isAsc) {
-				return valueA - valueB;
-			} else {
-				return valueB - valueA;
+			// Validate sortBy
+			const validSortFields = ['pub_date', 'downloaded_at'];
+			if (!validSortFields.includes(sortBy)) {
+				throw new Error(`Invalid sort field. Must be one of: ${validSortFields.join(', ')}`);
 			}
-		});
 
-		// Find the new position of the currently playing episode
-		if (this.currentEpisode) {
-			const newPosition = this.queue.findIndex(item => item.episodeId === this.currentEpisode.id);
-			if (newPosition !== -1) {
-				this.queuePosition = newPosition;
+			// Validate order
+			const validOrders = ['asc', 'desc'];
+			if (!validOrders.includes(order.toLowerCase())) {
+				throw new Error(`Invalid sort order. Must be one of: ${validOrders.join(', ')}`);
 			}
+
+			console.log(`[media] Sorting queue by ${sortBy} ${order}`);
+
+			const isAsc = order.toLowerCase() === 'asc';
+
+			// Sort the queue
+			this.queue.sort((a, b) => {
+				let valueA, valueB;
+
+				if (sortBy === 'pub_date') {
+					// pub_date is stored as ISO string
+					valueA = a.episode.pub_date ? new Date(a.episode.pub_date).getTime() : 0;
+					valueB = b.episode.pub_date ? new Date(b.episode.pub_date).getTime() : 0;
+				} else if (sortBy === 'downloaded_at') {
+					// downloaded_at is stored as unix timestamp
+					valueA = a.episode.downloaded_at || 0;
+					valueB = b.episode.downloaded_at || 0;
+				}
+
+				if (isAsc) {
+					return valueA - valueB;
+				} else {
+					return valueB - valueA;
+				}
+			});
+
+			// Find the new position of the currently playing episode
+			if (this.currentEpisode) {
+				const newPosition = this.queue.findIndex(item => item.episodeId === this.currentEpisode.id);
+				if (newPosition !== -1) {
+					this.queuePosition = newPosition;
+				}
+			}
+
+			// Rebuild MPV playlist to match
+			await this.rebuildMpvPlaylist();
+
+			this.broadcastQueue();
+
+			return { success: true, queueLength: this.queue.length, sortBy, order };
+		} finally {
+			releaseLock();
 		}
-
-		// Rebuild MPV playlist to match
-		await this.rebuildMpvPlaylist();
-
-		this.broadcastQueue();
-
-		return { success: true, queueLength: this.queue.length, sortBy, order };
 	}
 
 	/**
