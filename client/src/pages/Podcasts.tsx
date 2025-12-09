@@ -571,12 +571,18 @@ function Podcasts() {
 
 						<DragOverlay>
 							{activeDragItem ? (
-								<Card p="sm" shadow="lg" style={{ cursor: 'grabbing' }}>
+								<Card
+									p="sm"
+									shadow="lg"
+									style={{ cursor: 'grabbing' }}
+									bg={currentEpisode?.id === activeDragItem.episodeId ? "var(--mantine-color-teal-light)" : undefined}
+								>
 									<Group justify="space-between" align="center" wrap="nowrap">
 										<div style={{ flex: 1, minWidth: 0 }}>
 											<Group gap={4} wrap="nowrap">
 												<Text
 													size="sm"
+													c={currentEpisode?.id === activeDragItem.episodeId ? "var(--mantine-color-teal-light-color)" : undefined}
 													truncate
 													style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
 												>
