@@ -62,6 +62,29 @@ export interface RegeneratePlaylistResponse {
 	episodeCount: number;
 }
 
+export interface PlaylistEpisode {
+	id: number;
+	subscription_id: number;
+	title: string;
+	description: string;
+	pub_date: string;
+	duration: string;
+	audio_url: string;
+	image_url: string | null;
+	file_path: string | null;
+	downloaded_at: number | null;
+	playback_position: number;
+	playback_completed: boolean;
+	last_played_at: number | null;
+	position: number;
+}
+
+export interface PlaylistEpisodesResponse {
+	success: boolean;
+	episodes: PlaylistEpisode[];
+	count: number;
+}
+
 /**
  * Get all auto-generated playlists
  */
@@ -125,6 +148,23 @@ export async function getPlaylistById(id: number): Promise<PlaylistResponse> {
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.error || 'Failed to get playlist');
+	}
+
+	return response.json();
+}
+
+/**
+ * Get episodes in a user playlist
+ */
+export async function getPlaylistEpisodes(playlistId: number): Promise<PlaylistEpisodesResponse> {
+	const response = await fetch(`${API_BASE_URL}/api/playlists/${playlistId}/episodes`, {
+		method: 'GET',
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to get playlist episodes');
 	}
 
 	return response.json();

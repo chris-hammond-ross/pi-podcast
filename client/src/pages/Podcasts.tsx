@@ -130,7 +130,7 @@ function TrashDropZone() {
 				transition: 'all 150ms ease',
 			}}
 		>
-			<Trash size={20} color={isOver ? 'var(--mantine-color-red-filled)' : 'var(--mantine-color-red-text)'} />
+			<Trash size={16} color={isOver ? 'var(--mantine-color-red-filled)' : 'var(--mantine-color-red-text)'} />
 			<Text c={isOver ? 'var(--mantine-color-red-filled)' : 'red'} fw={isOver ? 600 : 400}>
 				Drop here to remove episode
 			</Text>
