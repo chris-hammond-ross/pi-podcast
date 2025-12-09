@@ -410,15 +410,36 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 
 	const removeFromQueue = useCallback(async (index: number) => {
 		setError(null);
+
+		// Store previous state for rollback
+		const previousQueue = queue;
+		const previousLength = queueLength;
+		const previousPosition = queuePosition;
+
+		// Optimistically update state immediately
+		setQueue(prev => prev.filter((_, i) => i !== index));
+		setQueueLength(prev => prev - 1);
+
+		// Adjust queue position if needed
+		if (index < queuePosition) {
+			setQueuePosition(prev => prev - 1);
+		} else if (index === queuePosition && queuePosition >= queueLength - 1) {
+			setQueuePosition(prev => Math.max(-1, prev - 1));
+		}
+
 		try {
 			await mediaApi.removeFromQueue(index);
 		} catch (err) {
+			// Rollback on error
+			setQueue(previousQueue);
+			setQueueLength(previousLength);
+			setQueuePosition(previousPosition);
+
 			const message = err instanceof Error ? err.message : 'Failed to remove from queue';
 			setError(message);
-			await refreshQueue();
 			throw err;
 		}
-	}, [refreshQueue]);
+	}, [queue, queueLength, queuePosition]);
 
 	const clearQueue = useCallback(async () => {
 		setError(null);
@@ -435,15 +456,29 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 
 	const moveInQueue = useCallback(async (from: number, to: number) => {
 		setError(null);
+
+		// Store previous state for rollback
+		const previousQueue = queue;
+
+		// Optimistically update state immediately
+		setQueue(prev => {
+			const newQueue = [...prev];
+			const [removed] = newQueue.splice(from, 1);
+			newQueue.splice(to, 0, removed);
+			return newQueue;
+		});
+
 		try {
 			await mediaApi.moveInQueue(from, to);
 		} catch (err) {
+			// Rollback on error
+			setQueue(previousQueue);
+
 			const message = err instanceof Error ? err.message : 'Failed to reorder queue';
 			setError(message);
-			await refreshQueue();
 			throw err;
 		}
-	}, [refreshQueue]);
+	}, [queue]);
 
 	const playQueueIndex = useCallback(async (index: number) => {
 		setError(null);
