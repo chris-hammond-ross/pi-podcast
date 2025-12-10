@@ -41,7 +41,9 @@ function Settings() {
 				visible={isRestarting}
 				zIndex={1000}
 				overlayProps={{ radius: 'sm', blur: 2 }}
-				loaderProps={{ type: 'bars' }}
+				loaderProps={{ type: 'dots' }}
+				h="100svh"
+				mt="calc(0px - var(--header-height))"
 			/>
 			<Tabs
 				defaultValue="bluetooth"
