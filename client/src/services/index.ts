@@ -9,6 +9,7 @@ export * from './downloads';
 export * from './episodes';
 export * from './mediaPlayer';
 export * from './playlists';
+export * from './system';
 export {
 	WebSocketService,
 	getWebSocketService,
