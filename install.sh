@@ -662,8 +662,8 @@ Environment="PULSE_SERVER=unix:$PULSE_SOCKET"
 RuntimeDirectory=pi-podcast
 RuntimeDirectoryMode=0755
 
-# Security hardening
-NoNewPrivileges=true
+# Security hardening (NoNewPrivileges disabled to allow sudo for service restarts)
+#NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=$INSTALL_DIR/api
