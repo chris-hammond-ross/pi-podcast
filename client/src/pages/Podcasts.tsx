@@ -585,20 +585,34 @@ function Podcasts() {
 											flexDirection: 'column'
 										}}
 									>
-										<SortableContext
-											items={queue.map(item => item.episodeId)}
-											strategy={verticalListSortingStrategy}
-										>
-											{queue.map((item, index) => (
-												<SortableQueueItem
-													key={item.episodeId}
-													item={item}
-													queueIndex={index}
-													isCurrentEpisode={currentEpisode?.id === item.episodeId}
-													onPlayEpisode={handlePlayEpisodeInQueue}
-												/>
-											))}
-										</SortableContext>
+										{queue.length === 0 ? (
+											<Card
+												mb="-1rem"
+												style={{
+													flex: 1,
+													display: 'flex',
+													alignItems: 'center',
+													justifyContent: 'center'
+												}}
+											>
+												<Text c="dimmed">No episodes in queue</Text>
+											</Card>
+										) : (
+											<SortableContext
+												items={queue.map(item => item.episodeId)}
+												strategy={verticalListSortingStrategy}
+											>
+												{queue.map((item, index) => (
+													<SortableQueueItem
+														key={item.episodeId}
+														item={item}
+														queueIndex={index}
+														isCurrentEpisode={currentEpisode?.id === item.episodeId}
+														onPlayEpisode={handlePlayEpisodeInQueue}
+													/>
+												))}
+											</SortableContext>
+										)}
 									</Stack>
 								</Tabs.Panel>
 							</Container>
