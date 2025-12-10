@@ -11,12 +11,14 @@ interface EpisodeRowProps {
 	episodeId: number;
 	subscriptionName?: string;
 	showDownloadStatus?: boolean;
+	onEpisodeDeleted?: (episodeId: number) => void;
 }
 
 function EpisodeRow({
 	episodeId,
 	subscriptionName,
-	showDownloadStatus = true
+	showDownloadStatus = true,
+	onEpisodeDeleted
 }: EpisodeRowProps) {
 	const [detailModalOpened, setDetailModalOpened] = useState(false);
 	const [actionsModalOpened, setActionsModalOpened] = useState(false);
@@ -81,6 +83,13 @@ function EpisodeRow({
 		updateEpisode(updatedEpisode.id, updatedEpisode);
 	};
 
+	const handleEpisodeDeleted = (deletedEpisodeId: number) => {
+		// Notify parent component
+		if (onEpisodeDeleted) {
+			onEpisodeDeleted(deletedEpisodeId);
+		}
+	};
+
 	// Show loading skeleton if episode is being fetched
 	if (isEpisodeLoading(episodeId) || !episode) {
 		return (
@@ -141,7 +150,11 @@ function EpisodeRow({
 							{subscriptionName && subscriptionName}
 						</Text>
 					</div>
-					<EpisodeActionsModal episodeId={episodeId} subscriptionName={subscriptionName} />
+					<EpisodeActionsModal 
+						episodeId={episodeId} 
+						subscriptionName={subscriptionName}
+						onEpisodeDeleted={handleEpisodeDeleted}
+					/>
 				</Group>
 			</Card>
 

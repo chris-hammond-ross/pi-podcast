@@ -237,6 +237,27 @@ router.delete('/queue', async (req, res) => {
 });
 
 /**
+ * DELETE /api/media/queue/episode/:episodeId
+ * Remove episode from queue by episode ID
+ * This handles the case where the episode is currently playing
+ */
+router.delete('/queue/episode/:episodeId', async (req, res) => {
+	try {
+		const episodeId = parseInt(req.params.episodeId, 10);
+
+		if (isNaN(episodeId)) {
+			return res.status(400).json({ error: 'Invalid episode ID' });
+		}
+
+		const result = await mediaPlayerService.removeEpisodeFromQueue(episodeId);
+		res.json(result);
+	} catch (error) {
+		console.error('[media-route] Error removing episode from queue:', error);
+		res.status(500).json({ error: error.message });
+	}
+});
+
+/**
  * DELETE /api/media/queue/:index
  * Remove item from queue by index
  */

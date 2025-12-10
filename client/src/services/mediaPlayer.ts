@@ -303,6 +303,24 @@ export async function removeFromQueue(index: number): Promise<{ success: boolean
 }
 
 /**
+ * Remove episode from queue by episode ID
+ * Handles the case where the episode is currently playing by stopping it first
+ */
+export async function removeEpisodeFromQueue(episodeId: number): Promise<{ success: boolean; removed: boolean; wasPlaying: boolean; queueLength: number }> {
+	const response = await fetch(`${API_BASE_URL}/api/media/queue/episode/${episodeId}`, {
+		method: 'DELETE',
+		headers: { 'Content-Type': 'application/json' }
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to remove episode from queue');
+	}
+
+	return response.json();
+}
+
+/**
  * Clear the entire queue
  */
 export async function clearQueue(): Promise<{ success: boolean }> {

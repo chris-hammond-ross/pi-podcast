@@ -45,6 +45,7 @@ export interface MediaPlayerContextValue {
 	addToQueue: (episodeId: number) => Promise<void>;
 	addMultipleToQueue: (episodeIds: number[]) => Promise<void>;
 	removeFromQueue: (index: number) => Promise<void>;
+	removeEpisodeFromQueue: (episodeId: number) => Promise<{ removed: boolean; wasPlaying: boolean }>;
 	clearQueue: () => Promise<void>;
 	moveInQueue: (from: number, to: number) => Promise<void>;
 	playQueueIndex: (index: number) => Promise<void>;
@@ -441,6 +442,20 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		}
 	}, [queue, queueLength, queuePosition]);
 
+	const removeEpisodeFromQueue = useCallback(async (episodeId: number): Promise<{ removed: boolean; wasPlaying: boolean }> => {
+		setError(null);
+		try {
+			const result = await mediaApi.removeEpisodeFromQueue(episodeId);
+			return { removed: result.removed, wasPlaying: result.wasPlaying };
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Failed to remove episode from queue';
+			setError(message);
+			await refreshQueue();
+			await refreshStatus();
+			throw err;
+		}
+	}, [refreshQueue, refreshStatus]);
+
 	const clearQueue = useCallback(async () => {
 		setError(null);
 		try {
@@ -579,6 +594,7 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		addToQueue,
 		addMultipleToQueue,
 		removeFromQueue,
+		removeEpisodeFromQueue,
 		clearQueue,
 		moveInQueue,
 		playQueueIndex,

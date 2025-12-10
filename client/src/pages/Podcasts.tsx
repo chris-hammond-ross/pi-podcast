@@ -313,6 +313,11 @@ function Podcasts() {
 		}
 	}, [navigate, selectedSubscription]);
 
+	// Handle episode deletion - remove from downloaded episodes list
+	const handleEpisodeDeleted = useCallback((deletedEpisodeId: number) => {
+		setDownloadedEpisodes(prev => prev.filter(ep => ep.id !== deletedEpisodeId));
+	}, []);
+
 	const openSavePlaylistModal = () => {
 		setPlaylistName('');
 		setSavePlaylistError(null);
@@ -747,6 +752,7 @@ function Podcasts() {
 											episodeId={episode.id}
 											subscriptionName={episode.subscription_name}
 											showDownloadStatus={false}
+											onEpisodeDeleted={handleEpisodeDeleted}
 										/>
 									))}
 								</Stack>

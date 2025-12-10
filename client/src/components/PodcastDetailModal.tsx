@@ -238,10 +238,26 @@ function PodcastDetailModal({
 		);
 	};
 
+	// Handle episode deletion - update local episode to show it's no longer downloaded
+	const handleEpisodeDeleted = useCallback((deletedEpisodeId: number) => {
+		setEpisodes(prev =>
+			prev.map(e => e.id === deletedEpisodeId ? {
+				...e,
+				downloaded_at: null,
+				file_path: null,
+				file_size: null
+			} : e)
+		);
+	}, []);
+
 	const renderEpisodeStatus = (episode: EpisodeRecord) => {
 		if (episode.downloaded_at) {
 			return (
-				<EpisodeActionsModal episodeId={episode.id} subscriptionName={subscription?.name} />
+				<EpisodeActionsModal 
+					episodeId={episode.id} 
+					subscriptionName={subscription?.name}
+					onEpisodeDeleted={handleEpisodeDeleted}
+				/>
 			);
 		}
 

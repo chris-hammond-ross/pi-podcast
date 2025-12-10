@@ -1008,6 +1008,88 @@ class MediaPlayerService extends EventEmitter {
 	}
 
 	/**
+	 * Remove an episode from the queue by episode ID
+	 * This handles the case where the episode is currently playing by stopping playback first
+	 * @param {number} episodeId - Episode ID to remove
+	 * @returns {Promise<Object>} Result with wasPlaying flag
+	 */
+	async removeEpisodeFromQueue(episodeId) {
+		const releaseLock = await this.acquireLock('removeEpisodeFromQueue');
+		
+		try {
+			// Find the episode in the queue
+			const index = this.queue.findIndex(item => item.episodeId === episodeId);
+			
+			if (index === -1) {
+				// Episode not in queue - that's fine, nothing to do
+				return {
+					success: true,
+					removed: false,
+					wasPlaying: false,
+					queueLength: this.queue.length
+				};
+			}
+
+			const wasPlaying = index === this.queuePosition;
+			const removed = this.queue[index];
+			
+			console.log(`[media] Removing episode from queue: ${removed.episode.title}, wasPlaying: ${wasPlaying}`);
+
+			if (wasPlaying) {
+				// Save current position before stopping
+				if (this.currentEpisode && this.position > 0) {
+					await this.saveCurrentPosition();
+				}
+
+				// Stop playback
+				try {
+					await this.sendCommand(['stop']);
+				} catch (err) {
+					console.warn('[media] Could not stop playback:', err.message);
+				}
+
+				this.stopPositionSaveTimer();
+				this.currentEpisode = null;
+				this.isPlaying = false;
+				this.isPaused = false;
+				this.position = 0;
+				this.duration = 0;
+			}
+
+			// Remove from MPV playlist
+			try {
+				await this.sendCommand(['playlist-remove', index]);
+			} catch (err) {
+				console.warn('[media] Could not remove from MPV playlist:', err.message);
+			}
+
+			// Remove from our queue
+			this.queue.splice(index, 1);
+
+			// Adjust queue position
+			if (wasPlaying) {
+				// If there are more items in the queue after this one, we could auto-advance
+				// For now, just reset to indicate nothing is playing
+				this.queuePosition = -1;
+			} else if (index < this.queuePosition) {
+				this.queuePosition--;
+			}
+
+			this.broadcastStatus();
+			this.broadcastQueue();
+
+			return {
+				success: true,
+				removed: true,
+				wasPlaying: wasPlaying,
+				queueLength: this.queue.length
+			};
+		} finally {
+			releaseLock();
+		}
+	}
+
+	/**
 	 * Clear the entire queue and stop playback
 	 * @returns {Promise<Object>} Result
 	 */
