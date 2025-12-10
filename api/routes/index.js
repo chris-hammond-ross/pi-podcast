@@ -9,6 +9,7 @@ const episodeRoutes = require('./episodes');
 const downloadRoutes = require('./downloads');
 const mediaRoutes = require('./media');
 const playlistRoutes = require('./playlists');
+const systemRoutes = require('./system');
 
 // Mount routes
 router.use('/bluetooth', bluetoothRoutes);
@@ -18,5 +19,6 @@ router.use('/episodes', episodeRoutes);
 router.use('/downloads', downloadRoutes);
 router.use('/media', mediaRoutes);
 router.use('/playlists', playlistRoutes);
+router.use('/system', systemRoutes);
 
 module.exports = router;

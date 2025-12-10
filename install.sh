@@ -29,6 +29,9 @@ cleanup() {
         [ -f "$SERVICE_FILE" ] && rm -f "$SERVICE_FILE"
         [ -f "$PULSEAUDIO_SERVICE_FILE" ] && rm -f "$PULSEAUDIO_SERVICE_FILE"
 
+        # Remove sudoers file if it was created
+        [ -f "/etc/sudoers.d/pi-podcast-restart" ] && rm -f "/etc/sudoers.d/pi-podcast-restart"
+
         # Remove installation directory if it was created during this run
         if [ "$INSTALL_DIR_CREATED" = "true" ] && [ -d "$INSTALL_DIR" ]; then
             rm -rf "$INSTALL_DIR"
@@ -162,6 +165,31 @@ create_service_user() {
     # Add user to required groups
     usermod -aG bluetooth,audio "$SERVICE_USER"
     print_success "Added $SERVICE_USER to bluetooth and audio groups"
+}
+
+configure_sudoers() {
+    print_header "Configuring sudoers for service restart"
+
+    local SUDOERS_FILE="/etc/sudoers.d/pi-podcast-restart"
+
+    # Create sudoers file to allow pi-podcast user to restart services without password
+    cat > "$SUDOERS_FILE" << EOF
+# Allow pi-podcast user to restart pi-podcast services without password
+# This enables the web UI to trigger service restarts
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast
+EOF
+
+    # Set correct permissions (sudoers files must be 0440)
+    chmod 0440 "$SUDOERS_FILE"
+
+    # Validate the sudoers file
+    if visudo -c -f "$SUDOERS_FILE" &>/dev/null; then
+        print_success "Sudoers configuration created at $SUDOERS_FILE"
+    else
+        print_error "Invalid sudoers configuration, removing file"
+        rm -f "$SUDOERS_FILE"
+        exit 1
+    fi
 }
 
 install_nodejs() {
@@ -734,6 +762,7 @@ main() {
     update_system
     install_dependencies
     create_service_user
+    configure_sudoers
     enable_bluetooth_adapter
     disable_user_pulseaudio
     configure_pulseaudio

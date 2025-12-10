@@ -282,6 +282,19 @@ remove_bluetooth_devices() {
     fi
 }
 
+remove_sudoers_config() {
+    print_header "Removing sudoers configuration"
+
+    local SUDOERS_FILE="/etc/sudoers.d/pi-podcast-restart"
+
+    if [ -f "$SUDOERS_FILE" ]; then
+        rm -f "$SUDOERS_FILE"
+        print_success "Removed sudoers configuration: $SUDOERS_FILE"
+    else
+        print_info "Sudoers configuration does not exist"
+    fi
+}
+
 remove_service_user() {
     print_header "Removing service user and group"
 
@@ -424,6 +437,7 @@ main() {
     remove_service_file
     remove_pulseaudio_config
     remove_bluetooth_devices
+    remove_sudoers_config
     remove_service_user
     remove_runtime_directory
     remove_install_directory
