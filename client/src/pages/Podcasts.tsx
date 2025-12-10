@@ -34,11 +34,12 @@ import {
 	ScrollArea,
 	Button,
 	Modal,
-	TextInput
+	TextInput,
+	ActionIcon
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { AlertCircle, X, Save, GripHorizontal, Trash } from 'lucide-react';
+import { AlertCircle, X, Save, GripHorizontal, Trash, Play } from 'lucide-react';
 import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
@@ -51,9 +52,11 @@ const TRASH_DROP_ID = 'trash-drop-zone';
 interface SortableQueueItemProps {
 	item: typeof queue[number];
 	isCurrentEpisode: boolean;
+	queueIndex: number;
+	onPlayEpisode: (index: number) => void;
 }
 
-function SortableQueueItem({ item, isCurrentEpisode }: SortableQueueItemProps) {
+function SortableQueueItem({ item, isCurrentEpisode, queueIndex, onPlayEpisode }: SortableQueueItemProps) {
 	const {
 		attributes,
 		listeners,
@@ -95,18 +98,30 @@ function SortableQueueItem({ item, isCurrentEpisode }: SortableQueueItemProps) {
 						)}
 					</Group>
 				</div>
-				<div
-					{...attributes}
-					{...listeners}
-					style={{
-						display: "flex",
-						alignItems: "center",
-						cursor: "grab",
-						touchAction: "none"
-					}}
-				>
-					<GripHorizontal size={20} />
-				</div>
+				<Group>
+					<ActionIcon
+						variant="light"
+						color="cyan"
+						onClick={() => onPlayEpisode(queueIndex)}
+						title="Play Episode"
+						disabled={isCurrentEpisode}
+					>
+						<Play size={16} />
+					</ActionIcon>
+					<div
+						{...attributes}
+						{...listeners}
+						style={{
+							display: "flex",
+							alignItems: "center",
+							cursor: "grab",
+							touchAction: "none"
+						}}
+					>
+						<GripHorizontal size={20} />
+					</div>
+				</Group>
+
 			</Group>
 		</Card>
 	);
@@ -165,7 +180,16 @@ function Podcasts() {
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const { queue, currentEpisode, clearQueue, moveInQueue, removeFromQueue } = useMediaPlayer();
+	const {
+		queue,
+		currentEpisode,
+		clearQueue,
+		moveInQueue,
+		removeFromQueue,
+		playQueueIndex,
+		pause,
+		queuePosition
+	} = useMediaPlayer();
 
 	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
@@ -300,6 +324,10 @@ function Podcasts() {
 		setPlaylistName('');
 		setSavePlaylistError(null);
 	};
+
+	const handlePlayEpisodeInQueue = useCallback(async (index: number) => {
+		await playQueueIndex(index);
+	}, [playQueueIndex]);
 
 	const handleSavePlaylist = async () => {
 		const trimmedName = playlistName.trim();
@@ -556,11 +584,13 @@ function Podcasts() {
 											items={queue.map(item => item.episodeId)}
 											strategy={verticalListSortingStrategy}
 										>
-											{queue.map((item) => (
+											{queue.map((item, index) => (
 												<SortableQueueItem
 													key={item.episodeId}
 													item={item}
+													queueIndex={index}
 													isCurrentEpisode={currentEpisode?.id === item.episodeId}
+													onPlayEpisode={handlePlayEpisodeInQueue}
 												/>
 											))}
 										</SortableContext>
