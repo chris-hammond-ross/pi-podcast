@@ -255,6 +255,7 @@ function EpisodeDetailModal({
 
 	return (
 		<Modal
+			className="podcast-details"
 			opened={opened}
 			onClose={onClose}
 			withCloseButton={false}
