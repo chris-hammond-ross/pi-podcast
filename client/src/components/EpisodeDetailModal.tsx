@@ -7,8 +7,7 @@ import {
 	Group,
 	ScrollArea,
 	ActionIcon,
-	Badge,
-	Box
+	Badge
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { Download, Trash2, X, Clock, Loader, Play, Pause } from 'lucide-react';
@@ -283,8 +282,7 @@ function EpisodeDetailModal({
 				gap="0"
 				style={{
 					flex: 1,
-					overflow: 'hidden',
-					minHeight: 0
+					overflow: 'hidden'
 				}}
 			>
 				{/* Header */}
@@ -356,25 +354,27 @@ function EpisodeDetailModal({
 				</Group>
 
 				{/* Description */}
-				<ScrollArea
-					style={{ flex: 1, minHeight: 0 }}
-					scrollbars="y"
-					scrollbarSize={4}
-				>
-					<Box p="md">
-						{description ? (
-							<Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-								{description}
-							</Text>
-
-						) : (
-							<Text size="sm" c="dimmed" ta="center">
-								No show notes available for this episode.
-							</Text>
-						)}
-					</Box>
-
-				</ScrollArea>
+				{description ? (
+					<ScrollArea
+						style={{ flex: 1, minHeight: 0 }}
+						scrollbars="y"
+						scrollbarSize={4}
+					>
+						<Text
+							size="sm"
+							p="md"
+							style={{
+								whiteSpace: 'pre-wrap'
+							}}
+						>
+							{description}
+						</Text>
+					</ScrollArea>
+				) : (
+					<Text size="sm" p="md" c="dimmed" ta="center">
+						No show notes available for this episode.
+					</Text>
+				)}
 
 				{/* Actions */}
 				<Group

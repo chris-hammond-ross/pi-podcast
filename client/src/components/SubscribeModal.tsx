@@ -140,7 +140,13 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 				}
 			}}
 		>
-			<Stack gap="0" style={{ flex: 1, overflow: 'hidden' }}>
+			<Stack
+				gap="0"
+				style={{
+					flex: 1,
+					overflow: 'hidden'
+				}}
+			>
 				<ActionIcon
 					radius="xl"
 					size="lg"
