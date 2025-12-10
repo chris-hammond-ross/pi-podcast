@@ -65,7 +65,8 @@ function EpisodeDetailModal({
 		pause,
 		currentEpisode,
 		isPlaying,
-		isPaused
+		isPaused,
+		removeEpisodeFromQueue
 	} = useMediaPlayer();
 
 	// Check if this episode is currently downloading
@@ -103,13 +104,30 @@ function EpisodeDetailModal({
 
 		setIsDeleting(true);
 		try {
+			// First, remove from queue if present (this also handles stopping playback if needed)
+			try {
+				const queueResult = await removeEpisodeFromQueue(episode.id);
+				if (queueResult.wasPlaying) {
+					console.log('[EpisodeDetailModal] Episode was playing, stopped playback');
+				}
+				if (queueResult.removed) {
+					console.log('[EpisodeDetailModal] Episode removed from queue');
+				}
+			} catch (queueErr) {
+				// Queue removal is best-effort, continue with deletion
+				console.warn('[EpisodeDetailModal] Could not remove from queue:', queueErr);
+			}
+
+			// Delete the file and database entry
 			await deleteEpisodeDownload(episode.id);
+
 			notifications.show({
 				color: 'teal',
 				message: `Deleted "${episode.title}"`,
 				position: 'top-right',
 				autoClose: 1200
 			});
+
 			if (onEpisodeUpdate) {
 				onEpisodeUpdate({
 					...episode,

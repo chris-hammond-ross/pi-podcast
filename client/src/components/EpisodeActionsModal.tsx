@@ -10,16 +10,17 @@ import type { EpisodeRecord } from '../services';
 interface EpisodeActionsModalProps {
 	episodeId: number;
 	subscriptionName?: string;
+	onEpisodeDeleted?: (episodeId: number) => void;
 }
 
-function EpisodeActionsModal({ episodeId, subscriptionName }: EpisodeActionsModalProps) {
+function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: EpisodeActionsModalProps) {
 	const [modalOpened, setModalOpened] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [episode, setEpisode] = useState<EpisodeRecord | null>(null);
 	const location = useLocation();
 
-	const { getEpisodeById, updateEpisode } = useEpisodesContext();
-	const { play, addToQueue } = useMediaPlayer();
+	const { getEpisodeById, updateEpisode, removeEpisode } = useEpisodesContext();
+	const { play, addToQueue, removeEpisodeFromQueue } = useMediaPlayer();
 
 	// Load episode data
 	useEffect(() => {
@@ -120,9 +121,24 @@ function EpisodeActionsModal({ episodeId, subscriptionName }: EpisodeActionsModa
 
 		setIsDeleting(true);
 		try {
+			// First, remove from queue if present (this also handles stopping playback if needed)
+			try {
+				const queueResult = await removeEpisodeFromQueue(episode.id);
+				if (queueResult.wasPlaying) {
+					console.log('[EpisodeActionsModal] Episode was playing, stopped playback');
+				}
+				if (queueResult.removed) {
+					console.log('[EpisodeActionsModal] Episode removed from queue');
+				}
+			} catch (queueErr) {
+				// Queue removal is best-effort, continue with deletion
+				console.warn('[EpisodeActionsModal] Could not remove from queue:', queueErr);
+			}
+
+			// Delete the file and database entry
 			await deleteEpisodeDownload(episode.id);
 
-			// Update cache
+			// Update episode in cache to reflect it's no longer downloaded
 			updateEpisode(episode.id, {
 				downloaded_at: null,
 				file_path: null,
@@ -136,6 +152,11 @@ function EpisodeActionsModal({ episodeId, subscriptionName }: EpisodeActionsModa
 				file_path: null,
 				file_size: null
 			} : null);
+
+			// Notify parent component that episode was deleted
+			if (onEpisodeDeleted) {
+				onEpisodeDeleted(episode.id);
+			}
 
 			notifications.show({
 				color: 'teal',
