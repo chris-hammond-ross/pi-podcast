@@ -10,7 +10,8 @@ import {
 	TextInput,
 	UnstyledButton,
 	Box,
-	ScrollArea
+	ScrollArea,
+	Card
 } from '@mantine/core';
 import {
 	Ellipsis,
@@ -437,13 +438,17 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 
 								{/* Existing playlists list */}
 								{isLoadingPlaylists ? (
-									<Text size="sm" c="dimmed" ta="center" py="md">
-										Loading playlists...
-									</Text>
+									<Card p="xs">
+										<Text size="sm" c="dimmed" ta="center" py="md">
+											Loading playlists...
+										</Text>
+									</Card>
 								) : userPlaylists.length === 0 ? (
-									<Text size="sm" c="dimmed" ta="center" py="md">
-										No playlists yet. Create one above!
-									</Text>
+									<Card p="xs">
+										<Text size="sm" c="dimmed" ta="center" py="md">
+											No user created playlists available
+										</Text>
+									</Card>
 								) : (
 									<ScrollArea.Autosize
 										style={{
