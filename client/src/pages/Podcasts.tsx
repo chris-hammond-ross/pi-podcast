@@ -2,14 +2,12 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
 	DndContext,
-	closestCenter,
 	KeyboardSensor,
 	PointerSensor,
 	useSensor,
 	useSensors,
 	useDroppable,
 	DragOverlay,
-	rectIntersection,
 	pointerWithin,
 } from '@dnd-kit/core';
 import {
@@ -537,7 +535,7 @@ function Podcasts() {
 									onClick={openSavePlaylistModal}
 									disabled={queue.length === 0}
 								>
-									Save Playlist
+									Save as Playlist
 								</Button>
 								<Button
 									variant='light'

@@ -1,11 +1,36 @@
 import { useState, useEffect } from 'react';
-import { Modal, Stack, Button, Group, Text, ActionIcon } from '@mantine/core';
-import { Ellipsis, ListPlus, Play, Trash2 } from 'lucide-react';
+import {
+	Modal,
+	Stack,
+	Button,
+	Group,
+	Text,
+	ActionIcon,
+	Divider,
+	TextInput,
+	UnstyledButton,
+	Box,
+	ScrollArea
+} from '@mantine/core';
+import {
+	Ellipsis,
+	ListPlus,
+	Play,
+	Trash2,
+	ListEnd,
+	ArrowLeft,
+	ListMusic
+} from 'lucide-react';
 import { notifications } from '@mantine/notifications';
 import { useLocation } from 'react-router-dom';
 import { useEpisodesContext, useMediaPlayer } from '../contexts';
-import { deleteEpisodeDownload } from '../services';
-import type { EpisodeRecord } from '../services';
+import {
+	deleteEpisodeDownload,
+	getUserPlaylists,
+	createUserPlaylist,
+	addEpisodeToPlaylist
+} from '../services';
+import type { EpisodeRecord, UserPlaylist } from '../services';
 
 interface EpisodeActionsModalProps {
 	episodeId: number;
@@ -13,13 +38,156 @@ interface EpisodeActionsModalProps {
 	onEpisodeDeleted?: (episodeId: number) => void;
 }
 
+const exampleUserPlaylists: UserPlaylist[] = [
+	{
+		id: 1,
+		name: "Tech Talks Daily",
+		description: "My favorite technology and programming podcasts",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/tech-talks-daily",
+		created_at: 1704067200000,
+		updated_at: 1704153600000,
+		episode_count: 24,
+	},
+	{
+		id: 2,
+		name: "Fiction & Literature",
+		description: null,
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/fiction-literature",
+		created_at: 1703462400000,
+		updated_at: 1704240000000,
+		episode_count: 18,
+	},
+	{
+		id: 3,
+		name: "News Roundup",
+		description: "Daily news and current affairs",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/news-roundup",
+		created_at: 1702857600000,
+		updated_at: 1704326400000,
+		episode_count: 42,
+	},
+	{
+		id: 4,
+		name: "Morning Commute",
+		description: "Quick listens for the commute to work",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/morning-commute",
+		created_at: 1702252800000,
+		updated_at: 1704412800000,
+		episode_count: 31,
+	},
+	{
+		id: 5,
+		name: "Tech Talks Daily",
+		description: "My favorite technology and programming podcasts",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/tech-talks-daily",
+		created_at: 1704067200000,
+		updated_at: 1704153600000,
+		episode_count: 24,
+	},
+	{
+		id: 6,
+		name: "Fiction & Literature",
+		description: null,
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/fiction-literature",
+		created_at: 1703462400000,
+		updated_at: 1704240000000,
+		episode_count: 18,
+	},
+	{
+		id: 7,
+		name: "News Roundup",
+		description: "Daily news and current affairs",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/news-roundup",
+		created_at: 1702857600000,
+		updated_at: 1704326400000,
+		episode_count: 42,
+	},
+	{
+		id: 8,
+		name: "Morning Commute",
+		description: "Quick listens for the commute to work",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/morning-commute",
+		created_at: 1702252800000,
+		updated_at: 1704412800000,
+		episode_count: 31,
+	},
+	{
+		id: 9,
+		name: "Tech Talks Daily",
+		description: "My favorite technology and programming podcasts",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/tech-talks-daily",
+		created_at: 1704067200000,
+		updated_at: 1704153600000,
+		episode_count: 24,
+	},
+	{
+		id: 10,
+		name: "Fiction & Literature",
+		description: null,
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/fiction-literature",
+		created_at: 1703462400000,
+		updated_at: 1704240000000,
+		episode_count: 18,
+	},
+	{
+		id: 11,
+		name: "News Roundup",
+		description: "Daily news and current affairs",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/news-roundup",
+		created_at: 1702857600000,
+		updated_at: 1704326400000,
+		episode_count: 42,
+	},
+	{
+		id: 12,
+		name: "Morning Commute",
+		description: "Quick listens for the commute to work",
+		type: "user",
+		subscription_id: null,
+		file_path: "/home/pi/.podcasts/playlists/morning-commute",
+		created_at: 1702252800000,
+		updated_at: 1704412800000,
+		episode_count: 31,
+	},
+];
+
 function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: EpisodeActionsModalProps) {
 	const [modalOpened, setModalOpened] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [isShowingPlaylistInterface, setIsShowingPlaylistInterface] = useState(false);
 	const [episode, setEpisode] = useState<EpisodeRecord | null>(null);
 	const location = useLocation();
 
-	const { getEpisodeById, updateEpisode, removeEpisode } = useEpisodesContext();
+	// Playlist state
+	const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
+	const [isLoadingPlaylists, setIsLoadingPlaylists] = useState(false);
+	const [newPlaylistName, setNewPlaylistName] = useState('');
+	const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
+	const [isAddingToPlaylist, setIsAddingToPlaylist] = useState(false);
+
+	const { getEpisodeById, updateEpisode } = useEpisodesContext();
 	const { play, addToQueue, removeEpisodeFromQueue } = useMediaPlayer();
 
 	// Load episode data
@@ -55,6 +223,32 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 		};
 	}, [modalOpened]);
 
+	// Load user playlists when playlist interface is shown
+	useEffect(() => {
+		if (isShowingPlaylistInterface) {
+			loadUserPlaylists();
+		}
+	}, [isShowingPlaylistInterface]);
+
+	const loadUserPlaylists = async () => {
+		setIsLoadingPlaylists(true);
+		try {
+			const response = await getUserPlaylists();
+			setUserPlaylists(response.playlists);
+			setUserPlaylists(exampleUserPlaylists);
+		} catch (err) {
+			console.error('Failed to load playlists:', err);
+			notifications.show({
+				color: 'red',
+				message: 'Failed to load playlists',
+				position: 'top-right',
+				autoClose: 3000
+			});
+		} finally {
+			setIsLoadingPlaylists(false);
+		}
+	};
+
 	const handleActionsClick = (e: React.MouseEvent) => {
 		e.stopPropagation();
 		// Add history state for modal
@@ -64,6 +258,8 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 
 	const handleModalClose = () => {
 		setModalOpened(false);
+		setIsShowingPlaylistInterface(false);
+		setNewPlaylistName('');
 		// Go back if we pushed a state
 		if (window.history.state !== null) {
 			window.history.back();
@@ -178,6 +374,76 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 		}
 	};
 
+	const handlePlaylistInterface = () => {
+		setIsShowingPlaylistInterface(true);
+	};
+
+	const isPlaylistNameValid = () => {
+		const trimmedName = newPlaylistName.trim();
+		if (!trimmedName) return false;
+		// Check if name already exists (case-insensitive)
+		return !userPlaylists.some(
+			playlist => playlist.name.toLowerCase() === trimmedName.toLowerCase()
+		);
+	};
+
+	const handleCreatePlaylistAndAdd = async () => {
+		if (!episode || !isPlaylistNameValid()) return;
+
+		setIsCreatingPlaylist(true);
+		try {
+			// Create the new playlist
+			const createResponse = await createUserPlaylist(newPlaylistName.trim());
+			const newPlaylist = createResponse.playlist;
+
+			// Add the episode to the new playlist
+			await addEpisodeToPlaylist(newPlaylist.id, episode.id);
+
+			notifications.show({
+				color: 'teal',
+				message: `Created "${newPlaylist.name}" and added episode`,
+				position: 'top-right',
+				autoClose: 1200
+			});
+			handleModalClose();
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to create playlist',
+				position: 'top-right',
+				autoClose: 3000
+			});
+		} finally {
+			setIsCreatingPlaylist(false);
+		}
+	};
+
+	const handleAddToExistingPlaylist = async (playlist: UserPlaylist) => {
+		if (!episode) return;
+
+		setIsAddingToPlaylist(true);
+		try {
+			await addEpisodeToPlaylist(playlist.id, episode.id);
+
+			notifications.show({
+				color: 'teal',
+				message: `Added to "${playlist.name}"`,
+				position: 'top-right',
+				autoClose: 1200
+			});
+			handleModalClose();
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to add to playlist',
+				position: 'top-right',
+				autoClose: 3000
+			});
+		} finally {
+			setIsAddingToPlaylist(false);
+		}
+	};
+
 	if (!episode) return null;
 
 	return (
@@ -204,10 +470,35 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 					blur: 5
 				}}
 				onClick={(e) => e.stopPropagation()}
+				styles={{
+					content: {
+						display: 'flex',
+						flexDirection: 'column',
+						maxHeight: 'calc(100svh - 2rem)'
+					},
+					body: {
+						display: 'flex',
+						flexDirection: 'column',
+						flex: 1,
+						overflow: 'hidden'
+					}
+				}}
 			>
-				<Stack gap="md">
+				<Stack
+					gap="md"
+					style={{
+						flex: 1,
+						overflow: 'hidden'
+					}}
+				>
 					{/* Header */}
-					<Group justify="space-between" align="flex-start">
+					<Group
+						justify="space-between"
+						align="flex-start"
+						style={{
+							flexShrink: 0
+						}}
+					>
 						<div style={{ flex: 1, minWidth: 0 }}>
 							<Text fw={600} size="lg" lineClamp={2}>
 								{episode.title}
@@ -218,39 +509,176 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 						</div>
 					</Group>
 
-					{/* Action Buttons */}
-					<Stack gap="xs">
-						<Button
-							variant="light"
-							color="teal"
-							leftSection={<Play size={16} />}
-							onClick={handlePlay}
-							fullWidth
-						>
-							Play Episode
-						</Button>
-						<Button
-							variant="light"
-							color="cyan"
-							leftSection={<ListPlus size={16} />}
-							onClick={handleAddToQueue}
-							fullWidth
-						>
-							Add to Queue
-						</Button>
-						<Button
-							variant="light"
-							color="red"
-							leftSection={<Trash2 size={16} />}
-							onClick={handleDelete}
-							loading={isDeleting}
-							fullWidth
-						>
-							Delete
-						</Button>
-					</Stack>
+					{isShowingPlaylistInterface ? (
+						<>
+
+							<Stack
+								gap="xs"
+								style={{
+									flex: 1,
+									overflow: 'hidden'
+								}}
+							>
+								<Box
+									style={{
+										flexShrink: 0
+									}}
+								>
+									<Button
+										variant="light"
+										color="blue"
+										leftSection={<ArrowLeft size={16} />}
+										onClick={() => {
+											setIsShowingPlaylistInterface(false);
+											setNewPlaylistName('');
+										}}
+										fullWidth
+									>
+										Return
+									</Button>
+								</Box>
+
+								<Divider my="xs" label="Create a new playlist" labelPosition="center" />
+
+								{/* Create new playlist section */}
+								<Group gap="xs">
+									<TextInput
+										placeholder="New playlist name"
+										value={newPlaylistName}
+										onChange={(e) => setNewPlaylistName(e.currentTarget.value)}
+										style={{ flex: 1 }}
+										onKeyDown={(e) => {
+											if (e.key === 'Enter' && isPlaylistNameValid()) {
+												handleCreatePlaylistAndAdd();
+											}
+										}}
+									/>
+									<Button
+										variant="light"
+										color="grape"
+										onClick={handleCreatePlaylistAndAdd}
+										loading={isCreatingPlaylist}
+										disabled={!isPlaylistNameValid()}
+									>
+										Create
+									</Button>
+								</Group>
+								{newPlaylistName.trim() && !isPlaylistNameValid() && (
+									<Text size="xs" c="red">
+										A playlist with this name already exists
+									</Text>
+								)}
+
+								<Divider my="xs" label="Choose an existing playlist" labelPosition="center" />
+
+								{/* Existing playlists list */}
+								{isLoadingPlaylists ? (
+									<Text size="sm" c="dimmed" ta="center" py="md">
+										Loading playlists...
+									</Text>
+								) : userPlaylists.length === 0 ? (
+									<Text size="sm" c="dimmed" ta="center" py="md">
+										No playlists yet. Create one above!
+									</Text>
+								) : (
+									<ScrollArea.Autosize
+										style={{
+											flex: 1
+										}}
+										scrollbars="y"
+										scrollbarSize={4}
+									>
+										<Stack gap="xs">
+											{userPlaylists.map((playlist) => (
+												<UnstyledButton
+													className='episode-playlist-row-button'
+													key={playlist.id}
+													onClick={() => handleAddToExistingPlaylist(playlist)}
+													disabled={isAddingToPlaylist}
+													style={{
+														padding: '12px',
+														borderRadius: '8px',
+														transition: 'background-color 150ms ease',
+														opacity: isAddingToPlaylist ? 0.6 : 1,
+														cursor: isAddingToPlaylist ? 'wait' : 'pointer'
+													}}
+												>
+													<Group gap="sm">
+														<Box
+															style={{
+																width: 40,
+																height: 40,
+																backgroundColor: 'var(--mantine-color-grape-light)',
+																display: 'flex',
+																alignItems: 'center',
+																justifyContent: 'center'
+															}}
+														>
+															<ListMusic size={20} color="var(--mantine-color-grape-light-color)" />
+														</Box>
+														<div style={{ flex: 1, minWidth: 0 }}>
+															<Text size="sm" fw={500} lineClamp={1}>
+																{playlist.name}
+															</Text>
+															<Text size="xs" c="dimmed">
+																{playlist.episode_count} {playlist.episode_count === 1 ? 'episode' : 'episodes'}
+															</Text>
+														</div>
+													</Group>
+												</UnstyledButton>
+											))}
+										</Stack>
+									</ScrollArea.Autosize>
+								)}
+							</Stack>
+						</>
+					) : (
+						<>
+							{/* Action Buttons */}
+							< Stack gap="xs">
+								<Button
+									variant="light"
+									color="teal"
+									leftSection={<Play size={16} />}
+									onClick={handlePlay}
+									fullWidth
+								>
+									Play Episode
+								</Button>
+								<Button
+									variant="light"
+									color="cyan"
+									leftSection={<ListEnd size={16} />}
+									onClick={handleAddToQueue}
+									fullWidth
+								>
+									Add to Queue
+								</Button>
+								<Button
+									variant="light"
+									color="grape"
+									leftSection={<ListPlus size={16} />}
+									onClick={handlePlaylistInterface}
+									fullWidth
+								>
+									Add to Playlist
+								</Button>
+								<Divider my="md" />
+								<Button
+									variant="light"
+									color="red"
+									leftSection={<Trash2 size={16} />}
+									onClick={handleDelete}
+									loading={isDeleting}
+									fullWidth
+								>
+									Delete
+								</Button>
+							</Stack>
+						</>
+					)}
 				</Stack>
-			</Modal>
+			</Modal >
 		</>
 	);
 }
