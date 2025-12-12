@@ -450,54 +450,77 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 										</Text>
 									</Card>
 								) : (
-									<ScrollArea.Autosize
-										style={{
-											flex: 1
-										}}
-										scrollbars="y"
-										scrollbarSize={4}
-									>
-										<Stack gap="xs">
-											{userPlaylists.map((playlist) => (
-												<UnstyledButton
-													className='episode-playlist-row-button'
-													key={playlist.id}
-													onClick={() => handleAddToExistingPlaylist(playlist)}
-													disabled={isAddingToPlaylist}
-													style={{
-														padding: '12px',
-														borderRadius: '8px',
-														transition: 'background-color 150ms ease',
-														opacity: isAddingToPlaylist ? 0.6 : 1,
-														cursor: isAddingToPlaylist ? 'wait' : 'pointer'
-													}}
-												>
-													<Group gap="sm">
-														<Box
-															style={{
-																width: 40,
-																height: 40,
-																backgroundColor: 'var(--mantine-color-grape-light)',
-																display: 'flex',
-																alignItems: 'center',
-																justifyContent: 'center'
-															}}
-														>
-															<ListMusic size={20} color="var(--mantine-color-grape-light-color)" />
-														</Box>
-														<div style={{ flex: 1, minWidth: 0 }}>
-															<Text size="sm" fw={500} lineClamp={1}>
-																{playlist.name}
-															</Text>
-															<Text size="xs" c="dimmed">
-																{playlist.episode_count} {playlist.episode_count === 1 ? 'episode' : 'episodes'}
-															</Text>
+									<Box style={{ overflow: 'hidden', flex: 1, minWidth: 0, maxWidth: '100%' }}>
+										<ScrollArea.Autosize
+											style={{
+												flex: 1,
+												width: "100%"
+											}}
+											scrollbars="y"
+											scrollbarSize={4}
+											styles={{
+												content: {
+													width: '100%',
+													maxWidth: '100%',
+													minWidth: 0
+												}
+											}}
+										>
+											<Stack gap="xs" w="100%">
+												{userPlaylists.map((playlist) => (
+													<UnstyledButton
+														bdrs="md"
+														px="md"
+														py="xs"
+														className='episode-playlist-row-button'
+														key={playlist.id}
+														onClick={() => handleAddToExistingPlaylist(playlist)}
+														disabled={isAddingToPlaylist}
+														style={{
+															transition: 'background-color 150ms ease',
+															opacity: isAddingToPlaylist ? 0.6 : 1,
+															cursor: isAddingToPlaylist ? 'wait' : 'pointer',
+															width: '100%'
+														}}
+													>
+														<div style={{ overflow: 'hidden' }}>
+															<Group gap="sm" wrap='nowrap' style={{ overflow: 'hidden' }}>
+																<Box
+																	bdrs="xs"
+																	style={{
+																		height: '28px',
+																		width: '28px',
+																		flexShrink: 0,
+																		backgroundColor: 'var(--mantine-color-grape-light)',
+																		display: 'flex',
+																		alignItems: 'center',
+																		justifyContent: 'center'
+																	}}
+																>
+																	<ListMusic size={16} color="var(--mantine-color-grape-light-color)" />
+																</Box>
+																<Text
+																	size="sm"
+																	style={{
+																		overflow: 'hidden',
+																		textOverflow: 'ellipsis',
+																		whiteSpace: 'nowrap',
+																		flex: 1,
+																		minWidth: 0
+																	}}
+																>
+																	{playlist.name}
+																</Text>
+																<Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+																	({playlist.episode_count})
+																</Text>
+															</Group>
 														</div>
-													</Group>
-												</UnstyledButton>
-											))}
-										</Stack>
-									</ScrollArea.Autosize>
+													</UnstyledButton>
+												))}
+											</Stack>
+										</ScrollArea.Autosize>
+									</Box>
 								)}
 							</Stack>
 						</>
