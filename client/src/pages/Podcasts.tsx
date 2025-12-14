@@ -161,7 +161,7 @@ function TrashDropZone() {
 		<Group
 			ref={setNodeRef}
 			my="md"
-			h={26}
+			h={36}
 			justify='center'
 			style={{
 				border: `2px dashed ${isOver ? 'var(--mantine-color-red-filled)' : 'var(--mantine-color-red-text)'}`,
