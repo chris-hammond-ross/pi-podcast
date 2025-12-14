@@ -84,7 +84,7 @@ function AppLayout() {
 					height: "var(--media-control-height)",
 					backgroundColor: 'var(--mantine-color-body)',
 					borderTop: `${rem(1)} solid var(--mantine-color-default-border)`,
-					zIndex: 100,
+					zIndex: 250,
 				}}
 			>
 				{/* Media player placeholder */}

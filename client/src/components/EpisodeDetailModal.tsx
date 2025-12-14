@@ -286,7 +286,8 @@ function EpisodeDetailModal({
 				content: {
 					display: 'flex',
 					flexDirection: 'column',
-					maxHeight: 'calc(100svh - 2rem)'
+					maxHeight: 'calc(100svh - calc(2rem + var(--media-control-height)))',
+					marginBottom: 'var(--media-control-height)'
 				},
 				body: {
 					display: 'flex',

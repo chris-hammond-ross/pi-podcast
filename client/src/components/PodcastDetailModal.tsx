@@ -253,8 +253,8 @@ function PodcastDetailModal({
 	const renderEpisodeStatus = (episode: EpisodeRecord) => {
 		if (episode.downloaded_at) {
 			return (
-				<EpisodeActionsModal 
-					episodeId={episode.id} 
+				<EpisodeActionsModal
+					episodeId={episode.id}
 					subscriptionName={subscription?.name}
 					onEpisodeDeleted={handleEpisodeDeleted}
 				/>
@@ -307,7 +307,8 @@ function PodcastDetailModal({
 					content: {
 						display: 'flex',
 						flexDirection: 'column',
-						maxHeight: 'calc(100svh - 2rem)',
+						maxHeight: 'calc(100svh - calc(2rem + var(--media-control-height)))',
+						marginBottom: 'var(--media-control-height)'
 					},
 					body: {
 						display: 'flex',
@@ -397,7 +398,7 @@ function PodcastDetailModal({
 									minWidth: 0
 								}}
 							>
-								Back
+								Backd
 							</Button>
 							<ActionIcon
 								size="lg"

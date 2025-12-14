@@ -129,7 +129,8 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 				content: {
 					display: 'flex',
 					flexDirection: 'column',
-					maxHeight: 'calc(100svh - 2rem)',
+					maxHeight: 'calc(100svh - calc(2rem + var(--media-control-height)))',
+					marginBottom: 'var(--media-control-height)'
 				},
 				body: {
 					display: 'flex',
@@ -147,22 +148,46 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 					overflow: 'hidden'
 				}}
 			>
-				<ActionIcon
-					radius="xl"
-					size="lg"
-					variant="white"
-					c='var(--mantine-color-default-border)'
-					onClick={onClose}
-					title="Close"
+				<Group
+					py="md"
+					align='flex-start'
+					justify='space-between'
 					style={{
 						position: 'absolute',
 						right: '1rem',
-						top: '1rem',
+						left: '1rem',
 						borderColor: 'var(--mantine-color-default-border)'
 					}}
 				>
-					<X size={18} />
-				</ActionIcon>
+					<Stack gap="xs">
+						{/* Episode Count */}
+						<Badge color="teal">
+							{podcast.trackCount} episodes
+						</Badge>
+						{/* Genre Badge */}
+						{podcast.primaryGenre && (
+							<Group>
+								<Badge color="cyan">
+									{podcast.primaryGenre}
+								</Badge>
+							</Group>
+						)}
+					</Stack>
+					<ActionIcon
+						radius="xl"
+						size="lg"
+						variant="white"
+						c='var(--mantine-color-default-border)'
+						onClick={onClose}
+						title="Close"
+						style={{
+							borderColor: 'var(--mantine-color-default-border)'
+						}}
+					>
+						<X size={18} />
+					</ActionIcon>
+				</Group>
+
 				{/* Podcast Image */}
 				<Image
 					src={podcast.artworkUrl600}
@@ -183,25 +208,9 @@ function SubscribeModal({ podcast, opened, onClose, onSubscribed }: SubscribeMod
 					}}
 				>
 					{/* Podcast Info */}
-					<Stack gap="xs">
-						<Text fw={600} size="lg">
-							{podcast.name}
-						</Text>
-						<Group justify='flex-start'>
-							{/* Episode Count */}
-							<Badge variant="light" color="teal">
-								{podcast.trackCount} episodes
-							</Badge>
-							{/* Genre Badge */}
-							{podcast.primaryGenre && (
-								<Group>
-									<Badge variant="light" color="cyan">
-										{podcast.primaryGenre}
-									</Badge>
-								</Group>
-							)}
-						</Group>
-					</Stack>
+					<Text fw={600} size="lg">
+						{podcast.name}
+					</Text>
 
 					{/* Description from RSS Feed */}
 					{isLoading ? (
