@@ -141,7 +141,7 @@ class DownloadProcessor extends EventEmitter {
 						return;
 					}
 				}
-				
+
 				// Log error but don't fail the download
 				if (stderr) {
 					console.warn(`[download] ffprobe stderr: ${stderr}`);
@@ -409,87 +409,140 @@ class DownloadProcessor extends EventEmitter {
 	}
 
 	/**
+	 * Clean URL by removing query strings after the final .mp3 extension
+	 * @param {string} url - URL to clean
+	 * @returns {string} Cleaned URL
+	 */
+	_cleanAudioUrl(url) {
+		// Find the last occurrence of .mp3
+		const lastMp3Index = url.lastIndexOf('.mp3');
+
+		if (lastMp3Index === -1) {
+			// No .mp3 found, return original URL
+			return url;
+		}
+
+		// Return everything up to and including the last .mp3
+		// This automatically removes any query strings after it
+		return url.substring(0, lastMp3Index + 4); // +4 to include '.mp3'
+	}
+
+	/**
 	 * Download file with progress tracking
+	 * Tries clean URL first, falls back to original URL with query strings if needed
 	 * @param {string} url - URL to download
 	 * @param {string} destPath - Destination path
 	 * @param {Object} queueItem - Queue item for progress updates
 	 * @returns {Promise<number>} File size in bytes
 	 */
 	async _downloadFile(url, destPath, queueItem) {
-		// First, follow all redirects to get the final response
-		const { response, request } = await this._followRedirects(url);
+		// Clean the URL to remove query strings after .mp3
+		const cleanUrl = this._cleanAudioUrl(url);
+		const urlsToTry = cleanUrl !== url ? [cleanUrl, url] : [url];
 
-		// Store request reference for cancellation
-		this.currentRequest = request;
+		let lastError = null;
 
-		return new Promise((resolve, reject) => {
-			const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
-			let downloadedBytes = 0;
-			let settled = false;
+		for (let i = 0; i < urlsToTry.length; i++) {
+			const tryUrl = urlsToTry[i];
+			const isRetry = i > 0;
 
-			const fileStream = fs.createWriteStream(destPath);
+			if (isRetry) {
+				console.log(`[download] Clean URL failed, retrying with original URL including query string`);
+			} else if (cleanUrl !== url) {
+				console.log(`[download] Attempting download with cleaned URL (query string removed)`);
+			}
 
-			const settle = (error, result) => {
-				if (settled) return;
-				settled = true;
-				clearTimeout(downloadTimer);
+			try {
+				// First, follow all redirects to get the final response
+				const { response, request } = await this._followRedirects(tryUrl);
 
-				if (error) {
-					fileStream.destroy();
-					// Only delete file on error, not on success
-					if (fs.existsSync(destPath)) {
-						try { fs.unlinkSync(destPath); } catch {}
-					}
-					reject(error);
-				} else {
-					resolve(result);
-				}
-			};
+				// Store request reference for cancellation
+				this.currentRequest = request;
 
-			// Download timeout - starts after redirects are resolved
-			const downloadTimer = setTimeout(() => {
-				console.log('[download] Download timeout triggered');
-				request.destroy();
-				fileStream.destroy();
-				settle(new Error('Download timeout'));
-			}, this.options.downloadTimeout);
+				return await new Promise((resolve, reject) => {
+					const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
+					let downloadedBytes = 0;
+					let settled = false;
 
-			response.on('data', (chunk) => {
-				downloadedBytes += chunk.length;
-				this._emitProgress(queueItem, downloadedBytes, totalBytes);
-			});
+					const fileStream = fs.createWriteStream(destPath);
 
-			response.on('error', (err) => {
-				console.log('[download] Response error:', err.message);
-				settle(err);
-			});
+					const settle = (error, result) => {
+						if (settled) return;
+						settled = true;
+						clearTimeout(downloadTimer);
 
-			response.on('aborted', () => {
-				console.log('[download] Response aborted');
-				if (this.cancelRequested) {
-					settle(new Error('Download aborted'));
-				} else {
-					settle(new Error('Connection aborted by server'));
-				}
-			});
+						if (error) {
+							fileStream.destroy();
+							// Only delete file on error, not on success
+							if (fs.existsSync(destPath)) {
+								try { fs.unlinkSync(destPath); } catch {}
+							}
+							reject(error);
+						} else {
+							resolve(result);
+						}
+					};
 
-			response.pipe(fileStream);
+					// Download timeout - starts after redirects are resolved
+					const downloadTimer = setTimeout(() => {
+						console.log('[download] Download timeout triggered');
+						request.destroy();
+						fileStream.destroy();
+						settle(new Error('Download timeout'));
+					}, this.options.downloadTimeout);
 
-			fileStream.on('finish', () => {
-				console.log(`[download] File stream finished, ${downloadedBytes} bytes written`);
-				clearTimeout(downloadTimer);
-				fileStream.close(() => {
-					// Emit final 100% progress
-					this._emitProgress(queueItem, downloadedBytes, totalBytes || downloadedBytes, true);
-					settle(null, downloadedBytes);
+					response.on('data', (chunk) => {
+						downloadedBytes += chunk.length;
+						this._emitProgress(queueItem, downloadedBytes, totalBytes);
+					});
+
+					response.on('error', (err) => {
+						console.log('[download] Response error:', err.message);
+						settle(err);
+					});
+
+					response.on('aborted', () => {
+						console.log('[download] Response aborted');
+						if (this.cancelRequested) {
+							settle(new Error('Download aborted'));
+						} else {
+							settle(new Error('Connection aborted by server'));
+						}
+					});
+
+					response.pipe(fileStream);
+
+					fileStream.on('finish', () => {
+						console.log(`[download] File stream finished, ${downloadedBytes} bytes written`);
+						clearTimeout(downloadTimer);
+						fileStream.close(() => {
+							// Emit final 100% progress
+							this._emitProgress(queueItem, downloadedBytes, totalBytes || downloadedBytes, true);
+							settle(null, downloadedBytes);
+						});
+					});
+
+					fileStream.on('error', (err) => {
+						console.log('[download] File stream error:', err.message);
+						settle(err);
+					});
 				});
-			});
+			} catch (err) {
+				lastError = err;
+				console.log(`[download] Download attempt ${i + 1}/${urlsToTry.length} failed: ${err.message}`);
 
-			fileStream.on('error', (err) => {
-				console.log('[download] File stream error:', err.message);
-				settle(err);
-			});
-		});
+				// If this was the last URL to try, throw the error
+				if (i === urlsToTry.length - 1) {
+					throw lastError;
+				}
+
+				// Otherwise, continue to next URL
+				continue;
+			}
+		}
+
+		// This should never be reached, but just in case
+		throw lastError || new Error('Download failed');
 	}
 
 	/**
