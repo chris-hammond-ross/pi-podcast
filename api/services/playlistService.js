@@ -251,8 +251,8 @@ class PlaylistService {
 
 		const playlists = db.prepare(`
 			SELECT p.*, s.name as subscription_name, s.artworkUrl100 as subscription_artwork,
-			       (SELECT COUNT(*) FROM episodes e 
-			        WHERE e.subscription_id = p.subscription_id 
+			       (SELECT COUNT(*) FROM episodes e
+			        WHERE e.subscription_id = p.subscription_id
 			          AND e.downloaded_at IS NOT NULL) as episode_count
 			FROM playlists p
 			JOIN subscriptions s ON p.subscription_id = s.id
@@ -497,6 +497,69 @@ class PlaylistService {
 		}
 
 		return result.changes > 0;
+	}
+
+	/**
+	 * Update user playlist episodes (reorder and/or remove)
+	 * Replaces all episodes in the playlist with the provided list in the specified order
+	 * @param {number} playlistId - Playlist ID
+	 * @param {Array<number>} episodeIds - Array of episode IDs in desired order
+	 * @returns {Object} Result with updated episode count
+	 */
+	updateUserPlaylistEpisodes(playlistId, episodeIds) {
+		const db = getDatabase();
+
+		const playlist = this.getPlaylistById(playlistId);
+		if (!playlist || playlist.type !== 'user') {
+			throw new Error('User playlist not found');
+		}
+
+		// Validate that all episodes exist and are downloaded
+		const episodes = [];
+		for (const episodeId of episodeIds) {
+			const episode = db.prepare('SELECT * FROM episodes WHERE id = ?').get(episodeId);
+			if (!episode) {
+				throw new Error(`Episode ${episodeId} not found`);
+			}
+			if (!episode.downloaded_at || !episode.file_path) {
+				throw new Error(`Episode ${episodeId} must be downloaded`);
+			}
+			episodes.push(episode);
+		}
+
+		const now = Math.floor(Date.now() / 1000);
+
+		// Use a transaction for atomic update
+		const updateTransaction = db.transaction(() => {
+			// Delete all existing episodes from the playlist
+			db.prepare('DELETE FROM playlist_episodes WHERE playlist_id = ?').run(playlistId);
+
+			// Insert episodes in new order
+			const insertStmt = db.prepare(`
+				INSERT INTO playlist_episodes (playlist_id, episode_url, episode_title, position, added_at)
+				VALUES (?, ?, ?, ?, ?)
+			`);
+
+			for (let i = 0; i < episodes.length; i++) {
+				const episode = episodes[i];
+				insertStmt.run(playlistId, episode.audio_url, episode.title, i, now);
+			}
+
+			// Update playlist updated_at
+			db.prepare('UPDATE playlists SET updated_at = ? WHERE id = ?').run(now, playlistId);
+		});
+
+		updateTransaction();
+
+		// Regenerate M3U
+		this._regenerateUserPlaylistM3u(playlistId);
+
+		console.log(`[playlist] Updated playlist ${playlistId} with ${episodes.length} episodes`);
+
+		return {
+			playlistId,
+			episodeCount: episodes.length
+		};
 	}
 
 	/**

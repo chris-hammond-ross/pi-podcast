@@ -277,6 +277,49 @@ router.get('/:id/episodes', (req, res) => {
 });
 
 /**
+ * PUT /api/playlists/:id/episodes
+ * Update all episodes in a user playlist (reorder and/or remove)
+ * Body: { episodeIds: number[] }
+ */
+router.put('/:id/episodes', (req, res) => {
+	try {
+		const { id } = req.params;
+		const { episodeIds } = req.body;
+
+		if (!Array.isArray(episodeIds)) {
+			return res.status(400).json({
+				success: false,
+				error: 'episodeIds must be an array'
+			});
+		}
+
+		const result = playlistService.updateUserPlaylistEpisodes(parseInt(id), episodeIds);
+
+		res.json({
+			success: true,
+			...result
+		});
+	} catch (err) {
+		if (err.message === 'User playlist not found') {
+			return res.status(404).json({
+				success: false,
+				error: err.message
+			});
+		}
+		if (err.message.includes('not found') || err.message.includes('must be downloaded')) {
+			return res.status(400).json({
+				success: false,
+				error: err.message
+			});
+		}
+		res.status(500).json({
+			success: false,
+			error: err.message
+		});
+	}
+});
+
+/**
  * POST /api/playlists/:id/episodes
  * Add an episode to a user playlist
  * Body: { episodeId: number }

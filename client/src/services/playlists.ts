@@ -85,6 +85,12 @@ export interface PlaylistEpisodesResponse {
 	count: number;
 }
 
+export interface UpdatePlaylistEpisodesResponse {
+	success: boolean;
+	playlistId: number;
+	episodeCount: number;
+}
+
 /**
  * Get all auto-generated playlists
  */
@@ -296,6 +302,28 @@ export async function removeEpisodeFromPlaylist(
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.error || 'Failed to remove episode from playlist');
+	}
+
+	return response.json();
+}
+
+/**
+ * Update all episodes in a user playlist (reorder and/or remove)
+ * Replaces all episodes with the provided list in the specified order
+ */
+export async function updatePlaylistEpisodes(
+	playlistId: number,
+	episodeIds: number[]
+): Promise<UpdatePlaylistEpisodesResponse> {
+	const response = await fetch(`${API_BASE_URL}/api/playlists/${playlistId}/episodes`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ episodeIds })
+	});
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to update playlist episodes');
 	}
 
 	return response.json();
