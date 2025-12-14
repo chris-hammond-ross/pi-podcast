@@ -11,11 +11,12 @@ import {
 	Text,
 	Group,
 	Progress,
-	Skeleton
+	Skeleton,
+	useMantineColorScheme,
+	Tooltip,
+	ActionIcon
 } from '@mantine/core';
-import {
-	RefreshCw
-} from 'lucide-react';
+import { RefreshCw, Sun, Moon } from 'lucide-react';
 import { BluetoothInterface } from '../components';
 import { restartServices, getWebSocketService, type SystemStats } from '../services';
 
@@ -24,6 +25,8 @@ const RESTART_OVERLAY_DURATION = 10000; // 10 seconds
 function Settings() {
 	const [isRestarting, setIsRestarting] = useState(false);
 	const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
+
+	const { colorScheme, setColorScheme } = useMantineColorScheme();
 
 	useEffect(() => {
 		const ws = getWebSocketService();
@@ -69,6 +72,17 @@ function Settings() {
 	const formatValue = (value: number | null | undefined, unit: string, decimals: number = 1): string => {
 		if (value === null || value === undefined) return '—';
 		return `${value.toFixed(decimals)} ${unit}`;
+	};
+
+	const toggleColorScheme = () => {
+		const newTheme = colorScheme === 'dark' ? 'light' : 'dark';
+
+		// Update Mantine's color scheme immediately for instant UI feedback
+		setColorScheme(newTheme);
+
+		// Update both localStorage keys to stay in sync
+		localStorage.setItem('mantine-color-scheme-value', newTheme);
+		localStorage.setItem('user-theme', newTheme);
 	};
 
 	return (
@@ -128,7 +142,22 @@ function Settings() {
 								<BluetoothInterface />
 							</Tabs.Panel>
 							<Tabs.Panel value="appearance">
-								Appearance
+								<Card py="xs">
+									<Group justify='space-between'>
+										<Text size='sm'>{colorScheme === 'dark' ? 'Dark Theme' : 'Light Theme'}</Text>
+										<Tooltip label={colorScheme === 'dark' ? 'Light Theme' : 'Dark Theme'}>
+											<ActionIcon
+												variant="light"
+												color={colorScheme === 'dark' ? 'orange' : 'violet'}
+												onClick={toggleColorScheme}
+												size="lg"
+											>
+												{colorScheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+											</ActionIcon>
+										</Tooltip>
+									</Group>
+								</Card>
+
 							</Tabs.Panel>
 							<Tabs.Panel value="system">
 								<Stack gap="md">
