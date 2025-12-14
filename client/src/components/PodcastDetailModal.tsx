@@ -321,48 +321,62 @@ function PodcastDetailModal({
 			>
 				<Stack gap="0" style={{ flex: 1, overflow: 'hidden' }}>
 					{/* Artwork - Episode Count - Close Button */}
-					<Group
+					<Stack
 						className='bg-cover-image'
-						px="md"
-						pt="md"
-						pb="xl"
-						justify='space-between'
+						p="md"
 						style={{
 							backgroundImage: `url(${subscription.artworkUrl600 || subscription.artworkUrl || 'https://placehold.co/300x300?text=No+Image'})`,
 							position: 'relative'
 						}}
 					>
 						<div className="bg-blury-overlay"></div>
-						<Badge
-							variant="filled"
-							color="teal"
+						<Group
+							justify='space-between'
+						>
+							<Badge
+								variant="filled"
+								color="teal"
+								style={{
+									position: 'relative',
+									zIndex: 1
+								}}
+							>
+								{isLoading ? (
+									<Loader size="xs" color="white" type="dots" />
+								) : (
+									<>{episodes.length} episodes</>
+								)}
+							</Badge>
+							<ActionIcon
+								radius="xl"
+								size="lg"
+								variant="white"
+								c='var(--mantine-color-default-border)'
+								onClick={handlePodcastClose}
+								title="Close"
+								style={{
+									position: 'relative',
+									zIndex: 1,
+									borderColor: 'var(--mantine-color-default-border)'
+								}}
+							>
+								<X size={18} />
+							</ActionIcon>
+						</Group>
+						<Text
+							px="0.3rem"
+							c="white"
+							size='lg'
+							lineClamp={2}
 							style={{
 								position: 'relative',
+								textShadow: '0px 0px 10px rgba(0,0,0,0.6)',
 								zIndex: 1
 							}}
 						>
-							{isLoading ? (
-								<Loader size="xs" color="white" type="dots" />
-							) : (
-								<>{episodes.length} episodes</>
-							)}
-						</Badge>
-						<ActionIcon
-							radius="xl"
-							size="lg"
-							variant="white"
-							c='var(--mantine-color-default-border)'
-							onClick={handlePodcastClose}
-							title="Close"
-							style={{
-								position: 'relative',
-								zIndex: 1,
-								borderColor: 'var(--mantine-color-default-border)'
-							}}
-						>
-							<X size={18} />
-						</ActionIcon>
-					</Group>
+							{subscription.name}
+						</Text>
+					</Stack>
 
 					{/* Actions */}
 					<Stack
@@ -380,14 +394,11 @@ function PodcastDetailModal({
 								leftSection={<Download size={16} />}
 								onClick={handleDownloadAll}
 								disabled={isLoading || episodes.length === 0}
-								style={{
-									flex: '1 0 auto',
-									maxWidth: '50%'
-								}}
+								style={{ flex: '1 1 0' }}
 							>
 								Download All
 							</Button>
-							<Button
+							{/*<Button
 								color="red"
 								size="sm"
 								variant="light"
@@ -398,8 +409,8 @@ function PodcastDetailModal({
 									minWidth: 0
 								}}
 							>
-								Backd
-							</Button>
+								Back
+							</Button>*/}
 							<ActionIcon
 								size="lg"
 								variant="light"
