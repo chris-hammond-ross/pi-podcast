@@ -106,6 +106,6 @@ button:focus-visible {
 @media (max-width: 767px) {
 	.mantine-Tabs-tab {
 		font-size: var(--mantine-font-size-xs);
-		padding-top: var(--mantine-spacing-md);
+		padding-block: var(--mantine-spacing-sm);
 	}
 }
