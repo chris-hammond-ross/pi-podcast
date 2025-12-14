@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const { bluetoothService, downloadProcessor, downloadQueueService, mediaPlayerService } = require('../services');
+const { bluetoothService, downloadProcessor, downloadQueueService, mediaPlayerService, systemService } = require('../services');
 
 /**
  * Initialize WebSocket server and set up event handlers
@@ -24,11 +24,17 @@ function initializeWebSocket(server) {
 	// Set up broadcast callback for Media Player service
 	mediaPlayerService.setBroadcastCallback(broadcast);
 
+	// Set up broadcast callback for System service
+	systemService.setBroadcastCallback(broadcast);
+
 	// Set up download processor event handlers
 	setupDownloadEvents(downloadProcessor, broadcast);
 
 	// Set up media player event handlers
 	setupMediaEvents(mediaPlayerService, broadcast);
+
+	// Start system stats broadcast
+	systemService.startStatsBroadcast();
 
 	wss.on('connection', (ws) => {
 		console.log('[websocket] Client connected');
@@ -59,6 +65,9 @@ function initializeWebSocket(server) {
 		// Send current media player status and queue to new client
 		sendMediaStatus(ws);
 		sendMediaQueue(ws);
+
+		// Send current system stats to new client
+		sendSystemStats(ws);
 
 		ws.on('message', (message) => {
 			try {
@@ -96,6 +105,9 @@ function initializeWebSocket(server) {
 					// Also send media status and queue
 					sendMediaStatus(ws);
 					sendMediaQueue(ws);
+
+					// Also send system stats
+					sendSystemStats(ws);
 				} else if (data.type === 'request-download-status') {
 					// Client specifically requesting download status
 					sendDownloadStatus(ws);
@@ -103,6 +115,9 @@ function initializeWebSocket(server) {
 					// Client specifically requesting media player status
 					sendMediaStatus(ws);
 					sendMediaQueue(ws);
+				} else if (data.type === 'request-system-stats') {
+					// Client specifically requesting system stats
+					sendSystemStats(ws);
 				}
 			} catch (err) {
 				console.error('[websocket] Parse error:', err.message);
@@ -116,6 +131,11 @@ function initializeWebSocket(server) {
 		ws.on('error', (err) => {
 			console.error('[websocket] Error:', err.message);
 		});
+	});
+
+	// Clean up on server close
+	wss.on('close', () => {
+		systemService.stopStatsBroadcast();
 	});
 
 	return wss;
@@ -270,6 +290,18 @@ function sendMediaQueue(ws) {
 	sendToClient(ws, {
 		type: 'media:queue-update',
 		...queue
+	});
+}
+
+/**
+ * Send system stats to a specific client
+ * @param {WebSocket} ws - The WebSocket client
+ */
+async function sendSystemStats(ws) {
+	const stats = await systemService.getSystemStats();
+	sendToClient(ws, {
+		type: 'system:stats',
+		...stats
 	});
 }
 

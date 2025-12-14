@@ -4,6 +4,7 @@
  */
 
 import type { BluetoothDevice } from './bluetooth';
+import type { CpuInfo, MemoryInfo, DiskInfo } from './system';
 
 // Message types from server
 export type ServerMessageType =
@@ -41,7 +42,9 @@ export type ServerMessageType =
 	| 'media:error'
 	| 'media:disconnected'
 	| 'media:queue-update'
-	| 'media:queue-finished';
+	| 'media:queue-finished'
+	// System messages
+	| 'system:stats';
 
 // Download-related types
 export interface DownloadQueueItem {
@@ -159,6 +162,17 @@ export interface MediaQueueUpdateData {
 	length: number;
 }
 
+// System stats-related types
+export interface SystemStatsData {
+	os: string;
+	timestamp: number;
+	cpu: CpuInfo;
+	memory: MemoryInfo;
+	disk: DiskInfo;
+	temperature: number | null;
+	uptime: string;
+}
+
 export interface ServerMessage {
 	type: ServerMessageType;
 	// Bluetooth fields
@@ -212,6 +226,14 @@ export interface ServerMessage {
 	items?: MediaQueueItem[];
 	currentIndex?: number;
 	length?: number;
+	// System stats fields
+	os?: string;
+	timestamp?: number;
+	cpu?: CpuInfo;
+	memory?: MemoryInfo;
+	disk?: DiskInfo;
+	temperature?: number | null;
+	uptime?: string;
 }
 
 export type MessageHandler = (message: ServerMessage) => void;
@@ -367,7 +389,10 @@ export class WebSocketService {
 	private handleMessage(data: string): void {
 		try {
 			const message: ServerMessage = JSON.parse(data);
-			console.log('[WebSocketService] Message received:', message.type);
+			// Only log non-stats messages to avoid console spam
+			if (message.type !== 'system:stats') {
+				console.log('[WebSocketService] Message received:', message.type);
+			}
 
 			// Notify all subscribers
 			this.messageHandlers.forEach((handler) => {
