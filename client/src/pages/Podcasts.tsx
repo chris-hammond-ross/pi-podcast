@@ -37,7 +37,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { AlertCircle, X, Save, GripHorizontal, Trash, Play } from 'lucide-react';
+import { AlertCircle, X, Save, GripHorizontal, Trash, Play, Pause } from 'lucide-react';
 import { useMediaPlayer } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
@@ -55,6 +55,8 @@ interface SortableQueueItemProps {
 }
 
 function SortableQueueItem({ item, isCurrentEpisode, queueIndex, onPlayEpisode }: SortableQueueItemProps) {
+	const { isPlaying, pause, togglePlayPause } = useMediaPlayer();
+
 	const {
 		attributes,
 		listeners,
@@ -97,15 +99,40 @@ function SortableQueueItem({ item, isCurrentEpisode, queueIndex, onPlayEpisode }
 					</Group>
 				</div>
 				<Group>
-					<ActionIcon
-						variant="light"
-						color="cyan"
-						onClick={() => onPlayEpisode(queueIndex)}
-						title="Play Episode"
-						disabled={isCurrentEpisode}
-					>
-						<Play size={16} />
-					</ActionIcon>
+					{isCurrentEpisode ? (
+						<>
+							{isPlaying ? (
+								<ActionIcon
+									variant="light"
+									color="cyan"
+									onClick={pause}
+									title="Pause Episode"
+								>
+									<Pause size={16} />
+								</ActionIcon>
+							) : (
+
+								<ActionIcon
+									variant="light"
+									color="cyan"
+									onClick={togglePlayPause}
+									title="Play Episode"
+								>
+									<Play size={16} />
+								</ActionIcon>
+							)}
+						</>
+					) : (
+						<ActionIcon
+							variant="light"
+							color="cyan"
+							onClick={() => onPlayEpisode(queueIndex)}
+							title="Play Episode"
+						>
+							<Play size={16} />
+						</ActionIcon>
+					)}
+
 					<div
 						{...attributes}
 						{...listeners}
@@ -184,9 +211,7 @@ function Podcasts() {
 		clearQueue,
 		moveInQueue,
 		removeFromQueue,
-		playQueueIndex,
-		pause,
-		queuePosition
+		playQueueIndex
 	} = useMediaPlayer();
 
 	// Track if we're navigating programmatically

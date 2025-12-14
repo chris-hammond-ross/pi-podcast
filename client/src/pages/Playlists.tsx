@@ -555,7 +555,7 @@ function Playlists() {
 										<Stack gap="sm">
 											<Card py="xs">
 												<Group justify='space-between' wrap='nowrap'>
-													<Text truncate>{editingPlaylist?.name}</Text>
+													<Text size='sm' truncate>{editingPlaylist?.name}</Text>
 													<ActionIcon
 														bdrs="50%"
 														variant='light'
