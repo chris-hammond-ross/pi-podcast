@@ -47,6 +47,8 @@ import type { Subscription, DownloadedEpisodeRecord } from '../services';
 
 const TRASH_DROP_ID = 'trash-drop-zone';
 
+const validTabs = ['podcasts', 'queue', 'episodes'];
+
 interface SortableQueueItemProps {
 	item: typeof queue[number];
 	isCurrentEpisode: boolean;
@@ -184,7 +186,6 @@ function Podcasts() {
 	const [modalOpened, setModalOpened] = useState(false);
 	const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
 	const [currentEpisodeId, setCurrentEpisodeId] = useState<number | null>(null);
-	const [activeTab, setActiveTab] = useState<string | null>('podcasts');
 	const [isDragging, setIsDragging] = useState(false);
 	const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null);
 	const isMobile = useMediaQuery('(max-width: 768px)');
@@ -201,7 +202,7 @@ function Podcasts() {
 	const [isSavingPlaylist, setIsSavingPlaylist] = useState(false);
 	const [savePlaylistError, setSavePlaylistError] = useState<string | null>(null);
 
-	const { subscriptionId, episodeId } = useParams<{ subscriptionId: string; episodeId: string; }>();
+	const { tab, subscriptionId, episodeId } = useParams<{ tab: string; subscriptionId: string; episodeId: string; }>();
 	const navigate = useNavigate();
 	const location = useLocation();
 
@@ -216,6 +217,9 @@ function Podcasts() {
 
 	// Track if we're navigating programmatically
 	const isNavigatingRef = useRef(false);
+
+	// Determine current tab from URL or default
+	const currentTab = tab && validTabs.includes(tab) ? tab : 'podcasts';
 
 	// Fetch downloaded episodes
 	const fetchDownloadedEpisodes = useCallback(async () => {
@@ -242,7 +246,7 @@ function Podcasts() {
 		}
 	}, [episodesLoaded, fetchDownloadedEpisodes]);
 
-	// Handle URL changes
+	// Handle URL changes for subscription/episode modal
 	useEffect(() => {
 		// If we triggered this navigation, skip processing
 		if (isNavigatingRef.current) {
@@ -283,7 +287,7 @@ function Podcasts() {
 					})
 					.catch(err => {
 						console.error('Failed to load subscription:', err);
-						navigate('/podcasts', { replace: true });
+						navigate(`/podcasts/${currentTab}`, { replace: true });
 					})
 					.finally(() => {
 						setIsLoadingSubscription(false);
@@ -295,25 +299,32 @@ function Podcasts() {
 			setSelectedSubscription(null);
 			setCurrentEpisodeId(null);
 		}
-	}, [subscriptionId, episodeId, location.pathname, subscriptions]);
+	}, [subscriptionId, episodeId, location.pathname, subscriptions, currentTab]);
+
+	const handleTabChange = useCallback((value: string | null) => {
+		if (value && validTabs.includes(value)) {
+			isNavigatingRef.current = true;
+			navigate(`/podcasts/${value}`);
+		}
+	}, [navigate]);
 
 	const handlePodcastClick = useCallback((podcast: Subscription) => {
 		setSelectedSubscription(podcast);
 		setCurrentEpisodeId(null);
 		setModalOpened(true);
 		isNavigatingRef.current = true;
-		navigate(`/podcasts/${podcast.id}`, { replace: false });
-	}, [navigate]);
+		navigate(`/podcasts/${currentTab}/${podcast.id}`);
+	}, [navigate, currentTab]);
 
 	const handleModalClose = useCallback(() => {
 		setModalOpened(false);
 		setSelectedSubscription(null);
 		setCurrentEpisodeId(null);
 		isNavigatingRef.current = true;
-		navigate('/podcasts', { replace: false });
+		navigate(`/podcasts/${currentTab}`);
 		// Refresh downloaded episodes when modal closes in case something changed
 		fetchDownloadedEpisodes();
-	}, [navigate, fetchDownloadedEpisodes]);
+	}, [navigate, currentTab, fetchDownloadedEpisodes]);
 
 	const handleSubscriptionUpdate = useCallback((updated: Subscription) => {
 		setSelectedSubscription(updated);
@@ -324,17 +335,17 @@ function Podcasts() {
 		if (selectedSubscription) {
 			setCurrentEpisodeId(epId);
 			isNavigatingRef.current = true;
-			navigate(`/podcasts/${selectedSubscription.id}/episode/${epId}`, { replace: false });
+			navigate(`/podcasts/${currentTab}/${selectedSubscription.id}/episode/${epId}`);
 		}
-	}, [navigate, selectedSubscription]);
+	}, [navigate, selectedSubscription, currentTab]);
 
 	const handleEpisodeClose = useCallback(() => {
 		if (selectedSubscription) {
 			setCurrentEpisodeId(null);
 			isNavigatingRef.current = true;
-			navigate(`/podcasts/${selectedSubscription.id}`, { replace: false });
+			navigate(`/podcasts/${currentTab}/${selectedSubscription.id}`);
 		}
-	}, [navigate, selectedSubscription]);
+	}, [navigate, selectedSubscription, currentTab]);
 
 	// Handle episode deletion - remove from downloaded episodes list
 	const handleEpisodeDeleted = useCallback((deletedEpisodeId: number) => {
@@ -510,8 +521,8 @@ function Podcasts() {
 
 	return (
 		<Tabs
-			value={activeTab}
-			onChange={setActiveTab}
+			value={currentTab}
+			onChange={handleTabChange}
 			style={{
 				display: 'flex',
 				flexDirection: 'column',
@@ -543,7 +554,7 @@ function Podcasts() {
 				>
 					&nbsp;
 				</div>
-				{activeTab === 'queue' && (
+				{currentTab === 'queue' && (
 					<DndContext
 						sensors={sensors}
 						collisionDetection={pointerWithin}
@@ -678,7 +689,7 @@ function Podcasts() {
 				)}
 			</Container>
 
-			{activeTab !== 'queue' && (
+			{currentTab !== 'queue' && (
 				<ScrollArea
 					style={{ flex: 1 }}
 					scrollbars="y"

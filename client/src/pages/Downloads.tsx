@@ -156,7 +156,7 @@ function Downloads() {
 	const handleTabChange = useCallback((value: string | null) => {
 		if (value && validTabs.includes(value)) {
 			isNavigatingRef.current = true;
-			navigate(`/downloads/${value}`, { replace: true });
+			navigate(`/downloads/${value}`);
 		}
 	}, [navigate]);
 
@@ -169,7 +169,7 @@ function Downloads() {
 				setSubscriptionName(item.subscription_name || '');
 				setEpisodeModalOpened(true);
 				isNavigatingRef.current = true;
-				navigate(`/downloads/completed/${item.episode_id}`, { replace: false });
+				navigate(`/downloads/completed/${item.episode_id}`);
 			})
 			.catch(err => {
 				console.error('Failed to load episode:', err);
@@ -184,7 +184,7 @@ function Downloads() {
 		setSelectedEpisode(null);
 		setSubscriptionName('');
 		isNavigatingRef.current = true;
-		navigate('/downloads/completed', { replace: false });
+		navigate('/downloads/completed');
 	}, [navigate]);
 
 	const handleEpisodeUpdate = useCallback((updatedEpisode: EpisodeRecord) => {

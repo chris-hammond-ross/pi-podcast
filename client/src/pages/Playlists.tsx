@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
 	DndContext,
 	KeyboardSensor,
@@ -51,6 +52,8 @@ import {
 import { formatDuration } from '../utilities';
 
 const TRASH_DROP_ID = 'trash-drop-zone';
+
+const validTabs = ['auto', 'playlists'];
 
 interface SortablePlaylistItemProps {
 	episode: PlaylistEpisode;
@@ -180,6 +183,18 @@ function Playlists() {
 	const { playlists: autoPlaylists, isLoading: autoIsLoading, error: autoError } = useAutoPlaylists();
 	const { playlists: userPlaylists, isLoading: userIsLoading, error: userError, refresh: refreshUserPlaylists } = useUserPlaylists();
 	const isMobile = useMediaQuery('(max-width: 768px)');
+
+	const { tab } = useParams<{ tab: string }>();
+	const navigate = useNavigate();
+
+	// Determine current tab from URL or default
+	const currentTab = tab && validTabs.includes(tab) ? tab : 'auto';
+
+	const handleTabChange = useCallback((value: string | null) => {
+		if (value && validTabs.includes(value)) {
+			navigate(`/playlists/${value}`);
+		}
+	}, [navigate]);
 
 	const sensors = useSensors(
 		useSensor(PointerSensor),
@@ -462,7 +477,8 @@ function Playlists() {
 
 	return (
 		<Tabs
-			defaultValue="auto"
+			value={currentTab}
+			onChange={handleTabChange}
 			style={{
 				display: 'flex',
 				flexDirection: 'column',

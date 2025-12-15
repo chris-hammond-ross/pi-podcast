@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
 	Box,
 	Container,
@@ -22,11 +23,25 @@ import { restartServices, getWebSocketService, type SystemStats } from '../servi
 
 const RESTART_OVERLAY_DURATION = 10000; // 10 seconds
 
+const validTabs = ['bluetooth', 'appearance', 'system'];
+
 function Settings() {
 	const [isRestarting, setIsRestarting] = useState(false);
 	const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
 
 	const { colorScheme, setColorScheme } = useMantineColorScheme();
+
+	const { tab } = useParams<{ tab: string }>();
+	const navigate = useNavigate();
+
+	// Determine current tab from URL or default
+	const currentTab = tab && validTabs.includes(tab) ? tab : 'bluetooth';
+
+	const handleTabChange = useCallback((value: string | null) => {
+		if (value && validTabs.includes(value)) {
+			navigate(`/settings/${value}`);
+		}
+	}, [navigate]);
 
 	useEffect(() => {
 		const ws = getWebSocketService();
@@ -96,7 +111,8 @@ function Settings() {
 				mt="calc(0px - var(--header-height))"
 			/>
 			<Tabs
-				defaultValue="bluetooth"
+				value={currentTab}
+				onChange={handleTabChange}
 				style={{
 					display: 'flex',
 					flexDirection: 'column',
