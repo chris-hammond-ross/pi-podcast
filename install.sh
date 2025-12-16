@@ -528,6 +528,9 @@ configure_hostname() {
     # Update /etc/hosts
     sed -i "s/127.0.1.1.*/127.0.1.1\t$HOSTNAME/" /etc/hosts
 
+    # Restart Avahi to broadcast the new hostname immediately
+    systemctl restart avahi-daemon
+
     print_success "Hostname set to $HOSTNAME"
     print_info "The device will be accessible at http://${HOSTNAME}.local"
 }
