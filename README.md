@@ -1,6 +1,8 @@
 # Pi Podcast
 A standalone podcast player for Raspberry Pi. Connects to a Bluetooth speaker and plays podcast episodes independently, controlled via a web interface from any device on the network. Designed to free up your phone while audio plays elsewhere.
 
+<img width="1080" height="740" alt="screenshot" src="https://raw.githubusercontent.com/chris-hammond-ross/pi-podcast/refs/heads/main/client/public/screenshot.jpg" />
+
 ## Prerequisites
 - [Raspberry Pi Zero 2 W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/) (recommended) - inexpensive and low power consumption, ideal for always-on operation. Other Raspberry Pi models with Bluetooth should also work.
 - Debian-based OS (Raspberry Pi OS recommended) - [getting started guide](https://www.raspberrypi.com/documentation/computers/getting-started.html)
