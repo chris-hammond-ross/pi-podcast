@@ -91,7 +91,7 @@ function Search() {
 	return (
 		<Container
 			size="sm"
-			py="md"
+			p="0"
 			style={{
 				height: 'var(--main-content-height)',
 				display: 'flex',
@@ -108,18 +108,29 @@ function Search() {
 					overflow: 'hidden'
 				}}
 			>
-				<PodcastSearch
-					onResultsChange={(count: number, results: Podcast[], searchTerm: string) => {
-						setSearchResults(results);
-						setResultCount(count);
-						setSearchTerm(searchTerm);
+				<Group
+					grow
+					px="md"
+					style={{
+						borderBottom: "calc(0.0625rem * var(--mantine-scale)) solid var(--mantine-color-default-border)"
 					}}
-				/>
+				>
+					<PodcastSearch
+						onResultsChange={(count: number, results: Podcast[], searchTerm: string) => {
+							setSearchResults(results);
+							setResultCount(count);
+							setSearchTerm(searchTerm);
+						}}
+					/>
+				</Group>
+
 				{searchResults.length > 0 ? (
 					<ScrollArea
 						style={{ flex: 1 }}
 						scrollbars="y"
 						scrollbarSize={4}
+						px="md"
+						pb="md"
 					>
 						<PodcastResults
 							podcasts={searchResults}
@@ -128,6 +139,8 @@ function Search() {
 					</ScrollArea>
 				) : (
 					<Card
+						mx="md"
+						mb="md"
 						style={{
 							flex: 1,
 							display: 'flex',

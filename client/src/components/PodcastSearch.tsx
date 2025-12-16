@@ -21,15 +21,15 @@ function PodcastSearch({
 }: PodcastSearchProps) {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const initialQuery = searchParams.get('q') || '';
-	
+
 	const [searchTerm, setSearchTerm] = useState(initialQuery);
 	const [submittedTerm, setSubmittedTerm] = useState(initialQuery);
 	const { results, isSearching, error, search, clearResults } = usePodcastSearch();
-	
+
 	// Use ref to store callback to avoid stale closures
 	const onResultsChangeRef = useRef(onResultsChange);
 	onResultsChangeRef.current = onResultsChange;
-	
+
 	// Track if we've done the initial search
 	const hasInitialSearched = useRef(false);
 
@@ -70,6 +70,7 @@ function PodcastSearch({
 
 	return (
 		<TextInput
+			variant='unstyled'
 			value={searchTerm}
 			onChange={(event) => setSearchTerm(event.currentTarget.value)}
 			onKeyDown={handleKeyDown}
@@ -91,6 +92,7 @@ function PodcastSearch({
 				)
 			}
 			error={error}
+			bg="var(--mantine-color-body)"
 		/>
 	);
 }
