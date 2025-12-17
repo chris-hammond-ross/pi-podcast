@@ -331,6 +331,13 @@ function Podcasts() {
 		refresh();
 	}, [refresh]);
 
+	const handleUnsubscribe = useCallback(() => {
+		// Refresh subscriptions list after unsubscribe
+		refresh();
+		// Refresh downloaded episodes too
+		fetchDownloadedEpisodes();
+	}, [refresh, fetchDownloadedEpisodes]);
+
 	const handleEpisodeOpen = useCallback((epId: number) => {
 		if (selectedSubscription) {
 			setCurrentEpisodeId(epId);
@@ -815,6 +822,7 @@ function Podcasts() {
 				opened={modalOpened}
 				onClose={handleModalClose}
 				onSubscriptionUpdate={handleSubscriptionUpdate}
+				onUnsubscribe={handleUnsubscribe}
 				initialEpisodeId={currentEpisodeId}
 				onEpisodeOpen={handleEpisodeOpen}
 				onEpisodeClose={handleEpisodeClose}

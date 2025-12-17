@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
 	Modal,
 	Text,
@@ -12,20 +13,22 @@ import {
 	ActionIcon,
 	ScrollArea,
 	Loader,
-	ThemeIcon
+	ThemeIcon,
+	Divider,
+	Checkbox
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
 	AlertCircle,
 	Download,
-	ArrowLeft,
+	Trash,
 	Ellipsis,
 	X,
 	Clock,
 	LoaderCircle
 } from 'lucide-react';
 import type { Subscription } from '../services';
-import { getEpisodes, getEpisodeCounts, syncEpisodes, type EpisodeRecord } from '../services';
+import { getEpisodes, getEpisodeCounts, syncEpisodes, updateAutoDownload, unsubscribe, type EpisodeRecord } from '../services';
 import { useDownloadContext } from '../contexts';
 import EpisodeDetailModal from './EpisodeDetailModal';
 import EpisodeActionsModal from './EpisodeActionsModal';
@@ -36,6 +39,7 @@ interface PodcastDetailModalProps {
 	opened: boolean;
 	onClose: () => void;
 	onSubscriptionUpdate?: (subscription: Subscription) => void;
+	onUnsubscribe?: () => void;
 	// Episode modal support
 	initialEpisodeId?: number | null;
 	onEpisodeOpen?: (episodeId: number) => void;
@@ -46,15 +50,22 @@ function PodcastDetailModal({
 	subscription,
 	opened,
 	onClose,
+	onSubscriptionUpdate,
+	onUnsubscribe,
 	initialEpisodeId,
 	onEpisodeOpen,
 	onEpisodeClose
 }: PodcastDetailModalProps) {
+	const location = useLocation();
 	const [episodes, setEpisodes] = useState<EpisodeRecord[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selectedEpisode, setSelectedEpisode] = useState<EpisodeRecord | null>(null);
 	const [episodeModalOpened, setEpisodeModalOpened] = useState(false);
+	const [podcastActionsOpened, setPodcastActionsOpened] = useState(false);
+	const [isAutoDownload, setIsAutoDownload] = useState(false);
+	const [isUpdatingAutoDownload, setIsUpdatingAutoDownload] = useState(false);
+	const [isUnsubscribing, setIsUnsubscribing] = useState(false);
 
 	// Track previous initialEpisodeId to detect changes (for back navigation)
 	const prevInitialEpisodeIdRef = useRef<number | null | undefined>(undefined);
@@ -72,6 +83,26 @@ function PodcastDetailModal({
 
 	// Get the episode ID currently being downloaded
 	const downloadingEpisodeId = currentDownload?.episodeId ?? null;
+
+	// Initialize auto download state from subscription
+	useEffect(() => {
+		if (subscription) {
+			setIsAutoDownload(subscription.auto_download === 1);
+		}
+	}, [subscription]);
+
+	// Handle browser back button to close actions modal
+	useEffect(() => {
+		const handlePopState = () => {
+			if (podcastActionsOpened) {
+				setPodcastActionsOpened(false);
+			}
+		};
+		window.addEventListener('popstate', handlePopState);
+		return () => {
+			window.removeEventListener('popstate', handlePopState);
+		};
+	}, [podcastActionsOpened]);
 
 	const loadEpisodes = useCallback(async (subscriptionId: number) => {
 		setIsLoading(true);
@@ -142,6 +173,7 @@ function PodcastDetailModal({
 			setError(null);
 			setSelectedEpisode(null);
 			setEpisodeModalOpened(false);
+			setPodcastActionsOpened(false);
 			prevInitialEpisodeIdRef.current = undefined;
 		}
 	}, [opened]);
@@ -229,7 +261,98 @@ function PodcastDetailModal({
 			setEpisodeModalOpened(false);
 			setSelectedEpisode(null);
 		}
+		if (podcastActionsOpened) {
+			setPodcastActionsOpened(false);
+		}
 		onClose();
+	};
+
+	const handlePodcastActionsOpen = () => {
+		// Add history state for modal
+		window.history.pushState({ actionsModal: true }, '', location.pathname + location.search);
+		setPodcastActionsOpened(true);
+	};
+
+	const handlePodcastActionsClose = () => {
+		setPodcastActionsOpened(false);
+		// Go back if we pushed a state
+		if (window.history.state?.actionsModal) {
+			window.history.back();
+		}
+	};
+
+	const handleAutoDownloadChange = async (checked: boolean) => {
+		if (!subscription?.id) return;
+
+		setIsUpdatingAutoDownload(true);
+
+		try {
+			const response = await updateAutoDownload(
+				subscription.id,
+				checked,
+				10000 // Set a high limit to effectively make it unlimited
+			);
+
+			setIsAutoDownload(checked);
+
+			// Notify parent of subscription update
+			if (onSubscriptionUpdate) {
+				onSubscriptionUpdate(response.subscription);
+			}
+
+			notifications.show({
+				color: 'teal',
+				message: checked
+					? 'Auto download enabled'
+					: 'Auto download disabled',
+				position: 'top-right',
+				autoClose: 1200
+			});
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to update auto download',
+				position: 'top-right',
+				autoClose: 3000
+			});
+		} finally {
+			setIsUpdatingAutoDownload(false);
+		}
+	};
+
+	const handleUnsubscribe = async () => {
+		if (!subscription?.feedUrl) return;
+
+		setIsUnsubscribing(true);
+
+		try {
+			await unsubscribe(subscription.feedUrl);
+
+			notifications.show({
+				color: 'teal',
+				message: `Unsubscribed from "${subscription.name}"`,
+				position: 'top-right',
+				autoClose: 1500
+			});
+
+			// Close actions modal first (without triggering history back since we're closing everything)
+			setPodcastActionsOpened(false);
+
+			// Close the main modal
+			onClose();
+
+			// Notify parent to refresh subscriptions
+			onUnsubscribe?.();
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to unsubscribe',
+				position: 'top-right',
+				autoClose: 3000
+			});
+		} finally {
+			setIsUnsubscribing(false);
+		}
 	};
 
 	const handleEpisodeUpdate = (updatedEpisode: EpisodeRecord) => {
@@ -398,25 +521,13 @@ function PodcastDetailModal({
 							>
 								Download All
 							</Button>
-							{/*<Button
-								color="red"
-								size="sm"
-								variant="light"
-								leftSection={<ArrowLeft size={16} />}
-								onClick={handlePodcastClose}
-								style={{
-									flex: '1 1 0',
-									minWidth: 0
-								}}
-							>
-								Back
-							</Button>*/}
 							<ActionIcon
 								size="lg"
 								variant="light"
-								color="blue"
+								color="cyan"
 								title="Settings Menu"
 								style={{ flex: '0 0 auto' }}
+								onClick={handlePodcastActionsOpen}
 							>
 								<Ellipsis size={16} />
 							</ActionIcon>
@@ -477,6 +588,82 @@ function PodcastDetailModal({
 								</Stack>
 							</ScrollArea>
 						)}
+					</Stack>
+				</Stack>
+			</Modal>
+
+			<Modal
+				opened={podcastActionsOpened}
+				onClose={handlePodcastActionsClose}
+				withCloseButton={false}
+				size="sm"
+				centered
+				overlayProps={{
+					blur: 5
+				}}
+				onClick={(e) => e.stopPropagation()}
+				styles={{
+					content: {
+						display: 'flex',
+						flexDirection: 'column',
+						maxHeight: 'calc(100svh - 2rem)'
+					},
+					body: {
+						display: 'flex',
+						flexDirection: 'column',
+						flex: 1,
+						overflow: 'hidden'
+					}
+				}}
+			>
+				<Stack
+					gap="md"
+					style={{
+						flex: 1,
+						overflow: 'hidden'
+					}}
+				>
+					{/* Header */}
+					<Group
+						justify="space-between"
+						align="flex-start"
+						style={{
+							flexShrink: 0
+						}}
+					>
+						<div style={{ flex: 1, minWidth: 0 }}>
+							<Text fw={600} size="lg" lineClamp={2}>
+								{subscription.name}
+							</Text>
+							<Text size="sm" c="dimmed" lineClamp={1} mt={4}>
+								{episodes.length} episodes
+							</Text>
+						</div>
+					</Group>
+					<Stack gap="xs">
+						<Card py="xs">
+							<Group justify='center'>
+								<Checkbox
+									variant='outline'
+									checked={isAutoDownload}
+									onChange={(event) => handleAutoDownloadChange(event.currentTarget.checked)}
+									label="Auto Download"
+									color="cyan"
+									disabled={isUpdatingAutoDownload}
+								/>
+							</Group>
+						</Card>
+						<Divider my="md" />
+						<Button
+							variant="light"
+							color="red"
+							leftSection={<Trash size={16} />}
+							fullWidth
+							onClick={handleUnsubscribe}
+							loading={isUnsubscribing}
+						>
+							Unsubscribe
+						</Button>
 					</Stack>
 				</Stack>
 			</Modal>
