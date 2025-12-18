@@ -5,13 +5,13 @@ const { parseStringPromise } = require('xml2js');
 /**
  * Subscription Service
  * Handles podcast subscription operations
- * 
+ *
  * Subscription schema is aligned with Podcast schema from iTunes API:
  * - id, name, artist, feedUrl, artworkUrl, artworkUrl100, artworkUrl600
  * - genres (JSON string), primaryGenre, trackCount, releaseDate, country
  * - description (optional, from RSS feed)
  * - lastFetched, createdAt (subscription-specific)
- * - auto_download, auto_download_limit (auto-download settings)
+ * - auto_download (auto-download settings)
  */
 class SubscriptionService {
 	/**
@@ -113,7 +113,7 @@ class SubscriptionService {
 	 */
 	subscribe(podcast) {
 		const db = getDatabase();
-		
+
 		// Check if already subscribed
 		const existing = this.getSubscriptionByFeedUrl(podcast.feedUrl);
 		if (existing) {
@@ -125,7 +125,7 @@ class SubscriptionService {
 
 		const stmt = db.prepare(`
 			INSERT INTO subscriptions (
-				feedUrl, name, artist, description, 
+				feedUrl, name, artist, description,
 				artworkUrl, artworkUrl100, artworkUrl600,
 				genres, primaryGenre, trackCount, releaseDate, country,
 				lastFetched, createdAt
@@ -167,8 +167,7 @@ class SubscriptionService {
 			country: podcast.country || null,
 			lastFetched: now,
 			createdAt: now,
-			auto_download: 0,
-			auto_download_limit: 5
+			auto_download: 0
 		};
 	}
 
@@ -181,9 +180,9 @@ class SubscriptionService {
 		const db = getDatabase();
 		const stmt = db.prepare('DELETE FROM subscriptions WHERE feedUrl = ?');
 		const result = stmt.run(feedUrl);
-		
+
 		console.log('[subscription] Unsubscribed from feed:', feedUrl);
-		
+
 		return result.changes > 0;
 	}
 
@@ -191,19 +190,13 @@ class SubscriptionService {
 	 * Update auto-download settings for a subscription
 	 * @param {number} id - Subscription ID
 	 * @param {boolean} autoDownload - Enable/disable auto-download
-	 * @param {number} [autoDownloadLimit] - Max episodes to auto-download
 	 * @returns {Object} Updated subscription
 	 */
-	updateAutoDownload(id, autoDownload, autoDownloadLimit) {
+	updateAutoDownload(id, autoDownload) {
 		const db = getDatabase();
 
 		let sql = 'UPDATE subscriptions SET auto_download = ?';
 		const params = [autoDownload ? 1 : 0];
-
-		if (autoDownloadLimit !== undefined) {
-			sql += ', auto_download_limit = ?';
-			params.push(autoDownloadLimit);
-		}
 
 		sql += ' WHERE id = ?';
 		params.push(id);
@@ -282,7 +275,7 @@ class SubscriptionService {
 		const feedData = await this.fetchFeed(feedUrl);
 
 		const stmt = db.prepare(`
-			UPDATE subscriptions 
+			UPDATE subscriptions
 			SET description = ?, lastFetched = ?
 			WHERE feedUrl = ?
 		`);

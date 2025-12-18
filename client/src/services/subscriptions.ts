@@ -1,10 +1,10 @@
 /**
  * Subscription service for managing podcast subscriptions
- * 
+ *
  * Subscription extends the Podcast type with additional fields:
  * - description (optional, from RSS feed)
  * - lastFetched, createdAt (subscription tracking)
- * - auto_download, auto_download_limit (auto-download settings)
+ * - auto_download (auto-download settings)
  */
 
 import type { Podcast } from './podcasts';
@@ -15,7 +15,6 @@ export interface Subscription extends Podcast {
 	lastFetched: number;
 	createdAt: number;
 	auto_download: number;
-	auto_download_limit: number;
 }
 
 export interface Episode {
@@ -181,7 +180,7 @@ export async function fetchFeed(feedUrl: string): Promise<FeedResponse> {
  * Subscribe to a podcast
  * @param podcast - The podcast to subscribe to (uses Podcast type fields)
  */
-export async function subscribe(podcast: Podcast & { description?: string }): Promise<SubscriptionResponse> {
+export async function subscribe(podcast: Podcast & { description?: string; }): Promise<SubscriptionResponse> {
 	try {
 		const response = await fetch(`${API_BASE_URL}/api/subscriptions`, {
 			method: 'POST',
@@ -209,7 +208,7 @@ export async function subscribe(podcast: Podcast & { description?: string }): Pr
  * Unsubscribe from a podcast
  * @param feedUrl - The podcast feed URL
  */
-export async function unsubscribe(feedUrl: string): Promise<{ success: boolean; message?: string }> {
+export async function unsubscribe(feedUrl: string): Promise<{ success: boolean; message?: string; }> {
 	try {
 		const params = new URLSearchParams({ feedUrl });
 		const response = await fetch(`${API_BASE_URL}/api/subscriptions?${params}`, {
@@ -237,12 +236,10 @@ export async function unsubscribe(feedUrl: string): Promise<{ success: boolean; 
  * Update subscription auto-download settings
  * @param subscriptionId - The subscription ID
  * @param autoDownload - Whether to auto-download new episodes
- * @param autoDownloadLimit - Max episodes to auto-download (optional)
  */
 export async function updateAutoDownload(
 	subscriptionId: number,
-	autoDownload: boolean,
-	autoDownloadLimit?: number
+	autoDownload: boolean
 ): Promise<SubscriptionResponse> {
 	try {
 		const response = await fetch(`${API_BASE_URL}/api/subscriptions/${subscriptionId}/auto-download`, {
@@ -251,8 +248,7 @@ export async function updateAutoDownload(
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				auto_download: autoDownload ? 1 : 0,
-				auto_download_limit: autoDownloadLimit
+				auto_download: autoDownload ? 1 : 0
 			}),
 		});
 

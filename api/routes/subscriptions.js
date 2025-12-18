@@ -89,11 +89,11 @@ router.get('/feed', async (req, res) => {
  */
 router.post('/', (req, res) => {
 	try {
-		const { 
-			feedUrl, 
+		const {
+			feedUrl,
 			name,
 			artist,
-			description, 
+			description,
 			artworkUrl,
 			artworkUrl100,
 			artworkUrl600,
@@ -234,12 +234,12 @@ router.get('/:id', (req, res) => {
 /**
  * PATCH /api/subscriptions/:id/auto-download
  * Update auto-download settings for a subscription
- * Body: { auto_download: 0|1, auto_download_limit?: number }
+ * Body: { auto_download: 0|1 }
  */
 router.patch('/:id/auto-download', (req, res) => {
 	try {
 		const { id } = req.params;
-		const { auto_download, auto_download_limit } = req.body;
+		const { auto_download } = req.body;
 
 		if (auto_download === undefined) {
 			return res.status(400).json({
@@ -250,8 +250,7 @@ router.patch('/:id/auto-download', (req, res) => {
 
 		const subscription = subscriptionService.updateAutoDownload(
 			parseInt(id),
-			!!auto_download,
-			auto_download_limit
+			!!auto_download
 		);
 
 		if (!subscription) {

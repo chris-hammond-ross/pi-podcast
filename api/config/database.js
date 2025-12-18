@@ -48,7 +48,6 @@ function createTables(database) {
 			country TEXT,
 			lastFetched INTEGER,
 			auto_download INTEGER DEFAULT 0,
-			auto_download_limit INTEGER DEFAULT 5,
 			createdAt INTEGER DEFAULT (strftime('%s', 'now'))
 		);
 

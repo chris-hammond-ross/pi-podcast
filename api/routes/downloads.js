@@ -252,7 +252,7 @@ router.post('/sync/subscription/:subscriptionId', async (req, res) => {
 
 		// Then queue any not downloaded
 		const episodes = episodeService.getNotDownloaded(parseInt(subscriptionId));
-		
+
 		let queueResult = { added: 0, skipped: 0, total: 0 };
 		if (episodes.length > 0) {
 			const episodeIds = episodes.map(e => e.id);
@@ -280,7 +280,7 @@ router.post('/sync/subscription/:subscriptionId', async (req, res) => {
 router.post('/sync-auto', async (req, res) => {
 	try {
 		const subscriptions = subscriptionService.getAutoDownloadSubscriptions();
-		
+
 		if (subscriptions.length === 0) {
 			return res.json({
 				success: true,
@@ -290,26 +290,25 @@ router.post('/sync-auto', async (req, res) => {
 		}
 
 		const results = [];
-		
+
 		for (const subscription of subscriptions) {
 			try {
 				// Sync episodes from feed
 				const syncResult = await episodeService.syncEpisodesFromFeed(subscription.id);
-				
-				// Get episodes not downloaded, limited by auto_download_limit
+
+				// Get episodes not downloaded
 				const episodes = episodeService.getEpisodesBySubscription(subscription.id, {
 					notDownloadedOnly: true,
-					limit: subscription.auto_download_limit || 5,
 					orderBy: 'pub_date',
 					order: 'DESC'
 				});
-				
+
 				let queueResult = { added: 0, skipped: 0, total: 0 };
 				if (episodes.length > 0) {
 					const episodeIds = episodes.map(e => e.id);
 					queueResult = downloadQueueService.addBatchToQueue(episodeIds);
 				}
-				
+
 				results.push({
 					subscriptionId: subscription.id,
 					subscriptionName: subscription.name,
@@ -326,7 +325,7 @@ router.post('/sync-auto', async (req, res) => {
 		}
 
 		const totalQueued = results.reduce((sum, r) => sum + (r.queue?.added || 0), 0);
-		
+
 		console.log(`[auto-download] Processed ${subscriptions.length} subscriptions, queued ${totalQueued} episodes`);
 
 		res.json({

@@ -289,8 +289,7 @@ function PodcastDetailModal({
 		try {
 			const response = await updateAutoDownload(
 				subscription.id,
-				checked,
-				10000 // Set a high limit to effectively make it unlimited
+				checked
 			);
 
 			setIsAutoDownload(checked);
