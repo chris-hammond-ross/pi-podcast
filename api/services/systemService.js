@@ -10,7 +10,7 @@
  * Create the file with: sudo visudo -f /etc/sudoers.d/pi-podcast-restart
  */
 
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const util = require('util');
 const os = require('os');
 const fs = require('fs');
@@ -278,22 +278,21 @@ async function rebootSystem() {
 		return { message: 'System reboot simulated (development mode)' };
 	}
 
-	try {
-		console.log('[systemService] Initiating system reboot...');
-		
-		// Use exec without waiting for completion since the system will reboot
-		// The command will trigger the reboot and we return immediately
-		exec('sudo /sbin/reboot', (error) => {
-			if (error) {
-				console.error('[systemService] Reboot command error:', error.message);
-			}
-		});
+	console.log('[systemService] Initiating system reboot...');
 
-		return { message: 'System reboot initiated' };
-	} catch (error) {
-		console.error('[systemService] Failed to reboot system:', error.message);
-		throw new Error(`Failed to reboot system: ${error.message}`);
-	}
+	// Spawn the reboot command as a detached process
+	// This ensures the reboot happens even if the Node process exits
+	const child = spawn('sudo', ['/sbin/reboot'], {
+		detached: true,
+		stdio: 'ignore'
+	});
+
+	// Unref the child so the parent can exit independently
+	child.unref();
+
+	console.log('[systemService] Reboot command spawned');
+
+	return { message: 'System reboot initiated' };
 }
 
 module.exports = {
