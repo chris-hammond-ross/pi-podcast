@@ -248,25 +248,23 @@ function Settings() {
 									) : (
 										<Stack gap="2px">
 											<Card py="xs">
-												<Text pb="sm" size='sm'>System</Text>
+												<Group justify='space-between' pb="sm">
+													<Text size='sm'>System</Text>
+													<Text size='sm' c="dimmed">{systemStats.os}</Text>
+												</Group>
 												<Stack gap="0.4rem">
 													<Group justify='space-between'>
 														<Text c="dimmed" size='sm'>Uptime</Text>
 														<Text size='sm'>{systemStats.uptime}</Text>
 													</Group>
-													<Group justify='space-between'>
-														<Text c="dimmed" size='sm'>OS</Text>
-														<Text size='sm'>{systemStats.os}</Text>
-													</Group>
 												</Stack>
 											</Card>
 											<Card py="xs">
-												<Text pb="sm" size='sm'>CPU</Text>
+												<Group justify='space-between' pb="sm">
+													<Text size='sm'>CPU</Text>
+													<Text size='sm' c="dimmed">{systemStats.cpu.cores} Cores</Text>
+												</Group>
 												<Stack gap="0.4rem">
-													<Group justify='space-between'>
-														<Text c="dimmed" size='sm'>Cores</Text>
-														<Text size='sm'>{systemStats.cpu.cores}</Text>
-													</Group>
 													<Group justify='space-between'>
 														<Text c="dimmed" size='sm'>Frequency</Text>
 														<Text size='sm'>{formatValue(systemStats.cpu.frequency, 'GHz', 2)}</Text>
