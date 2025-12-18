@@ -17,7 +17,7 @@ import {
 	Center,
 	SegmentedControl
 } from '@mantine/core';
-import { RefreshCw, Sun, Moon, Power } from 'lucide-react';
+import { RefreshCw, Sun, Moon, Power, Bot } from 'lucide-react';
 import { BluetoothInterface } from '../components';
 import { restartServices, getWebSocketService, type SystemStats } from '../services';
 
@@ -174,6 +174,15 @@ function Settings() {
 														<Center pr="xs" style={{ gap: 10 }}>
 															<Moon size={16} />
 															<span>Dark</span>
+														</Center>
+													),
+												},
+												{
+													value: 'auto',
+													label: (
+														<Center pr="xs" style={{ gap: 10 }}>
+															<Bot size={16} />
+															<span>Auto</span>
 														</Center>
 													),
 												},
