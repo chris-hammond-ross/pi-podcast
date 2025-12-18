@@ -20,6 +20,7 @@ class Device {
 		this.statements = {
 			getByMac: this.db.prepare('SELECT * FROM bluetooth_devices WHERE mac_address = ?'),
 			getAllPaired: this.db.prepare('SELECT * FROM bluetooth_devices WHERE paired = 1'),
+			getLastConnected: this.db.prepare('SELECT * FROM bluetooth_devices WHERE last_connected = 1 AND paired = 1 LIMIT 1'),
 			insert: this.db.prepare(`
 				INSERT INTO bluetooth_devices (mac_address, name, rssi, last_seen)
 				VALUES (?, ?, ?, strftime('%s', 'now'))
@@ -37,6 +38,16 @@ class Device {
 			updateTrusted: this.db.prepare(`
 				UPDATE bluetooth_devices
 				SET trusted = ?, last_seen = strftime('%s', 'now')
+				WHERE mac_address = ?
+			`),
+			clearLastConnected: this.db.prepare(`
+				UPDATE bluetooth_devices
+				SET last_connected = 0
+				WHERE last_connected = 1
+			`),
+			setLastConnected: this.db.prepare(`
+				UPDATE bluetooth_devices
+				SET last_connected = 1, last_seen = strftime('%s', 'now')
 				WHERE mac_address = ?
 			`)
 		};
@@ -59,6 +70,38 @@ class Device {
 	getAllPaired() {
 		this.ensureInitialized();
 		return this.statements.getAllPaired.all();
+	}
+
+	/**
+	 * Get the last connected device (if any)
+	 * @returns {Object|undefined} The last connected device or undefined
+	 */
+	getLastConnected() {
+		this.ensureInitialized();
+		return this.statements.getLastConnected.get();
+	}
+
+	/**
+	 * Set a device as the last connected device
+	 * Clears the flag from any other device first
+	 * @param {string} mac - The MAC address of the device to mark as last connected
+	 */
+	setLastConnected(mac) {
+		this.ensureInitialized();
+		// Use a transaction to ensure atomicity
+		const transaction = this.db.transaction(() => {
+			this.statements.clearLastConnected.run();
+			this.statements.setLastConnected.run(mac);
+		});
+		transaction();
+	}
+
+	/**
+	 * Clear the last connected flag from all devices
+	 */
+	clearLastConnected() {
+		this.ensureInitialized();
+		this.statements.clearLastConnected.run();
 	}
 
 	/**

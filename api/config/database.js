@@ -84,6 +84,7 @@ function createTables(database) {
 			last_seen INTEGER DEFAULT (strftime('%s', 'now')),
 			paired INTEGER DEFAULT 0,
 			trusted INTEGER DEFAULT 0,
+			last_connected INTEGER DEFAULT 0,
 			created_at INTEGER DEFAULT (strftime('%s', 'now'))
 		);
 
@@ -134,6 +135,7 @@ function createTables(database) {
 		CREATE INDEX IF NOT EXISTS idx_playlists_subscription_id ON playlists(subscription_id);
 		CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_mac ON bluetooth_devices(mac_address);
 		CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_last_seen ON bluetooth_devices(last_seen);
+		CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_last_connected ON bluetooth_devices(last_connected);
 		CREATE INDEX IF NOT EXISTS idx_episodes_subscription_id ON episodes(subscription_id);
 		CREATE INDEX IF NOT EXISTS idx_episodes_guid ON episodes(guid);
 		CREATE INDEX IF NOT EXISTS idx_episodes_downloaded_at ON episodes(downloaded_at);

@@ -22,10 +22,10 @@ class BluetoothService {
 		this.isScanning = false;
 		this.bluetoothPowered = true;
 		this.lastSeenTimestamps = new Map();
-		
+
 		this.deviceModel = new Device();
 		this.commandQueue = new CommandQueue();
-		
+
 		// Callback for broadcasting messages (will be set by websocket)
 		this.broadcastCallback = null;
 	}
@@ -103,7 +103,7 @@ class BluetoothService {
 		setTimeout(async () => {
 			this.loadPairedDevicesFromDatabase();
 			await this.refreshBluetoothState();
-			
+
 			// Broadcast initial state
 			this.broadcast({
 				type: 'system-status',
@@ -113,7 +113,7 @@ class BluetoothService {
 				connected_device: this.connectedDeviceMac ? this.currentDevices.find(d => d.mac === this.connectedDeviceMac) : null,
 				is_scanning: this.isScanning
 			});
-			
+
 			// Send devices list
 			if (this.currentDevices.length > 0) {
 				this.broadcast({
@@ -121,8 +121,11 @@ class BluetoothService {
 					devices: this.currentDevices
 				});
 			}
-			
+
 			console.log('[bluetooth] Initial state broadcast complete');
+
+			// Attempt to auto-reconnect to last connected device
+			await this.attemptAutoReconnect();
 		}, 1000);
 	}
 
@@ -133,7 +136,7 @@ class BluetoothService {
 		try {
 			const pairedDevices = this.deviceModel.getAllPaired();
 			console.log(`[database] Loading ${pairedDevices.length} paired devices from database`);
-			
+
 			pairedDevices.forEach(dbDevice => {
 				const existing = this.currentDevices.find(d => d.mac === dbDevice.mac_address);
 				if (!existing) {
@@ -156,15 +159,85 @@ class BluetoothService {
 	}
 
 	/**
+	 * Attempt to auto-reconnect to the last connected device
+	 * Called during service initialization
+	 */
+	async attemptAutoReconnect() {
+		// Don't auto-reconnect if already connected
+		if (this.connectedDeviceMac) {
+			console.log('[bluetooth] Already connected, skipping auto-reconnect');
+			return;
+		}
+
+		try {
+			const lastConnectedDevice = this.deviceModel.getLastConnected();
+
+			if (!lastConnectedDevice) {
+				console.log('[bluetooth] No last connected device found, skipping auto-reconnect');
+				return;
+			}
+
+			console.log(`[bluetooth] Attempting auto-reconnect to: ${lastConnectedDevice.name} (${lastConnectedDevice.mac_address})`);
+
+			// Broadcast that we're attempting to reconnect
+			this.broadcast({
+				type: 'auto-reconnect-started',
+				device: {
+					mac: lastConnectedDevice.mac_address,
+					name: lastConnectedDevice.name
+				}
+			});
+
+			// Give a short delay for Bluetooth subsystem to fully initialize
+			await new Promise(resolve => setTimeout(resolve, 2000));
+
+			// Attempt to connect (use simple connect, not full sequence since already paired/trusted)
+			const result = await this.connectDevice(lastConnectedDevice.mac_address, false);
+
+			// Check if connection was successful
+			const success = /Connection successful/i.test(result.output) ||
+				/Already connected/i.test(result.output);
+
+			if (success) {
+				console.log(`[bluetooth] Auto-reconnect successful: ${lastConnectedDevice.name}`);
+				this.broadcast({
+					type: 'auto-reconnect-success',
+					device: {
+						mac: lastConnectedDevice.mac_address,
+						name: lastConnectedDevice.name
+					}
+				});
+			} else {
+				console.log(`[bluetooth] Auto-reconnect failed: ${lastConnectedDevice.name}`);
+				console.log('[bluetooth] Connect output:', result.output.substring(0, 200));
+				this.broadcast({
+					type: 'auto-reconnect-failed',
+					device: {
+						mac: lastConnectedDevice.mac_address,
+						name: lastConnectedDevice.name
+					},
+					error: 'Connection failed'
+				});
+			}
+		} catch (err) {
+			console.error('[bluetooth] Auto-reconnect error:', err.message);
+			this.broadcast({
+				type: 'auto-reconnect-failed',
+				error: err.message
+			});
+		}
+	}
+
+	/**
 	 * Refresh the Bluetooth state by querying bluetoothctl
 	 */
 	async refreshBluetoothState() {
 		try {
 			console.log('[bluetooth] Refreshing Bluetooth state...');
-			
+
 			// Get controller info to check power state
 			const showOutput = await this.sendCommand('show', 3000);
-			
+
 			// Parse power state
 			if (/Powered:\s*yes/i.test(showOutput)) {
 				this.bluetoothPowered = true;
@@ -173,13 +246,13 @@ class BluetoothService {
 				this.bluetoothPowered = false;
 				console.log('[bluetooth] Bluetooth is powered off');
 			}
-			
+
 			// Check each paired device's connection status
 			for (const device of this.currentDevices) {
 				if (device.paired) {
 					try {
 						const infoOutput = await this.sendCommand(`info ${device.mac}`, 2000);
-						
+
 						// Check if connected
 						if (/Connected:\s*yes/i.test(infoOutput)) {
 							device.is_connected = true;
@@ -189,7 +262,7 @@ class BluetoothService {
 						} else {
 							device.is_connected = false;
 						}
-						
+
 						// Update paired/trusted from info output
 						if (/Paired:\s*yes/i.test(infoOutput)) {
 							device.paired = true;
@@ -202,7 +275,7 @@ class BluetoothService {
 					}
 				}
 			}
-			
+
 			console.log('[bluetooth] Bluetooth state refresh complete');
 		} catch (err) {
 			console.error('[bluetooth] Error refreshing Bluetooth state:', err.message);
@@ -334,17 +407,17 @@ class BluetoothService {
 				if (match) {
 					const mac = match[1];
 					console.log('[devices] Device removed/went offline:', mac);
-					
+
 					const device = this.currentDevices.find(d => d.mac === mac);
 					if (device) {
 						device.is_online = false;
 						device.is_connected = false;
 						this.lastSeenTimestamps.delete(mac);
-						
+
 						if (this.connectedDeviceMac === mac) {
 							this.connectedDeviceMac = null;
 						}
-						
+
 						this.broadcast({
 							type: 'device-updated',
 							device: device
@@ -546,6 +619,15 @@ class BluetoothService {
 
 					if (isNowConnected) {
 						this.connectedDeviceMac = mac;
+
+						// Track this as the last connected device for auto-reconnect
+						try {
+							this.deviceModel.setLastConnected(mac);
+							console.log('[database] Updated last connected device:', mac);
+						} catch (err) {
+							console.error('[database] Failed to update last connected device:', err.message);
+						}
+
 						this.broadcast({
 							type: 'device-connected',
 							device: device
