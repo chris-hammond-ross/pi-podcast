@@ -5,7 +5,7 @@
  * IMPORTANT: For this to work on the Pi, you need to add passwordless sudo
  * access for the pi-podcast user. Add this to /etc/sudoers.d/pi-podcast-restart:
  * 
- *   pi-podcast ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast, /usr/bin/vcgencmd measure_temp, /sbin/reboot
+ *   pi-podcast ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast, /usr/bin/vcgencmd measure_temp, /usr/sbin/reboot
  * 
  * Create the file with: sudo visudo -f /etc/sudoers.d/pi-podcast-restart
  */
@@ -282,7 +282,7 @@ async function rebootSystem() {
 
 	// Spawn the reboot command as a detached process
 	// This ensures the reboot happens even if the Node process exits
-	const child = spawn('sudo', ['/sbin/reboot'], {
+	const child = spawn('sudo', ['/usr/sbin/reboot'], {
 		detached: true,
 		stdio: 'ignore'
 	});
