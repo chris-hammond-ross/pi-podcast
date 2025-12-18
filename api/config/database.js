@@ -11,7 +11,7 @@ let db = null;
  */
 function parseRssDate(dateStr) {
 	if (!dateStr) return null;
-	
+
 	try {
 		// JavaScript's Date.parse can handle RFC 2822 dates
 		const timestamp = Date.parse(dateStr);
@@ -21,7 +21,7 @@ function parseRssDate(dateStr) {
 	} catch (e) {
 		// Fall through to return null
 	}
-	
+
 	return null;
 }
 
@@ -47,6 +47,8 @@ function createTables(database) {
 			releaseDate TEXT,
 			country TEXT,
 			lastFetched INTEGER,
+			auto_download INTEGER DEFAULT 0,
+			auto_download_limit INTEGER DEFAULT 5,
 			createdAt INTEGER DEFAULT (strftime('%s', 'now'))
 		);
 
@@ -55,6 +57,9 @@ function createTables(database) {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
 			description TEXT,
+			type TEXT DEFAULT 'user',
+			subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE CASCADE,
+			file_path TEXT,
 			created_at INTEGER DEFAULT (strftime('%s', 'now')),
 			updated_at INTEGER DEFAULT (strftime('%s', 'now'))
 		);
@@ -91,6 +96,7 @@ function createTables(database) {
 			title TEXT,
 			description TEXT,
 			pub_date TEXT,
+			pub_date_unix INTEGER,
 			duration TEXT,
 			audio_url TEXT NOT NULL,
 			audio_type TEXT DEFAULT 'audio/mpeg',
@@ -99,6 +105,9 @@ function createTables(database) {
 			file_path TEXT,
 			file_size INTEGER,
 			downloaded_at INTEGER,
+			playback_position INTEGER DEFAULT 0,
+			playback_completed INTEGER DEFAULT 0,
+			last_played_at INTEGER,
 			created_at INTEGER DEFAULT (strftime('%s', 'now')),
 			FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
 			UNIQUE(subscription_id, guid)
@@ -122,142 +131,20 @@ function createTables(database) {
 		-- Create indexes for better query performance
 		CREATE INDEX IF NOT EXISTS idx_subscriptions_feedUrl ON subscriptions(feedUrl);
 		CREATE INDEX IF NOT EXISTS idx_playlist_episodes_playlist_id ON playlist_episodes(playlist_id);
+		CREATE INDEX IF NOT EXISTS idx_playlists_type ON playlists(type);
+		CREATE INDEX IF NOT EXISTS idx_playlists_subscription_id ON playlists(subscription_id);
 		CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_mac ON bluetooth_devices(mac_address);
 		CREATE INDEX IF NOT EXISTS idx_bluetooth_devices_last_seen ON bluetooth_devices(last_seen);
 		CREATE INDEX IF NOT EXISTS idx_episodes_subscription_id ON episodes(subscription_id);
 		CREATE INDEX IF NOT EXISTS idx_episodes_guid ON episodes(guid);
 		CREATE INDEX IF NOT EXISTS idx_episodes_downloaded_at ON episodes(downloaded_at);
+		CREATE INDEX IF NOT EXISTS idx_episodes_pub_date_unix ON episodes(pub_date_unix);
+		CREATE INDEX IF NOT EXISTS idx_episodes_last_played_at ON episodes(last_played_at);
 		CREATE INDEX IF NOT EXISTS idx_download_queue_status ON download_queue(status);
 		CREATE INDEX IF NOT EXISTS idx_download_queue_episode_id ON download_queue(episode_id);
 	`);
 
 	console.log('[database] Tables verified/created');
-
-	// Run migrations AFTER tables exist
-	runMigrations(database);
-}
-
-/**
- * Run migrations to add columns to existing tables
- * @param {Database} database - The database instance
- */
-function runMigrations(database) {
-	// Helper to check if column exists
-	const columnExists = (table, column) => {
-		const result = database.prepare(`PRAGMA table_info(${table})`).all();
-		return result.some(col => col.name === column);
-	};
-
-	// Helper to check if index exists
-	const indexExists = (indexName) => {
-		const result = database.prepare(
-			`SELECT name FROM sqlite_master WHERE type='index' AND name=?`
-		).get(indexName);
-		return !!result;
-	};
-
-	// === Subscription migrations ===
-
-	// Add auto_download columns to subscriptions if they don't exist
-	if (!columnExists('subscriptions', 'auto_download')) {
-		database.exec('ALTER TABLE subscriptions ADD COLUMN auto_download INTEGER DEFAULT 0');
-		console.log('[database] Added auto_download column to subscriptions');
-	}
-
-	if (!columnExists('subscriptions', 'auto_download_limit')) {
-		database.exec('ALTER TABLE subscriptions ADD COLUMN auto_download_limit INTEGER DEFAULT 5');
-		console.log('[database] Added auto_download_limit column to subscriptions');
-	}
-
-	// === Episode migrations ===
-
-	// Add pub_date_unix column for proper date sorting
-	// This stores the pub_date as a Unix timestamp for reliable sorting
-	if (!columnExists('episodes', 'pub_date_unix')) {
-		database.exec('ALTER TABLE episodes ADD COLUMN pub_date_unix INTEGER');
-		console.log('[database] Added pub_date_unix column to episodes');
-		
-		// Migrate existing pub_date values to pub_date_unix
-		const episodes = database.prepare('SELECT id, pub_date FROM episodes WHERE pub_date IS NOT NULL').all();
-		const updateStmt = database.prepare('UPDATE episodes SET pub_date_unix = ? WHERE id = ?');
-		
-		let migrated = 0;
-		for (const episode of episodes) {
-			const unixTimestamp = parseRssDate(episode.pub_date);
-			if (unixTimestamp) {
-				updateStmt.run(unixTimestamp, episode.id);
-				migrated++;
-			}
-		}
-		
-		if (migrated > 0) {
-			console.log(`[database] Migrated ${migrated} episodes with pub_date_unix timestamps`);
-		}
-	}
-
-	// Create index for pub_date_unix for efficient sorting
-	if (!indexExists('idx_episodes_pub_date_unix')) {
-		database.exec('CREATE INDEX idx_episodes_pub_date_unix ON episodes(pub_date_unix)');
-		console.log('[database] Added index idx_episodes_pub_date_unix');
-	}
-
-	// === Episode playback migrations ===
-
-	// Add playback_position column for resume functionality
-	if (!columnExists('episodes', 'playback_position')) {
-		database.exec('ALTER TABLE episodes ADD COLUMN playback_position INTEGER DEFAULT 0');
-		console.log('[database] Added playback_position column to episodes');
-	}
-
-	// Add playback_completed flag to track finished episodes
-	if (!columnExists('episodes', 'playback_completed')) {
-		database.exec('ALTER TABLE episodes ADD COLUMN playback_completed INTEGER DEFAULT 0');
-		console.log('[database] Added playback_completed column to episodes');
-	}
-
-	// Add last_played_at timestamp
-	if (!columnExists('episodes', 'last_played_at')) {
-		database.exec('ALTER TABLE episodes ADD COLUMN last_played_at INTEGER');
-		console.log('[database] Added last_played_at column to episodes');
-	}
-
-	// Create index for last_played_at (after column exists)
-	if (!indexExists('idx_episodes_last_played_at')) {
-		database.exec('CREATE INDEX idx_episodes_last_played_at ON episodes(last_played_at)');
-		console.log('[database] Added index idx_episodes_last_played_at');
-	}
-
-	// === Playlist migrations ===
-
-	// Add type column to playlists ('user' or 'auto')
-	if (!columnExists('playlists', 'type')) {
-		database.exec("ALTER TABLE playlists ADD COLUMN type TEXT DEFAULT 'user'");
-		console.log('[database] Added type column to playlists');
-	}
-
-	// Add subscription_id column for auto playlists
-	if (!columnExists('playlists', 'subscription_id')) {
-		database.exec('ALTER TABLE playlists ADD COLUMN subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE CASCADE');
-		console.log('[database] Added subscription_id column to playlists');
-	}
-
-	// Add file_path column to store the .m3u file location
-	if (!columnExists('playlists', 'file_path')) {
-		database.exec('ALTER TABLE playlists ADD COLUMN file_path TEXT');
-		console.log('[database] Added file_path column to playlists');
-	}
-
-	// Create index for playlist type
-	if (!indexExists('idx_playlists_type')) {
-		database.exec('CREATE INDEX idx_playlists_type ON playlists(type)');
-		console.log('[database] Added index idx_playlists_type');
-	}
-
-	// Create index for playlist subscription_id
-	if (!indexExists('idx_playlists_subscription_id')) {
-		database.exec('CREATE INDEX idx_playlists_subscription_id ON playlists(subscription_id)');
-		console.log('[database] Added index idx_playlists_subscription_id');
-	}
 }
 
 /**
