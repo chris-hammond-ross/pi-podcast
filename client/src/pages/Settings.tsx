@@ -163,8 +163,8 @@ function Settings() {
 					zIndex={1000}
 				>
 					<Stack align="center" gap="lg" w={300}>
-						<Power size={48} style={{ color: 'var(--mantine-color-orange-5)' }} />
-						<Text size="lg" fw={500} c="white">Rebooting system...</Text>
+						{/*<Power size={48} style={{ color: 'var(--mantine-color-orange-5)' }} />*/}
+						<Text size="lg" fw={500} c="white">Rebooting, please wait</Text>
 						<Stack w="100%" gap="xs">
 							<Progress
 								value={rebootProgress}
@@ -300,37 +300,41 @@ function Settings() {
 											Reboot
 										</Button>
 									</Group>
-									{!systemStats ? (
+									{(!systemStats || isRestarting || isRebooting) ? (
 										<Stack gap="2px">
-											<Card py="xs">
-												<Skeleton height={16} width="30%" mb="sm" />
-												<Stack gap="0.4rem">
-													<Skeleton height={14} />
-													<Skeleton height={14} />
+											{[...Array(6).keys()].map(i => (
+												<Stack gap="2px" key={i}>
+													<Card py="xs">
+														<Skeleton height={16} width="30%" mb="sm" />
+														<Stack gap="0.4rem">
+															<Skeleton height={14} />
+															<Skeleton height={14} />
+														</Stack>
+													</Card>
+													<Card py="xs">
+														<Skeleton height={16} width="20%" mb="sm" />
+														<Stack gap="0.4rem">
+															<Skeleton height={14} />
+															<Skeleton height={14} />
+															<Skeleton height={14} />
+														</Stack>
+													</Card>
+													<Card py="xs">
+														<Skeleton height={16} width="40%" mb="sm" />
+														<Stack gap="0.4rem">
+															<Skeleton height={14} />
+															<Skeleton height={8} />
+														</Stack>
+													</Card>
+													<Card py="xs">
+														<Skeleton height={16} width="35%" mb="sm" />
+														<Stack gap="0.4rem">
+															<Skeleton height={14} />
+															<Skeleton height={8} />
+														</Stack>
+													</Card>
 												</Stack>
-											</Card>
-											<Card py="xs">
-												<Skeleton height={16} width="20%" mb="sm" />
-												<Stack gap="0.4rem">
-													<Skeleton height={14} />
-													<Skeleton height={14} />
-													<Skeleton height={14} />
-												</Stack>
-											</Card>
-											<Card py="xs">
-												<Skeleton height={16} width="40%" mb="sm" />
-												<Stack gap="0.4rem">
-													<Skeleton height={14} />
-													<Skeleton height={8} />
-												</Stack>
-											</Card>
-											<Card py="xs">
-												<Skeleton height={16} width="35%" mb="sm" />
-												<Stack gap="0.4rem">
-													<Skeleton height={14} />
-													<Skeleton height={8} />
-												</Stack>
-											</Card>
+											))}
 										</Stack>
 									) : (
 										<Stack gap="2px">
