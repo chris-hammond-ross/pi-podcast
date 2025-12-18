@@ -5,7 +5,7 @@
  * IMPORTANT: For this to work on the Pi, you need to add passwordless sudo
  * access for the pi-podcast user. Add this to /etc/sudoers.d/pi-podcast-restart:
  * 
- *   pi-podcast ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast, /usr/bin/vcgencmd measure_temp, /usr/sbin/reboot
+ *   pi-podcast ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast, /usr/bin/systemctl reboot, /usr/bin/vcgencmd measure_temp
  * 
  * Create the file with: sudo visudo -f /etc/sudoers.d/pi-podcast-restart
  */
@@ -280,17 +280,12 @@ async function rebootSystem() {
 
 	console.log('[systemService] Initiating system reboot...');
 
-	// Spawn the reboot command as a detached process
-	// This ensures the reboot happens even if the Node process exits
-	const child = spawn('sudo', ['/usr/sbin/reboot'], {
-		detached: true,
-		stdio: 'ignore'
+	// Use systemctl reboot - consistent with how restart works
+	// Don't await since the system will reboot
+	execAsync('sudo /usr/bin/systemctl reboot').catch(err => {
+		// This will likely error as the system reboots, which is expected
+		console.log('[systemService] Reboot initiated (error expected):', err.message);
 	});
-
-	// Unref the child so the parent can exit independently
-	child.unref();
-
-	console.log('[systemService] Reboot command spawned');
 
 	return { message: 'System reboot initiated' };
 }
