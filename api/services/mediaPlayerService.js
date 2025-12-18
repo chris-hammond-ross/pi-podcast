@@ -145,14 +145,14 @@ class MediaPlayerService extends EventEmitter {
 
 			// Determine the runtime directory from environment or default
 			const xdgRuntimeDir = process.env.XDG_RUNTIME_DIR || '/run/pi-podcast';
-			
+
 			// PulseAudio socket path - check multiple possible locations
 			const possiblePulseSockets = [
 				`${xdgRuntimeDir}/pulse/native`,
 				'/run/pi-podcast/pulse/native',
 				`/tmp/pulse-${process.getuid()}/native`
 			];
-			
+
 			let pulseServer = process.env.PULSE_SERVER;
 			if (!pulseServer) {
 				for (const socketPath of possiblePulseSockets) {
@@ -163,7 +163,7 @@ class MediaPlayerService extends EventEmitter {
 					}
 				}
 			}
-			
+
 			console.log(`[media] XDG_RUNTIME_DIR: ${xdgRuntimeDir}`);
 			console.log(`[media] PULSE_SERVER: ${pulseServer || 'not set'}`);
 
@@ -188,7 +188,7 @@ class MediaPlayerService extends EventEmitter {
 				XDG_RUNTIME_DIR: xdgRuntimeDir,
 				HOME: process.env.HOME || '/var/lib/pi-podcast'
 			};
-			
+
 			// Only set PULSE_SERVER if we found a socket
 			if (pulseServer) {
 				mpvEnv.PULSE_SERVER = pulseServer;
@@ -450,7 +450,7 @@ class MediaPlayerService extends EventEmitter {
 				this.queuePosition = pos;
 				const queueItem = this.queue[pos];
 				this.currentEpisode = queueItem.episode;
-				
+
 				// Get duration
 				try {
 					this.duration = await this.getProperty('duration') || 0;
@@ -466,12 +466,12 @@ class MediaPlayerService extends EventEmitter {
 
 				this.isPlaying = true;
 				this.isPaused = false;
-				
+
 				// Start position save timer
 				this.startPositionSaveTimer();
 
 				console.log(`[media] Now playing: ${this.currentEpisode.title} (queue position ${pos})`);
-				
+
 				this.broadcastStatus();
 				this.broadcastQueue();
 				this.broadcast({
@@ -507,7 +507,7 @@ class MediaPlayerService extends EventEmitter {
 			const queueItem = this.queue[newPosition];
 			this.currentEpisode = queueItem.episode;
 			this.position = 0;
-			
+
 			console.log(`[media] Queue position changed to ${newPosition}: ${this.currentEpisode.title}`);
 		}
 	}
@@ -519,9 +519,9 @@ class MediaPlayerService extends EventEmitter {
 	async handleEndFile(message) {
 		const reason = message.reason;
 		const fileError = message.file_error;
-		
+
 		console.log('[media] End file, reason:', reason);
-		
+
 		if (fileError) {
 			console.error('[media] File error:', fileError);
 		}
@@ -553,9 +553,9 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	handleIdle() {
 		console.log('[media] Entered idle state - queue finished or stopped');
-		
+
 		this.stopPositionSaveTimer();
-		
+
 		// Save final position
 		if (this.currentEpisode && this.position > 0) {
 			this.saveCurrentPosition();
@@ -677,7 +677,7 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	async playEpisode(episodeId) {
 		const releaseLock = await this.acquireLock('playEpisode');
-		
+
 		try {
 			const episode = this.validateEpisodeForQueue(episodeId);
 
@@ -782,7 +782,7 @@ class MediaPlayerService extends EventEmitter {
 		// Only use 'append-play' if autoPlay is true and queue was empty
 		const wasEmpty = this.queue.length === 1 && !this.isPlaying;
 		const mode = (autoPlay && wasEmpty) ? 'append-play' : 'append';
-		
+
 		await this.sendCommand(['loadfile', episode.file_path, mode]);
 
 		if (autoPlay && wasEmpty) {
@@ -831,7 +831,7 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	async playNext() {
 		const releaseLock = await this.acquireLock('playNext');
-		
+
 		try {
 			if (this.queue.length === 0) {
 				throw new Error('Queue is empty');
@@ -864,7 +864,7 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	async playPrevious() {
 		const releaseLock = await this.acquireLock('playPrevious');
-		
+
 		try {
 			if (this.queue.length === 0) {
 				throw new Error('Queue is empty');
@@ -898,7 +898,7 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	async playQueueIndex(index) {
 		const releaseLock = await this.acquireLock('playQueueIndex');
-		
+
 		try {
 			if (index < 0 || index >= this.queue.length) {
 				throw new Error('Invalid queue index');
@@ -1015,11 +1015,11 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	async removeEpisodeFromQueue(episodeId) {
 		const releaseLock = await this.acquireLock('removeEpisodeFromQueue');
-		
+
 		try {
 			// Find the episode in the queue
 			const index = this.queue.findIndex(item => item.episodeId === episodeId);
-			
+
 			if (index === -1) {
 				// Episode not in queue - that's fine, nothing to do
 				return {
@@ -1032,7 +1032,7 @@ class MediaPlayerService extends EventEmitter {
 
 			const wasPlaying = index === this.queuePosition;
 			const removed = this.queue[index];
-			
+
 			console.log(`[media] Removing episode from queue: ${removed.episode.title}, wasPlaying: ${wasPlaying}`);
 
 			if (wasPlaying) {
@@ -1095,7 +1095,7 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	async clearQueue() {
 		const releaseLock = await this.acquireLock('clearQueue');
-		
+
 		try {
 			console.log('[media] Clearing queue');
 
@@ -1180,7 +1180,7 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	async shuffleQueue() {
 		const releaseLock = await this.acquireLock('shuffleQueue');
-		
+
 		try {
 			if (this.queue.length <= 1) {
 				return { success: true, queueLength: this.queue.length, message: 'Queue too short to shuffle' };
@@ -1196,7 +1196,7 @@ class MediaPlayerService extends EventEmitter {
 			// Extract the currently playing item if any
 			let currentItem = null;
 			let itemsToShuffle = [...this.queue];
-			
+
 			if (hasCurrentlyPlaying) {
 				currentItem = itemsToShuffle.splice(currentlyPlayingIndex, 1)[0];
 			}
@@ -1235,7 +1235,7 @@ class MediaPlayerService extends EventEmitter {
 	 */
 	async sortQueue(sortBy = 'pub_date', order = 'asc') {
 		const releaseLock = await this.acquireLock('sortQueue');
-		
+
 		try {
 			if (this.queue.length <= 1) {
 				return { success: true, queueLength: this.queue.length, message: 'Queue too short to sort' };
@@ -1316,7 +1316,7 @@ class MediaPlayerService extends EventEmitter {
 		if (this.queuePosition >= 0 && this.queuePosition < this.queue.length) {
 			// Set the playlist position
 			await this.setProperty('playlist-pos', this.queuePosition);
-			
+
 			// Restore playback position within the episode
 			if (this.position > 0) {
 				await new Promise(resolve => setTimeout(resolve, 300));
@@ -1565,6 +1565,7 @@ class MediaPlayerService extends EventEmitter {
 
 	/**
 	 * Cleanup and shutdown the media player service
+	 * Properly waits for MPV to exit to avoid blocking systemd shutdown
 	 */
 	async cleanup() {
 		console.log('[media] Cleaning up media player service...');
@@ -1574,24 +1575,59 @@ class MediaPlayerService extends EventEmitter {
 
 		this.stopPositionSaveTimer();
 
-		// Close socket
+		// Close socket first to stop sending commands
 		if (this.socket) {
 			this.socket.destroy();
 			this.socket = null;
 		}
 
-		// Kill MPV process
+		// Kill MPV process and wait for it to exit
 		if (this.mpvProcess) {
-			this.mpvProcess.kill('SIGTERM');
+			await new Promise((resolve) => {
+				const mpv = this.mpvProcess;
 
-			// Force kill after timeout
-			setTimeout(() => {
-				if (this.mpvProcess) {
-					this.mpvProcess.kill('SIGKILL');
+				// Set up exit handler
+				const onExit = () => {
+					this.mpvProcess = null;
+					resolve();
+				};
+
+				// If already exited, resolve immediately
+				if (mpv.exitCode !== null || mpv.killed) {
+					onExit();
+					return;
 				}
-			}, 2000);
 
-			this.mpvProcess = null;
+				mpv.once('exit', onExit);
+
+				// Send SIGTERM
+				console.log('[media] Sending SIGTERM to MPV...');
+				mpv.kill('SIGTERM');
+
+				// Force SIGKILL after 2 seconds if still running
+				const killTimeout = setTimeout(() => {
+					if (this.mpvProcess && !this.mpvProcess.killed) {
+						console.log('[media] Force killing MPV with SIGKILL');
+						this.mpvProcess.kill('SIGKILL');
+					}
+				}, 2000);
+
+				// Safety timeout - don't wait forever (5 seconds max)
+				const safetyTimeout = setTimeout(() => {
+					clearTimeout(killTimeout);
+					if (this.mpvProcess) {
+						console.log('[media] MPV cleanup timeout, continuing anyway');
+						this.mpvProcess = null;
+						resolve();
+					}
+				}, 5000);
+
+				// Clean up timeouts when process exits
+				mpv.once('exit', () => {
+					clearTimeout(killTimeout);
+					clearTimeout(safetyTimeout);
+				});
+			});
 		}
 
 		// Remove socket file
