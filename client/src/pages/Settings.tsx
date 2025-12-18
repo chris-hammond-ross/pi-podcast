@@ -148,47 +148,46 @@ function Settings() {
 							</Tabs.Panel>
 							<Tabs.Panel value="appearance">
 								<Card py="xs">
-									<Group justify='space-between'>
-										<Text size='sm'>Theme</Text>
-										<SegmentedControl
-											value={colorScheme}
-											onChange={(value) => {
-												const newTheme = value as 'light' | 'dark';
-												setColorScheme(newTheme);
-												localStorage.setItem('mantine-color-scheme-value', newTheme);
-												localStorage.setItem('user-theme', newTheme);
-											}}
-											data={[
-												{
-													value: 'light',
-													label: (
-														<Center pr="xs" style={{ gap: 10 }}>
-															<Sun size={16} />
-															<span>Light</span>
-														</Center>
-													),
-												},
-												{
-													value: 'dark',
-													label: (
-														<Center pr="xs" style={{ gap: 10 }}>
-															<Moon size={16} />
-															<span>Dark</span>
-														</Center>
-													),
-												},
-												{
-													value: 'auto',
-													label: (
-														<Center pr="xs" style={{ gap: 10 }}>
-															<Bot size={16} />
-															<span>Auto</span>
-														</Center>
-													),
-												},
-											]}
-										/>
-									</Group>
+									<SegmentedControl
+										fullWidth
+										value={colorScheme}
+										transitionDuration={300}
+										onChange={(value) => {
+											const newTheme = value as 'light' | 'dark';
+											setColorScheme(newTheme);
+											localStorage.setItem('mantine-color-scheme-value', newTheme);
+											localStorage.setItem('user-theme', newTheme);
+										}}
+										data={[
+											{
+												value: 'light',
+												label: (
+													<Center pr="xs" style={{ gap: 10 }}>
+														<Sun size={16} />
+														<span>Light</span>
+													</Center>
+												),
+											},
+											{
+												value: 'dark',
+												label: (
+													<Center pr="xs" style={{ gap: 10 }}>
+														<Moon size={16} />
+														<span>Dark</span>
+													</Center>
+												),
+											},
+											{
+												value: 'auto',
+												label: (
+													<Center pr="xs" style={{ gap: 10 }}>
+														<Bot size={16} />
+														<span>Auto</span>
+													</Center>
+												),
+											},
+										]}
+									/>
 								</Card>
 
 							</Tabs.Panel>
