@@ -172,15 +172,15 @@ create_service_user() {
 }
 
 configure_sudoers() {
-    print_header "Configuring sudoers for service restart"
+    print_header "Configuring sudoers for service restart and reboot"
 
     local SUDOERS_FILE="/etc/sudoers.d/pi-podcast-restart"
 
-    # Create sudoers file to allow pi-podcast user to restart services without password
+    # Create sudoers file to allow pi-podcast user to restart services and reboot without password
     cat > "$SUDOERS_FILE" << EOF
-# Allow pi-podcast user to restart pi-podcast services without password
-# This enables the web UI to trigger service restarts
-$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast, /usr/bin/vcgencmd measure_temp
+# Allow pi-podcast user to restart pi-podcast services and reboot without password
+# This enables the web UI to trigger service restarts and system reboots
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast, /usr/bin/vcgencmd measure_temp, /sbin/reboot
 EOF
 
     # Set correct permissions (sudoers files must be 0440)

@@ -1,11 +1,11 @@
 /**
  * System Service
- * Handles system-level operations like service restarts and system stats
+ * Handles system-level operations like service restarts, reboots, and system stats
  * 
  * IMPORTANT: For this to work on the Pi, you need to add passwordless sudo
  * access for the pi-podcast user. Add this to /etc/sudoers.d/pi-podcast-restart:
  * 
- *   pi-podcast ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast, /usr/bin/vcgencmd measure_temp
+ *   pi-podcast ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pi-podcast, /usr/bin/systemctl restart pulseaudio-pi-podcast, /usr/bin/vcgencmd measure_temp, /sbin/reboot
  * 
  * Create the file with: sudo visudo -f /etc/sudoers.d/pi-podcast-restart
  */
@@ -267,8 +267,38 @@ async function restartServices() {
 	}
 }
 
+/**
+ * Reboot the system
+ * This will reboot the entire Raspberry Pi
+ */
+async function rebootSystem() {
+	if (!isLinux) {
+		// Mock response for development on Windows/Mac
+		console.log('[systemService] Mock reboot - not on Linux');
+		return { message: 'System reboot simulated (development mode)' };
+	}
+
+	try {
+		console.log('[systemService] Initiating system reboot...');
+		
+		// Use exec without waiting for completion since the system will reboot
+		// The command will trigger the reboot and we return immediately
+		exec('sudo /sbin/reboot', (error) => {
+			if (error) {
+				console.error('[systemService] Reboot command error:', error.message);
+			}
+		});
+
+		return { message: 'System reboot initiated' };
+	} catch (error) {
+		console.error('[systemService] Failed to reboot system:', error.message);
+		throw new Error(`Failed to reboot system: ${error.message}`);
+	}
+}
+
 module.exports = {
 	restartServices,
+	rebootSystem,
 	getSystemStats,
 	setBroadcastCallback,
 	startStatsBroadcast,

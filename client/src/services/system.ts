@@ -10,11 +10,24 @@ interface RestartResponse {
 	error?: string;
 }
 
+interface RebootResponse {
+	success: boolean;
+	message?: string;
+	error?: string;
+}
+
 /**
  * Restart the pi-podcast services
  */
 export async function restartServices(): Promise<RestartResponse> {
 	return apiPost<RestartResponse>('/api/system/restart');
+}
+
+/**
+ * Reboot the entire system (Raspberry Pi)
+ */
+export async function rebootSystem(): Promise<RebootResponse> {
+	return apiPost<RebootResponse>('/api/system/reboot');
 }
 
 /**

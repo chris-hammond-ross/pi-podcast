@@ -15,4 +15,17 @@ router.post('/restart', async (req, res) => {
 	}
 });
 
+/**
+ * POST /api/system/reboot
+ * Reboot the entire system (Raspberry Pi)
+ */
+router.post('/reboot', async (req, res) => {
+	try {
+		const result = await systemService.rebootSystem();
+		res.json({ success: true, ...result });
+	} catch (err) {
+		res.status(500).json({ success: false, error: err.message });
+	}
+});
+
 module.exports = router;

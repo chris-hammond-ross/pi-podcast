@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
 	Box,
@@ -7,6 +7,7 @@ import {
 	Tabs,
 	ScrollArea,
 	Button,
+	Overlay,
 	LoadingOverlay,
 	Card,
 	Text,
@@ -19,15 +20,20 @@ import {
 } from '@mantine/core';
 import { RefreshCw, Sun, Moon, Power, Bot } from 'lucide-react';
 import { BluetoothInterface } from '../components';
-import { restartServices, getWebSocketService, type SystemStats } from '../services';
+import { restartServices, rebootSystem, getWebSocketService, type SystemStats } from '../services';
 
-const RESTART_OVERLAY_DURATION = 10000; // 10 seconds
+const RESTART_OVERLAY_DURATION = 10000; // 10 seconds for service restart
+const REBOOT_OVERLAY_DURATION = 90000; // 90 seconds for system reboot
 
 const validTabs = ['bluetooth', 'appearance', 'system'];
 
 function Settings() {
 	const [isRestarting, setIsRestarting] = useState(false);
+	const [isRebooting, setIsRebooting] = useState(false);
+	const [rebootCountdown, setRebootCountdown] = useState(0);
 	const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
+
+	const rebootIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	const { colorScheme, setColorScheme } = useMantineColorScheme();
 
@@ -42,6 +48,15 @@ function Settings() {
 			navigate(`/settings/${value}`);
 		}
 	}, [navigate]);
+
+	// Cleanup interval on unmount
+	useEffect(() => {
+		return () => {
+			if (rebootIntervalRef.current) {
+				clearInterval(rebootIntervalRef.current);
+			}
+		};
+	}, []);
 
 	useEffect(() => {
 		const ws = getWebSocketService();
@@ -84,21 +99,91 @@ function Settings() {
 		}, RESTART_OVERLAY_DURATION);
 	};
 
+	const handleReboot = async () => {
+		setIsRebooting(true);
+		setRebootCountdown(REBOOT_OVERLAY_DURATION / 1000); // Convert to seconds
+
+		try {
+			await rebootSystem();
+		} catch (error) {
+			console.error('Failed to reboot system:', error);
+		}
+
+		// Start countdown timer
+		rebootIntervalRef.current = setInterval(() => {
+			setRebootCountdown((prev) => {
+				if (prev <= 1) {
+					// Countdown finished, try to reload the page
+					if (rebootIntervalRef.current) {
+						clearInterval(rebootIntervalRef.current);
+						rebootIntervalRef.current = null;
+					}
+					// Attempt to reload - if system is back up, page will load
+					window.location.reload();
+					return 0;
+				}
+				return prev - 1;
+			});
+		}, 1000);
+	};
+
 	const formatValue = (value: number | null | undefined, unit: string, decimals: number = 1): string => {
 		if (value === null || value === undefined) return '—';
 		return `${value.toFixed(decimals)} ${unit}`;
 	};
 
+	const formatCountdown = (seconds: number): string => {
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	};
+
+	const rebootProgress = ((REBOOT_OVERLAY_DURATION / 1000 - rebootCountdown) / (REBOOT_OVERLAY_DURATION / 1000)) * 100;
+
 	return (
 		<Box pos="relative" style={{ height: 'var(--main-content-height)' }}>
-			<LoadingOverlay
-				visible={isRestarting}
-				zIndex={1000}
-				overlayProps={{ radius: 'sm', blur: 2 }}
-				loaderProps={{ type: 'dots' }}
-				h="100svh"
-				mt="calc(0px - var(--header-height))"
-			/>
+			{/* Restart Service Overlay */}
+			{isRestarting && (
+				<LoadingOverlay
+					visible={isRestarting}
+					zIndex={1000}
+					overlayProps={{ radius: 'sm', blur: 2 }}
+					loaderProps={{ type: 'dots' }}
+					h="100svh"
+					mt="calc(0px - var(--header-height))"
+				/>
+			)}
+
+			{/* Reboot System Overlay */}
+			{isRebooting && (
+				<Overlay
+					fixed
+					center
+					blur={2}
+					zIndex={1000}
+				>
+					<Stack align="center" gap="lg" w={300}>
+						<Power size={48} style={{ color: 'var(--mantine-color-orange-5)' }} />
+						<Text size="lg" fw={500} c="white">Rebooting system...</Text>
+						<Stack w="100%" gap="xs">
+							<Progress
+								value={rebootProgress}
+								size="lg"
+								striped
+								animated
+								color="orange"
+							/>
+							<Text size="xl" fw={600} c="white" ta="center">
+								{formatCountdown(rebootCountdown)}
+							</Text>
+						</Stack>
+						<Text size="sm" c="dimmed" ta="center">
+							The page will automatically reload when the system is back online
+						</Text>
+					</Stack>
+				</Overlay>
+			)}
+
 			<Tabs
 				value={currentTab}
 				onChange={handleTabChange}
@@ -199,7 +284,8 @@ function Settings() {
 											color='pink'
 											leftSection={<RefreshCw size={16} />}
 											onClick={handleRestartService}
-											loading={isRestarting}
+											loading={isRestarting || isRebooting}
+											disabled={isRebooting || isRestarting}
 										>
 											Reset Service
 										</Button>
@@ -207,8 +293,9 @@ function Settings() {
 											variant='light'
 											color='orange'
 											leftSection={<Power size={16} />}
-											onClick={handleRestartService}
-											loading={isRestarting}
+											onClick={handleReboot}
+											loading={isRebooting || isRestarting}
+											disabled={isRestarting || isRebooting}
 										>
 											Reboot
 										</Button>
