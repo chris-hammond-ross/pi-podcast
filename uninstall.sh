@@ -19,6 +19,7 @@ DB_FILE="/opt/pi-podcast/api/podcast.db"
 SERVICE_NAME="pi-podcast"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 PULSEAUDIO_SERVICE_FILE="/etc/systemd/system/pulseaudio-pi-podcast.service"
+CRON_FILE="/etc/cron.d/pi-podcast-auto-download"
 SERVICE_USER="pi-podcast"
 SERVICE_GROUP="pi-podcast"
 SERVICE_HOME="/var/lib/pi-podcast"
@@ -112,6 +113,7 @@ confirm_uninstall() {
     echo "The following will be removed:"
     echo "  - Systemd service: ${SERVICE_NAME}"
     echo "  - Service file: ${SERVICE_FILE}"
+    echo "  - Cron job: ${CRON_FILE}"
     if [ "$KEEP_DATA" = false ]; then
         echo "  - Installation directory: ${INSTALL_DIR}"
         echo "  - Database file: ${DB_FILE}"
@@ -129,7 +131,7 @@ confirm_uninstall() {
         echo "  - PulseAudio service for pi-podcast"
     fi
     echo ""
-    echo -e "${YELLOW}Note: System packages (Node.js, git, bluez, sqlite3, pulseaudio, mpv) will NOT be removed.${NC}"
+    echo -e "${YELLOW}Note: System packages (Node.js, git, bluez, sqlite3, pulseaudio, mpv, cron) will NOT be removed.${NC}"
     echo ""
 
     read -p "Are you sure you want to continue? [y/N] " -n 1 -r
@@ -172,6 +174,17 @@ remove_service_file() {
         print_success "Service file removed"
     else
         print_info "Service file does not exist"
+    fi
+}
+
+remove_cron_job() {
+    print_header "Removing auto-download cron job"
+
+    if [ -f "$CRON_FILE" ]; then
+        rm -f "$CRON_FILE"
+        print_success "Cron job removed: $CRON_FILE"
+    else
+        print_info "Cron job does not exist"
     fi
 }
 
@@ -412,9 +425,10 @@ print_uninstall_summary() {
     echo "  - mpv"
     echo "  - avahi-daemon"
     echo "  - ffmpeg"
+    echo "  - cron"
     echo ""
     echo "To remove these packages manually (if not needed by other applications):"
-    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3 pulseaudio pulseaudio-module-bluetooth mpv avahi-daemon ffmpeg${NC}"
+    echo -e "  ${BLUE}sudo apt-get remove nodejs git bluez bluez-tools sqlite3 pulseaudio pulseaudio-module-bluetooth mpv avahi-daemon ffmpeg cron${NC}"
     echo ""
 }
 
@@ -435,6 +449,7 @@ main() {
     stop_service
     disable_service
     remove_service_file
+    remove_cron_job
     remove_pulseaudio_config
     remove_bluetooth_devices
     remove_sudoers_config

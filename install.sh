@@ -29,6 +29,9 @@ cleanup() {
         [ -f "$SERVICE_FILE" ] && rm -f "$SERVICE_FILE"
         [ -f "$PULSEAUDIO_SERVICE_FILE" ] && rm -f "$PULSEAUDIO_SERVICE_FILE"
 
+        # Remove cron job if it was created
+        [ -f "$CRON_FILE" ] && rm -f "$CRON_FILE"
+
         # Remove sudoers file if it was created
         [ -f "/etc/sudoers.d/pi-podcast-restart" ] && rm -f "/etc/sudoers.d/pi-podcast-restart"
 
@@ -61,6 +64,7 @@ REPO_URL="https://github.com/chris-hammond-ross/pi-podcast.git"
 INSTALL_DIR="/opt/pi-podcast"
 SERVICE_FILE="/etc/systemd/system/pi-podcast.service"
 PULSEAUDIO_SERVICE_FILE="/etc/systemd/system/pulseaudio-pi-podcast.service"
+CRON_FILE="/etc/cron.d/pi-podcast-auto-download"
 DB_FILE="/opt/pi-podcast/api/podcast.db"
 NODE_VERSION="20"
 SERVICE_USER="pi-podcast"
@@ -236,9 +240,10 @@ install_dependencies() {
         pulseaudio \
         pulseaudio-module-bluetooth \
         mpv \
-        ffmpeg
+        ffmpeg \
+        cron
 
-    print_success "Dependencies installed (including MPV)"
+    print_success "Dependencies installed (including MPV and cron)"
 
     # Enable Bluetooth service
     systemctl enable bluetooth
@@ -249,6 +254,11 @@ install_dependencies() {
     systemctl enable avahi-daemon
     systemctl start avahi-daemon
     print_success "Avahi daemon enabled and started"
+
+    # Enable cron service
+    systemctl enable cron
+    systemctl start cron
+    print_success "Cron service enabled and started"
 }
 
 disable_user_pulseaudio() {
@@ -691,6 +701,26 @@ EOF
     print_success "Systemd service created and enabled"
 }
 
+create_auto_download_cron() {
+    print_header "Creating auto-download cron job"
+
+    # Create cron job file for auto-downloading latest episodes
+    # Runs every 6 hours at minute 0
+    cat > "$CRON_FILE" << 'EOF'
+# Pi Podcast - Auto-download latest episodes
+# Syncs RSS feeds and downloads the latest episode for subscriptions with auto-download enabled
+# Runs every 6 hours
+
+0 */6 * * * root curl -s -X POST http://localhost/api/downloads/sync-auto >/dev/null 2>&1
+EOF
+
+    # Set correct permissions for cron file
+    chmod 644 "$CRON_FILE"
+
+    print_success "Auto-download cron job created at $CRON_FILE"
+    print_info "Cron job will run every 6 hours to check for new episodes"
+}
+
 print_installation_summary() {
     print_header "Installation Complete"
 
@@ -712,6 +742,11 @@ print_installation_summary() {
     echo "  - Home: $SERVICE_HOME"
     echo "  - Member of: bluetooth, audio"
     echo ""
+    echo "Auto-Download:"
+    echo "  - Cron job: $CRON_FILE"
+    echo "  - Schedule: Every 6 hours"
+    echo "  - Endpoint: POST /api/downloads/sync-auto"
+    echo ""
     echo "Useful commands:"
     echo -e "  Start service:    ${BLUE}sudo systemctl start pi-podcast${NC}"
     echo -e "  Stop service:     ${BLUE}sudo systemctl stop pi-podcast${NC}"
@@ -724,6 +759,10 @@ print_installation_summary() {
     echo -e "  View logs:        ${BLUE}sudo journalctl -u pulseaudio-pi-podcast -f${NC}"
     echo -e "  Restart:          ${BLUE}sudo systemctl restart pulseaudio-pi-podcast${NC}"
     echo -e "  List sinks:       ${BLUE}sudo -u pi-podcast XDG_RUNTIME_DIR=$RUNTIME_DIR PULSE_SERVER=unix:$PULSE_SOCKET pactl list sinks short${NC}"
+    echo ""
+    echo "Auto-Download:"
+    echo -e "  Trigger manually: ${BLUE}curl -X POST http://localhost/api/downloads/sync-auto${NC}"
+    echo -e "  View cron job:    ${BLUE}cat $CRON_FILE${NC}"
     echo ""
     echo "Access the application:"
     if [ "$SKIP_HOSTNAME" = false ]; then
@@ -777,6 +816,7 @@ main() {
     install_api_dependencies
     build_react_frontend
     create_systemd_service
+    create_auto_download_cron
     start_service
 
     # Summary

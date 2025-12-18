@@ -274,7 +274,8 @@ router.post('/sync/subscription/:subscriptionId', async (req, res) => {
 
 /**
  * POST /api/downloads/sync-auto
- * Sync and queue episodes for all subscriptions with auto-download enabled
+ * Sync feeds and queue the latest episode for subscriptions with auto-download enabled
+ * Only downloads the latest episode if it hasn't been downloaded yet
  * This endpoint is designed to be called by a cron job
  */
 router.post('/sync-auto', async (req, res) => {
@@ -290,30 +291,40 @@ router.post('/sync-auto', async (req, res) => {
 		}
 
 		const results = [];
+		const episodeIdsToQueue = [];
 
 		for (const subscription of subscriptions) {
 			try {
-				// Sync episodes from feed
+				// Sync episodes from feed to ensure DB is up to date
 				const syncResult = await episodeService.syncEpisodesFromFeed(subscription.id);
 
-				// Get episodes not downloaded
-				const episodes = episodeService.getEpisodesBySubscription(subscription.id, {
-					notDownloadedOnly: true,
+				// Get the latest episode for this subscription
+				const latestEpisodes = episodeService.getEpisodesBySubscription(subscription.id, {
+					limit: 1,
 					orderBy: 'pub_date',
 					order: 'DESC'
 				});
 
-				let queueResult = { added: 0, skipped: 0, total: 0 };
-				if (episodes.length > 0) {
-					const episodeIds = episodes.map(e => e.id);
-					queueResult = downloadQueueService.addBatchToQueue(episodeIds);
+				let queued = false;
+				let latestEpisodeTitle = null;
+
+				if (latestEpisodes.length > 0) {
+					const latestEpisode = latestEpisodes[0];
+					latestEpisodeTitle = latestEpisode.title;
+
+					// Check if the latest episode has not been downloaded
+					if (!latestEpisode.downloaded_at) {
+						episodeIdsToQueue.push(latestEpisode.id);
+						queued = true;
+					}
 				}
 
 				results.push({
 					subscriptionId: subscription.id,
 					subscriptionName: subscription.name,
 					sync: syncResult,
-					queue: queueResult
+					latestEpisode: latestEpisodeTitle,
+					queued
 				});
 			} catch (err) {
 				results.push({
@@ -324,13 +335,18 @@ router.post('/sync-auto', async (req, res) => {
 			}
 		}
 
-		const totalQueued = results.reduce((sum, r) => sum + (r.queue?.added || 0), 0);
+		// Batch add all episodes to queue
+		let queueResult = { added: 0, skipped: 0, total: 0 };
+		if (episodeIdsToQueue.length > 0) {
+			queueResult = downloadQueueService.addBatchToQueue(episodeIdsToQueue);
+		}
 
-		console.log(`[auto-download] Processed ${subscriptions.length} subscriptions, queued ${totalQueued} episodes`);
+		console.log(`[auto-download] Processed ${subscriptions.length} subscriptions, queued ${queueResult.added} episodes`);
 
 		res.json({
 			success: true,
-			message: `Processed ${subscriptions.length} subscriptions, queued ${totalQueued} episodes`,
+			message: `Processed ${subscriptions.length} subscriptions, queued ${queueResult.added} episodes`,
+			queue: queueResult,
 			results
 		});
 	} catch (err) {
