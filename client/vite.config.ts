@@ -18,7 +18,7 @@ export default defineConfig({
 		}
 	},
 	build: {
-		chunkSizeWarningLimit: 600,
+		chunkSizeWarningLimit: 800,
 		rollupOptions: {
 			output: {
 				entryFileNames: `assets/index.js`,

@@ -163,7 +163,8 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 				break;
 
 			default:
-				console.warn('[useBluetoothWebSocket] Unknown message type:', message.type);
+			// Don't send a message by default
+			// console.warn('[useBluetoothWebSocket] Unknown message type:', message.type);
 		}
 	}, []);
 
@@ -175,7 +176,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 		const setup = async () => {
 			try {
 				setConnectionError(null);
-				
+
 				// Subscribe to messages first
 				const unsubscribe = service.on(handleMessage);
 				unsubscribeRef.current = unsubscribe;
@@ -185,10 +186,10 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 					console.log('[useBluetoothWebSocket] Already connected, requesting status');
 					setIsConnected(true);
 					setError(null);
-					
+
 					// Request current status from server
 					service.send({ type: 'request-status' });
-					
+
 					// Set a timeout - if we don't get a response, stop loading anyway
 					setTimeout(() => {
 						if (mounted && !hasReceivedInitialState.current) {
