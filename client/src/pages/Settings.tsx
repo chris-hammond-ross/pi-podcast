@@ -22,8 +22,8 @@ import { RefreshCw, Sun, Moon, Power, Bot } from 'lucide-react';
 import { BluetoothInterface } from '../components';
 import { restartServices, rebootSystem, getWebSocketService, type SystemStats } from '../services';
 
-const RESTART_OVERLAY_DURATION = 10000; // 10 seconds for service restart
-const REBOOT_OVERLAY_DURATION = 90000; // 90 seconds for system reboot
+const RESTART_OVERLAY_DURATION = 6000; // 6 seconds for service restart
+const REBOOT_OVERLAY_DURATION = 60000; // 60 seconds for system reboot
 
 const validTabs = ['bluetooth', 'appearance', 'system'];
 
