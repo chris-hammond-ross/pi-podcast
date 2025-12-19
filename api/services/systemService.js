@@ -241,7 +241,8 @@ async function getSystemStats() {
 
 /**
  * Restart the podcast services
- * PulseAudio should restart first (audio subsystem), then the main service
+ * Uses a shell script approach to restart both services sequentially
+ * without waiting for completion (since this process will be killed)
  */
 async function restartServices() {
 	if (!isLinux) {
@@ -250,21 +251,27 @@ async function restartServices() {
 		return { message: 'Services restart simulated (development mode)' };
 	}
 
-	try {
-		console.log('[systemService] Restarting pulseaudio-pi-podcast...');
-		await execAsync('sudo systemctl restart pulseaudio-pi-podcast');
+	console.log('[systemService] Initiating services restart...');
 
-		// Small delay to let PulseAudio initialize
-		await new Promise(resolve => setTimeout(resolve, 1000));
+	// Spawn a detached shell that will:
+	// 1. Wait a moment for the HTTP response to be sent
+	// 2. Restart pulseaudio-pi-podcast
+	// 3. Wait for PulseAudio to initialize
+	// 4. Restart pi-podcast
+	const child = spawn('sh', ['-c', 
+		'sleep 0.5 && ' +
+		'sudo /usr/bin/systemctl restart pulseaudio-pi-podcast && ' +
+		'sleep 1 && ' +
+		'sudo /usr/bin/systemctl restart pi-podcast'
+	], {
+		detached: true,
+		stdio: 'ignore'
+	});
 
-		console.log('[systemService] Restarting pi-podcast...');
-		await execAsync('sudo systemctl restart pi-podcast');
+	child.unref();
 
-		return { message: 'Services restarted successfully' };
-	} catch (error) {
-		console.error('[systemService] Failed to restart services:', error.message);
-		throw new Error(`Failed to restart services: ${error.message}`);
-	}
+	console.log('[systemService] Restart sequence spawned');
+	return { message: 'Services restart initiated' };
 }
 
 /**
