@@ -29,9 +29,13 @@ class BluetoothService {
 		// Callback for broadcasting messages (will be set by websocket)
 		this.broadcastCallback = null;
 
-		// Battery polling interval (null when not polling)
+		// Battery polling configuration
 		this.batteryPollInterval = null;
-		this.BATTERY_POLL_INTERVAL_MS = 60000; // Poll every 60 seconds
+		this.BATTERY_INITIAL_POLL_INTERVAL_MS = 3000;  // Poll every 3 seconds initially
+		this.BATTERY_NORMAL_POLL_INTERVAL_MS = 60000; // Poll every 60 seconds after battery detected
+		this.BATTERY_INITIAL_TIMEOUT_MS = 30000;      // Give up after 30 seconds if no battery detected
+		this.batteryPollStartTime = null;
+		this.batterySupported = false; // Track if current device supports battery
 	}
 
 	/**
@@ -270,6 +274,7 @@ class BluetoothService {
 							const battery = this.parseBatteryFromInfo(infoOutput);
 							if (battery !== null) {
 								device.battery = battery;
+								this.batterySupported = true;
 								console.log('[bluetooth] Device battery level:', device.mac, battery + '%');
 							}
 						} else {
@@ -658,10 +663,7 @@ class BluetoothService {
 							console.error('[database] Failed to update last connected device:', err.message);
 						}
 
-						// Fetch battery level for newly connected device
-						this.fetchAndUpdateBattery(mac);
-
-						// Start battery polling
+						// Start battery polling (will do initial fast polling)
 						this.startBatteryPolling();
 
 						this.broadcast({
@@ -757,6 +759,7 @@ class BluetoothService {
 	/**
 	 * Fetch battery level for a device and update its state
 	 * @param {string} mac - The MAC address
+	 * @returns {number|null} The battery level or null if not available
 	 */
 	async fetchAndUpdateBattery(mac) {
 		try {
@@ -781,33 +784,76 @@ class BluetoothService {
 					});
 				}
 			}
+
+			return battery;
 		} catch (err) {
 			console.error(`[battery] Failed to fetch battery for ${mac}:`, err.message);
+			return null;
 		}
 	}
 
 	/**
 	 * Start polling for battery level of connected device
+	 * Uses fast polling initially (every 3s), then switches to slow polling (every 60s)
+	 * once battery is detected, or stops after 30s if battery is never detected
 	 */
 	startBatteryPolling() {
-		// Don't start if already polling
-		if (this.batteryPollInterval) {
-			return;
-		}
+		// Stop any existing polling first
+		this.stopBatteryPolling();
 
 		// Don't start if no device connected
 		if (!this.connectedDeviceMac) {
 			return;
 		}
 
-		console.log('[battery] Starting battery polling');
+		// Reset state for new polling session
+		this.batterySupported = false;
+		this.batteryPollStartTime = Date.now();
+
+		console.log('[battery] Starting initial fast battery polling (every 3s)');
+
+		// Start with fast polling
+		this.batteryPollInterval = setInterval(async () => {
+			if (!this.connectedDeviceMac) {
+				this.stopBatteryPolling();
+				return;
+			}
+
+			const battery = await this.fetchAndUpdateBattery(this.connectedDeviceMac);
+			const elapsedTime = Date.now() - this.batteryPollStartTime;
+
+			if (battery !== null) {
+				// Battery detected! Switch to slow polling
+				if (!this.batterySupported) {
+					this.batterySupported = true;
+					console.log(`[battery] Battery supported! Switching to slow polling (every 60s)`);
+					this.switchToSlowBatteryPolling();
+				}
+			} else if (!this.batterySupported && elapsedTime >= this.BATTERY_INITIAL_TIMEOUT_MS) {
+				// Timeout reached without detecting battery - device doesn't support it
+				console.log(`[battery] No battery detected after ${this.BATTERY_INITIAL_TIMEOUT_MS / 1000}s - device does not support battery reporting`);
+				this.stopBatteryPolling();
+			}
+		}, this.BATTERY_INITIAL_POLL_INTERVAL_MS);
+	}
+
+	/**
+	 * Switch from fast polling to slow polling (called when battery is first detected)
+	 */
+	switchToSlowBatteryPolling() {
+		// Clear the fast polling interval
+		if (this.batteryPollInterval) {
+			clearInterval(this.batteryPollInterval);
+		}
+
+		// Start slow polling
 		this.batteryPollInterval = setInterval(() => {
 			if (this.connectedDeviceMac) {
 				this.fetchAndUpdateBattery(this.connectedDeviceMac);
 			} else {
 				this.stopBatteryPolling();
 			}
-		}, this.BATTERY_POLL_INTERVAL_MS);
+		}, this.BATTERY_NORMAL_POLL_INTERVAL_MS);
 	}
 
 	/**
@@ -819,6 +865,7 @@ class BluetoothService {
 			clearInterval(this.batteryPollInterval);
 			this.batteryPollInterval = null;
 		}
+		this.batteryPollStartTime = null;
 	}
 
 	// Public API methods
