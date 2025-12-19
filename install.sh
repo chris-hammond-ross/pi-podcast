@@ -529,14 +529,40 @@ configure_hostname() {
     CURRENT_HOSTNAME=$(hostname)
     if [ "$CURRENT_HOSTNAME" = "$HOSTNAME" ]; then
         print_info "Hostname already set to $HOSTNAME"
-        return 0
+    else
+        # Set the hostname using hostnamectl (this updates /etc/hostname too)
+        hostnamectl set-hostname "$HOSTNAME"
+        print_success "Hostname set via hostnamectl"
     fi
 
-    # Set the hostname
-    hostnamectl set-hostname "$HOSTNAME"
+    # Explicitly write to /etc/hostname to ensure persistence
+    echo "$HOSTNAME" > /etc/hostname
+    print_success "Written hostname to /etc/hostname"
 
-    # Update /etc/hosts
-    sed -i "s/127.0.1.1.*/127.0.1.1\t$HOSTNAME/" /etc/hosts
+    # Update /etc/hosts - handle both cases: existing 127.0.1.1 line or missing
+    if grep -q "127.0.1.1" /etc/hosts; then
+        # Replace existing 127.0.1.1 line
+        sed -i "s/^127.0.1.1.*/127.0.1.1\t$HOSTNAME/" /etc/hosts
+    else
+        # Add new 127.0.1.1 line after localhost
+        sed -i "/^127.0.0.1/a 127.0.1.1\t$HOSTNAME" /etc/hosts
+    fi
+    print_success "Updated /etc/hosts"
+
+    # Prevent DHCP from overwriting the hostname
+    # Check if dhcpcd.conf exists (Raspberry Pi OS uses dhcpcd)
+    if [ -f /etc/dhcpcd.conf ]; then
+        if ! grep -q "^hostname$" /etc/dhcpcd.conf; then
+            # Add 'hostname' option to prevent DHCP from setting hostname
+            # The bare 'hostname' directive tells dhcpcd to use the system hostname
+            echo "" >> /etc/dhcpcd.conf
+            echo "# Preserve system hostname (set by pi-podcast installer)" >> /etc/dhcpcd.conf
+            echo "hostname" >> /etc/dhcpcd.conf
+            print_success "Configured dhcpcd to preserve hostname"
+        else
+            print_info "dhcpcd already configured to preserve hostname"
+        fi
+    fi
 
     # Restart Avahi to broadcast the new hostname immediately
     systemctl restart avahi-daemon
