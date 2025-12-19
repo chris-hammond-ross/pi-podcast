@@ -178,7 +178,7 @@ function Settings() {
 							</Text>
 						</Stack>
 						<Text size="sm" c="dimmed" ta="center">
-							The page will automatically reload when the system is back online
+							This page will automatically reload when the system is back online
 						</Text>
 					</Stack>
 				</Overlay>

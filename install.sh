@@ -526,7 +526,13 @@ configure_hostname() {
 
     print_header "Configuring hostname"
 
-    # Set the hostname using hostnamectl (this updates /etc/hostname too)
+    # Disable cloud-init if present (it overrides hostname on every boot)
+    if [ -d /etc/cloud ] && [ ! -f /etc/cloud/cloud-init.disabled ]; then
+        touch /etc/cloud/cloud-init.disabled
+        print_success "Disabled cloud-init to prevent hostname override"
+    fi
+
+    # Set the hostname using hostnamectl
     hostnamectl set-hostname "$HOSTNAME"
     print_success "Hostname set via hostnamectl"
 
@@ -534,29 +540,8 @@ configure_hostname() {
     echo "$HOSTNAME" > /etc/hostname
     print_success "Written hostname to /etc/hostname"
 
-    # Check if cloud-init is managing /etc/hosts
-    if grep -q "manage_etc_hosts" /etc/hosts 2>/dev/null; then
-        print_info "Detected cloud-init managed hosts file"
-
-        # Disable cloud-init's hosts management
-        if [ -f /etc/cloud/cloud.cfg ]; then
-            # Check if manage_etc_hosts is set
-            if grep -q "manage_etc_hosts" /etc/cloud/cloud.cfg; then
-                sed -i 's/manage_etc_hosts:.*/manage_etc_hosts: false/' /etc/cloud/cloud.cfg
-            else
-                echo "manage_etc_hosts: false" >> /etc/cloud/cloud.cfg
-            fi
-            print_success "Disabled cloud-init hosts management in cloud.cfg"
-        fi
-
-        # Also create/update the cloud-init config override
-        mkdir -p /etc/cloud/cloud.cfg.d
-        echo "manage_etc_hosts: false" > /etc/cloud/cloud.cfg.d/99-pi-podcast-hostname.cfg
-        print_success "Created cloud-init override config"
-
-        # Now we can safely update /etc/hosts
-        # Remove the cloud-init warning comments and update the file
-        cat > /etc/hosts << EOF
+    # Write clean /etc/hosts file
+    cat > /etc/hosts << EOF
 127.0.0.1 localhost
 127.0.1.1 $HOSTNAME
 
@@ -565,33 +550,7 @@ configure_hostname() {
 ff02::1 ip6-allnodes
 ff02::2 ip6-allrouters
 EOF
-        print_success "Recreated /etc/hosts without cloud-init management"
-    else
-        # Standard hosts file update
-        if grep -q "127.0.1.1" /etc/hosts; then
-            # Replace existing 127.0.1.1 line
-            sed -i "s/^127.0.1.1.*/127.0.1.1\t$HOSTNAME/" /etc/hosts
-        else
-            # Add new 127.0.1.1 line after localhost
-            sed -i "/^127.0.0.1/a 127.0.1.1\t$HOSTNAME" /etc/hosts
-        fi
-        print_success "Updated /etc/hosts"
-    fi
-
-    # Prevent DHCP from overwriting the hostname
-    # Check if dhcpcd.conf exists (Raspberry Pi OS uses dhcpcd)
-    if [ -f /etc/dhcpcd.conf ]; then
-        if ! grep -q "^hostname$" /etc/dhcpcd.conf; then
-            # Add 'hostname' option to prevent DHCP from setting hostname
-            # The bare 'hostname' directive tells dhcpcd to use the system hostname
-            echo "" >> /etc/dhcpcd.conf
-            echo "# Preserve system hostname (set by pi-podcast installer)" >> /etc/dhcpcd.conf
-            echo "hostname" >> /etc/dhcpcd.conf
-            print_success "Configured dhcpcd to preserve hostname"
-        else
-            print_info "dhcpcd already configured to preserve hostname"
-        fi
-    fi
+    print_success "Updated /etc/hosts"
 
     # Restart Avahi to broadcast the new hostname immediately
     systemctl restart avahi-daemon
