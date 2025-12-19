@@ -12,6 +12,7 @@ export interface BluetoothDevice {
 	paired?: boolean;
 	trusted?: boolean;
 	is_online?: boolean;
+	battery?: number | null;
 }
 
 export interface ScanResponse {
@@ -44,6 +45,13 @@ export interface InfoResponse {
 	command: string;
 	output: string;
 	device?: BluetoothDevice;
+}
+
+export interface BatteryResponse {
+	success: boolean;
+	mac: string;
+	battery: number | null;
+	supported: boolean;
 }
 
 export interface BluetoothError {
@@ -299,7 +307,7 @@ export async function removeDevice(mac: string): Promise<{ success: boolean; com
  */
 export async function getDeviceInfo(mac: string): Promise<InfoResponse> {
 	try {
-		const response = await fetch(`${API_BASE_URL}/api/bluetooth/${mac}/info`, {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/device/${mac}/info`, {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json',
@@ -317,6 +325,34 @@ export async function getDeviceInfo(mac: string): Promise<InfoResponse> {
 			throw new Error(`Info retrieval failed: ${error.message}`);
 		}
 		throw new Error('Info retrieval failed: Unknown error');
+	}
+}
+
+/**
+ * Gets battery level for a Bluetooth device
+ * @param mac - The MAC address of the device
+ * @returns Battery info including level (0-100) or null if not supported
+ */
+export async function getDeviceBattery(mac: string): Promise<BatteryResponse> {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/bluetooth/device/${mac}/battery`, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			}
+		});
+
+		if (!response.ok) {
+			const error = (await response.json()) as BluetoothError;
+			throw new Error(error.error || 'Failed to get battery level');
+		}
+
+		return await response.json();
+	} catch (error) {
+		if (error instanceof Error) {
+			throw new Error(`Battery retrieval failed: ${error.message}`);
+		}
+		throw new Error('Battery retrieval failed: Unknown error');
 	}
 }
 

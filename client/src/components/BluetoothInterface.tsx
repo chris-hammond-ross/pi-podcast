@@ -5,7 +5,7 @@
  */
 
 import { Stack, Group, Text, Alert, Button, Box, Switch, Loader, Divider, LoadingOverlay } from '@mantine/core';
-import { AlertCircle, Bluetooth, Search, SearchX } from 'lucide-react';
+import { AlertCircle, Bluetooth, Search, SearchX, Battery, BatteryLow, BatteryMedium, BatteryFull, BatteryWarning } from 'lucide-react';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket, useBluetoothPower } from '../hooks';
 import type { BluetoothDevice } from '../services';
 
@@ -75,30 +75,6 @@ export function BluetoothInterface() {
 			await startScan();
 		}
 	};
-
-	// Plays a simple beep tone using Web Audio API
-	// function playTone() {
-	// 	const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-	// 	const oscillator = audioContext.createOscillator();
-	// 	const gainNode = audioContext.createGain();
-
-	// 	oscillator.connect(gainNode);
-	// 	gainNode.connect(audioContext.destination);
-
-	// 	oscillator.frequency.value = 440;
-	// 	oscillator.type = 'sine';
-
-	// 	gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-	// 	gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
-	// 	gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-	// 	oscillator.start(audioContext.currentTime);
-	// 	oscillator.stop(audioContext.currentTime + 0.5);
-
-	// 	oscillator.onended = () => {
-	// 		audioContext.close();
-	// 	};
-	// }
 
 	const hasDevices = devices.length > 0;
 
@@ -275,6 +251,42 @@ function ScanningIndicator() {
 }
 
 /**
+ * Battery Indicator - Shows battery level with appropriate icon and color
+ */
+interface BatteryIndicatorProps {
+	level: number;
+}
+
+function BatteryIndicator({ level }: BatteryIndicatorProps) {
+	// Determine icon and color based on battery level
+	let Icon = Battery;
+	let color = 'dimmed';
+
+	if (level <= 10) {
+		Icon = BatteryWarning;
+		color = 'red';
+	} else if (level <= 25) {
+		Icon = BatteryLow;
+		color = 'orange';
+	} else if (level <= 50) {
+		Icon = BatteryMedium;
+		color = 'yellow';
+	} else {
+		Icon = BatteryFull;
+		color = 'teal';
+	}
+
+	return (
+		<Group gap={4} wrap="nowrap">
+			<Icon size={14} color={`var(--mantine-color-${color}-6)`} />
+			<Text size="xs" c={color} fw={500}>
+				{level}%
+			</Text>
+		</Group>
+	);
+}
+
+/**
  * Device Row Component - Single device in the list
  */
 interface DeviceRowProps {
@@ -292,6 +304,7 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionS
 	const isOnline = device.is_online ?? true; // Default to online if not specified
 	const isPaired = device.paired ?? false;
 	const isLoading = isConnecting || isDisconnecting;
+	const battery = device.battery;
 
 	// Determine the status text and color
 	let statusText = 'Not connected';
@@ -353,6 +366,10 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionS
 						</Text>
 					</Group>
 				</Box>
+				{/* Show battery indicator for connected devices with battery info */}
+				{isConnected && battery != null && (
+					<BatteryIndicator level={battery} />
+				)}
 			</Group>
 		</Button>
 	);

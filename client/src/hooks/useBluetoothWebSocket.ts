@@ -72,7 +72,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 					setDevices((prev) =>
 						prev.map((d) =>
 							d.mac === connectedDev.mac
-								? { ...d, is_connected: true, is_online: true }
+								? { ...d, is_connected: true, is_online: true, battery: connectedDev.battery }
 								: d
 						)
 					);
@@ -86,7 +86,7 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 					setDevices((prev) =>
 						prev.map((d) =>
 							d.mac === disconnectedDev.mac
-								? { ...d, is_connected: false }
+								? { ...d, is_connected: false, battery: null }
 								: d
 						)
 					);
@@ -112,6 +112,30 @@ export function useBluetoothWebSocket(): UseBluetoothWebSocketReturn {
 					setConnectedDevice((prev) => {
 						if (prev?.mac === updatedDev.mac && !updatedDev.is_connected) {
 							return null;
+						}
+						// Update connected device if it's the same device
+						if (prev?.mac === updatedDev.mac) {
+							return { ...prev, ...updatedDev };
+						}
+						return prev;
+					});
+				}
+				break;
+
+			case 'device-battery-updated':
+				if (message.device) {
+					const batteryDev = message.device;
+					setDevices((prev) =>
+						prev.map((d) =>
+							d.mac === batteryDev.mac
+								? { ...d, battery: batteryDev.battery }
+								: d
+						)
+					);
+					// Update connected device battery if it's the same device
+					setConnectedDevice((prev) => {
+						if (prev?.mac === batteryDev.mac) {
+							return { ...prev, battery: batteryDev.battery };
 						}
 						return prev;
 					});

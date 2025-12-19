@@ -14,6 +14,7 @@ export type ServerMessageType =
 	| 'device-disconnected'
 	| 'device-removed'
 	| 'device-updated'
+	| 'device-battery-updated'
 	| 'devices-list'
 	| 'system-status'
 	| 'bluetooth-power-changed'

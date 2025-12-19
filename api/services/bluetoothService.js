@@ -16,7 +16,7 @@ class BluetoothService {
 	constructor() {
 		this.bluetoothctl = null;
 		this.isConnected = false;
-		this.currentDevices = []; // Array of { mac, name, rssi, is_connected, paired, trusted, is_online }
+		this.currentDevices = []; // Array of { mac, name, rssi, is_connected, paired, trusted, is_online, battery }
 		this.outputBuffer = '';
 		this.connectedDeviceMac = null;
 		this.isScanning = false;
@@ -28,6 +28,10 @@ class BluetoothService {
 
 		// Callback for broadcasting messages (will be set by websocket)
 		this.broadcastCallback = null;
+
+		// Battery polling interval (null when not polling)
+		this.batteryPollInterval = null;
+		this.BATTERY_POLL_INTERVAL_MS = 60000; // Poll every 60 seconds
 	}
 
 	/**
@@ -86,6 +90,7 @@ class BluetoothService {
 		this.bluetoothctl.on('close', (code) => {
 			console.log('[bluetoothctl] Process exited with code', code);
 			this.isConnected = false;
+			this.stopBatteryPolling();
 			this.broadcast({
 				type: 'system-status',
 				bluetooth_connected: false,
@@ -147,7 +152,8 @@ class BluetoothService {
 						is_connected: false,
 						paired: !!dbDevice.paired,
 						trusted: !!dbDevice.trusted,
-						is_online: false
+						is_online: false,
+						battery: null
 					};
 					this.currentDevices.push(device);
 					console.log('[database] Loaded paired device:', device.mac, device.name);
@@ -259,8 +265,16 @@ class BluetoothService {
 							device.is_online = true;
 							this.connectedDeviceMac = device.mac;
 							console.log('[bluetooth] Device is connected:', device.mac, device.name);
+
+							// Parse battery level for connected device
+							const battery = this.parseBatteryFromInfo(infoOutput);
+							if (battery !== null) {
+								device.battery = battery;
+								console.log('[bluetooth] Device battery level:', device.mac, battery + '%');
+							}
 						} else {
 							device.is_connected = false;
+							device.battery = null; // Clear battery when not connected
 						}
 
 						// Update paired/trusted from info output
@@ -274,6 +288,11 @@ class BluetoothService {
 						console.log('[bluetooth] Could not get info for device:', device.mac, err.message);
 					}
 				}
+			}
+
+			// Start battery polling if we have a connected device
+			if (this.connectedDeviceMac) {
+				this.startBatteryPolling();
 			}
 
 			console.log('[bluetooth] Bluetooth state refresh complete');
@@ -338,6 +357,7 @@ class BluetoothService {
 			// For scan commands, also look for the prompt appearing after command echo
 			const isScanCommand = /^scan\s+(on|off|bredr|le)$/i.test(command);
 			const isPowerCommand = /^power\s+(on|off)$/i.test(command);
+			const isInfoCommand = /^info\s+/i.test(command);
 
 			const isComplete = () => {
 				// Check for explicit completion patterns
@@ -347,6 +367,11 @@ class BluetoothService {
 
 				// For scan/power commands, just wait for the prompt to appear after the command
 				if ((isScanCommand || isPowerCommand) && this.outputBuffer.includes('[bluetooth]#')) {
+					return true;
+				}
+
+				// For info commands, look for the device info block completion
+				if (isInfoCommand && this.outputBuffer.includes('[bluetooth]#')) {
 					return true;
 				}
 
@@ -412,10 +437,12 @@ class BluetoothService {
 					if (device) {
 						device.is_online = false;
 						device.is_connected = false;
+						device.battery = null;
 						this.lastSeenTimestamps.delete(mac);
 
 						if (this.connectedDeviceMac === mac) {
 							this.connectedDeviceMac = null;
+							this.stopBatteryPolling();
 						}
 
 						this.broadcast({
@@ -469,7 +496,8 @@ class BluetoothService {
 								is_connected: false,
 								paired: !!dbDevice.paired,
 								trusted: !!dbDevice.trusted,
-								is_online: true
+								is_online: true,
+								battery: null
 							};
 							this.currentDevices.push(knownDevice);
 							this.lastSeenTimestamps.set(mac, Date.now());
@@ -548,7 +576,8 @@ class BluetoothService {
 							is_connected: false,
 							paired: false,
 							trusted: false,
-							is_online: true
+							is_online: true,
+							battery: null
 						};
 						this.currentDevices.push(newDevice);
 						this.lastSeenTimestamps.set(mac, Date.now());
@@ -600,7 +629,8 @@ class BluetoothService {
 								is_connected: false,
 								paired: !!dbDevice.paired,
 								trusted: !!dbDevice.trusted,
-								is_online: true
+								is_online: true,
+								battery: null
 							};
 							this.currentDevices.push(device);
 
@@ -628,6 +658,12 @@ class BluetoothService {
 							console.error('[database] Failed to update last connected device:', err.message);
 						}
 
+						// Fetch battery level for newly connected device
+						this.fetchAndUpdateBattery(mac);
+
+						// Start battery polling
+						this.startBatteryPolling();
+
 						this.broadcast({
 							type: 'device-connected',
 							device: device
@@ -637,7 +673,9 @@ class BluetoothService {
 					} else {
 						if (this.connectedDeviceMac === mac) {
 							this.connectedDeviceMac = null;
+							this.stopBatteryPolling();
 						}
+						device.battery = null; // Clear battery when disconnected
 						this.broadcast({
 							type: 'device-disconnected',
 							device: device
@@ -657,12 +695,14 @@ class BluetoothService {
 				const device = this.currentDevices.find(d => d.mac === this.connectedDeviceMac);
 				if (device) {
 					device.is_connected = false;
+					device.battery = null;
 					this.broadcast({
 						type: 'device-disconnected',
 						device: device
 					});
 				}
 				this.connectedDeviceMac = null;
+				this.stopBatteryPolling();
 			}
 		}
 	}
@@ -695,6 +735,92 @@ class BluetoothService {
 		return rssiMatch ? parseInt(rssiMatch[1], 10) : -70;
 	}
 
+	/**
+	 * Parse battery percentage from device info output
+	 * Battery is reported as: "Battery Percentage: 0x5a (90)"
+	 * @param {string} output - The info command output
+	 * @returns {number|null} The battery percentage (0-100) or null if not available
+	 */
+	parseBatteryFromInfo(output) {
+		// Pattern: "Battery Percentage: 0xNN (decimal)"
+		const batteryMatch = output.match(/Battery Percentage:\s*0x[0-9a-fA-F]+\s*\((\d+)\)/i);
+		if (batteryMatch) {
+			const battery = parseInt(batteryMatch[1], 10);
+			// Validate it's a reasonable percentage
+			if (battery >= 0 && battery <= 100) {
+				return battery;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Fetch battery level for a device and update its state
+	 * @param {string} mac - The MAC address
+	 */
+	async fetchAndUpdateBattery(mac) {
+		try {
+			const infoOutput = await this.sendCommand(`info ${mac}`, 2000);
+			const battery = this.parseBatteryFromInfo(infoOutput);
+
+			const device = this.currentDevices.find(d => d.mac === mac);
+			if (device) {
+				const previousBattery = device.battery;
+				device.battery = battery;
+
+				// Only broadcast if battery changed
+				if (previousBattery !== battery) {
+					console.log(`[battery] Device ${mac} battery: ${battery !== null ? battery + '%' : 'not available'}`);
+					this.broadcast({
+						type: 'device-battery-updated',
+						device: {
+							mac: device.mac,
+							name: device.name,
+							battery: device.battery
+						}
+					});
+				}
+			}
+		} catch (err) {
+			console.error(`[battery] Failed to fetch battery for ${mac}:`, err.message);
+		}
+	}
+
+	/**
+	 * Start polling for battery level of connected device
+	 */
+	startBatteryPolling() {
+		// Don't start if already polling
+		if (this.batteryPollInterval) {
+			return;
+		}
+
+		// Don't start if no device connected
+		if (!this.connectedDeviceMac) {
+			return;
+		}
+
+		console.log('[battery] Starting battery polling');
+		this.batteryPollInterval = setInterval(() => {
+			if (this.connectedDeviceMac) {
+				this.fetchAndUpdateBattery(this.connectedDeviceMac);
+			} else {
+				this.stopBatteryPolling();
+			}
+		}, this.BATTERY_POLL_INTERVAL_MS);
+	}
+
+	/**
+	 * Stop polling for battery level
+	 */
+	stopBatteryPolling() {
+		if (this.batteryPollInterval) {
+			console.log('[battery] Stopping battery polling');
+			clearInterval(this.batteryPollInterval);
+			this.batteryPollInterval = null;
+		}
+	}
+
 	// Public API methods
 
 	/**
@@ -711,7 +837,8 @@ class BluetoothService {
 		if (!state) {
 			this.isScanning = false;
 			this.connectedDeviceMac = null;
-			this.currentDevices = this.currentDevices.map(d => ({ ...d, is_connected: false }));
+			this.stopBatteryPolling();
+			this.currentDevices = this.currentDevices.map(d => ({ ...d, is_connected: false, battery: null }));
 
 			this.broadcast({
 				type: 'bluetooth-power-changed',
@@ -868,6 +995,7 @@ class BluetoothService {
 		this.currentDevices = this.currentDevices.filter((d) => d.mac !== mac);
 		if (mac === this.connectedDeviceMac) {
 			this.connectedDeviceMac = null;
+			this.stopBatteryPolling();
 		}
 
 		this.broadcast({
@@ -886,15 +1014,41 @@ class BluetoothService {
 	async getDeviceInfo(mac) {
 		const output = await this.sendCommand(`info ${mac}`);
 		const rssi = this.parseRSSIFromInfo(output);
+		const battery = this.parseBatteryFromInfo(output);
+
 		const device = this.currentDevices.find(d => d.mac === mac);
 		if (device) {
 			device.rssi = rssi;
+			if (device.is_connected) {
+				device.battery = battery;
+			}
 		}
 
 		return {
 			command: `info ${mac}`,
 			output,
-			device: device || { mac, name: 'Unknown', rssi, is_connected: false }
+			device: device || { mac, name: 'Unknown', rssi, is_connected: false, battery }
+		};
+	}
+
+	/**
+	 * Get battery level for a device
+	 * @param {string} mac - The MAC address
+	 * @returns {Promise<Object>} Result object with battery level
+	 */
+	async getBatteryLevel(mac) {
+		const output = await this.sendCommand(`info ${mac}`);
+		const battery = this.parseBatteryFromInfo(output);
+
+		const device = this.currentDevices.find(d => d.mac === mac);
+		if (device && device.is_connected) {
+			device.battery = battery;
+		}
+
+		return {
+			mac,
+			battery,
+			supported: battery !== null
 		};
 	}
 
@@ -943,6 +1097,7 @@ class BluetoothService {
 	 * Cleanup on shutdown
 	 */
 	cleanup() {
+		this.stopBatteryPolling();
 		if (this.bluetoothctl) {
 			this.bluetoothctl.kill();
 		}

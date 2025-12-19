@@ -518,6 +518,61 @@ enable_bluetooth_adapter() {
     fi
 }
 
+configure_bluetooth_experimental() {
+    print_header "Enabling Bluetooth experimental features"
+
+    local BLUETOOTH_CONF="/etc/bluetooth/main.conf"
+
+    # Experimental features enable battery level reporting for Bluetooth devices
+    # This is required for many headphones, speakers, and other devices to report battery status
+
+    if [ -f "$BLUETOOTH_CONF" ]; then
+        # Backup the original config
+        cp "$BLUETOOTH_CONF" "$BLUETOOTH_CONF.backup"
+
+        # Check if Experimental is already set to true
+        if grep -q "^Experimental\s*=\s*true" "$BLUETOOTH_CONF"; then
+            print_info "Experimental features already enabled in $BLUETOOTH_CONF"
+        elif grep -q "^Experimental\s*=" "$BLUETOOTH_CONF"; then
+            # Update existing setting (might be set to false or commented)
+            sed -i 's/^Experimental\s*=.*/Experimental = true/' "$BLUETOOTH_CONF"
+            print_success "Updated Experimental = true in $BLUETOOTH_CONF"
+        elif grep -q "^#\s*Experimental\s*=" "$BLUETOOTH_CONF"; then
+            # Uncomment and set to true
+            sed -i 's/^#\s*Experimental\s*=.*/Experimental = true/' "$BLUETOOTH_CONF"
+            print_success "Uncommented and enabled Experimental = true in $BLUETOOTH_CONF"
+        elif grep -q "^\[General\]" "$BLUETOOTH_CONF"; then
+            # Add under existing [General] section
+            sed -i '/^\[General\]/a Experimental = true' "$BLUETOOTH_CONF"
+            print_success "Added Experimental = true to [General] section"
+        else
+            # Add [General] section with Experimental at the beginning of the file
+            sed -i '1i [General]\nExperimental = true\n' "$BLUETOOTH_CONF"
+            print_success "Added [General] section with Experimental = true"
+        fi
+    else
+        # Create the config file if it doesn't exist
+        cat > "$BLUETOOTH_CONF" << EOF
+[General]
+Experimental = true
+EOF
+        print_success "Created $BLUETOOTH_CONF with Experimental = true"
+    fi
+
+    # Restart Bluetooth service to apply changes
+    systemctl restart bluetooth
+    sleep 2
+
+    if systemctl is-active --quiet bluetooth; then
+        print_success "Bluetooth service restarted with experimental features enabled"
+        print_info "Battery level reporting is now available for supported devices"
+    else
+        print_error "Bluetooth service failed to restart"
+        print_info "Check logs with: journalctl -u bluetooth -n 50"
+        # Don't exit - this is not critical for basic functionality
+    fi
+}
+
 configure_hostname() {
     if [ "$SKIP_HOSTNAME" = true ]; then
         print_info "Skipping hostname configuration (--skip-hostname flag set)"
@@ -756,6 +811,10 @@ print_installation_summary() {
     echo "  - Home: $SERVICE_HOME"
     echo "  - Member of: bluetooth, audio"
     echo ""
+    echo "Bluetooth:"
+    echo "  - Experimental features: enabled"
+    echo "  - Battery reporting: available for supported devices"
+    echo ""
     echo "Auto-Download:"
     echo "  - Cron job: $CRON_FILE"
     echo "  - Schedule: Every 6 hours"
@@ -820,6 +879,7 @@ main() {
     create_service_user
     configure_sudoers
     enable_bluetooth_adapter
+    configure_bluetooth_experimental
     disable_user_pulseaudio
     configure_pulseaudio
     install_nodejs

@@ -161,6 +161,23 @@ router.get('/device/:mac/info', async (req, res) => {
 });
 
 /**
+ * GET /api/bluetooth/device/:mac/battery
+ * Get battery level for a device
+ * Returns: { mac, battery: number|null, supported: boolean }
+ */
+router.get('/device/:mac/battery', async (req, res) => {
+	try {
+		const { mac } = req.params;
+		if (!mac) throw new Error('MAC address required');
+
+		const result = await bluetoothService.getBatteryLevel(mac);
+		res.json({ success: true, ...result });
+	} catch (err) {
+		res.status(500).json({ success: false, error: err.message });
+	}
+});
+
+/**
  * POST /api/bluetooth/command
  * Send a raw command to bluetoothctl
  * Body: { command: string }
