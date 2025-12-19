@@ -260,26 +260,21 @@ interface BatteryIndicatorProps {
 function BatteryIndicator({ level }: BatteryIndicatorProps) {
 	// Determine icon and color based on battery level
 	let Icon = Battery;
-	let color = 'dimmed';
 
 	if (level <= 10) {
 		Icon = BatteryWarning;
-		color = 'red';
 	} else if (level <= 25) {
 		Icon = BatteryLow;
-		color = 'yellow';
 	} else if (level <= 50) {
 		Icon = BatteryMedium;
-		color = 'teal';
 	} else {
 		Icon = BatteryFull;
-		color = 'teal';
 	}
 
 	return (
 		<Group gap={4} wrap="nowrap">
-			<Icon size={18} color={`var(--mantine-color-${color}-6)`} />
-			<Text size="xs" c={color} fw={500}>
+			<Icon size={18} />
+			<Text size="xs" fw={500}>
 				{level}%
 			</Text>
 		</Group>
