@@ -267,10 +267,10 @@ function BatteryIndicator({ level }: BatteryIndicatorProps) {
 		color = 'red';
 	} else if (level <= 25) {
 		Icon = BatteryLow;
-		color = 'orange';
+		color = 'yellow';
 	} else if (level <= 50) {
 		Icon = BatteryMedium;
-		color = 'yellow';
+		color = 'teal';
 	} else {
 		Icon = BatteryFull;
 		color = 'teal';
@@ -278,7 +278,7 @@ function BatteryIndicator({ level }: BatteryIndicatorProps) {
 
 	return (
 		<Group gap={4} wrap="nowrap">
-			<Icon size={14} color={`var(--mantine-color-${color}-6)`} />
+			<Icon size={18} color={`var(--mantine-color-${color}-6)`} />
 			<Text size="xs" c={color} fw={500}>
 				{level}%
 			</Text>
@@ -356,9 +356,15 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionS
 		>
 			<Group justify="space-between" wrap="nowrap" w="100%">
 				<Box style={{ minWidth: 0, flex: 1 }}>
-					<Text fw={500} truncate c={isMuted ? 'dimmed' : undefined}>
-						{device.name}
-					</Text>
+					<Group gap="xs">
+						<Text fw={500} truncate c={isMuted ? 'dimmed' : undefined}>
+							{device.name}
+						</Text>
+						{isConnected && battery != null && (
+							<BatteryIndicator level={battery} />
+						)}
+					</Group>
+
 					<Group gap="xs">
 						{isLoading && <Loader size={10} />}
 						<Text size="xs" c="dimmed">
@@ -366,10 +372,6 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionS
 						</Text>
 					</Group>
 				</Box>
-				{/* Show battery indicator for connected devices with battery info */}
-				{isConnected && battery != null && (
-					<BatteryIndicator level={battery} />
-				)}
 			</Group>
 		</Button>
 	);
