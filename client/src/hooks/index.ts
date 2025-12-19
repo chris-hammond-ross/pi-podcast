@@ -38,7 +38,6 @@ export const useBluetoothConnection = isDemoMode ? useBluetoothConnectionDemo : 
 export const useBluetoothWebSocket = isDemoMode ? useBluetoothWebSocketDemo : useBluetoothWebSocketReal;
 
 // These don't need demo versions
-export { useBluetoothStatus } from './useBluetoothStatus';
 export { useApiHealth } from './useApiHealth';
 export { useSubscriptions } from './useSubscriptions';
 export { useAutoPlaylists } from './useAutoPlaylists';
