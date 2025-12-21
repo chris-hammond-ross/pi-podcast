@@ -109,3 +109,19 @@ button:focus-visible {
 		padding-block: var(--mantine-spacing-sm);
 	}
 }
+
+@media (min-width: 767px) {
+	.search-input .mantine-Input-wrapper .mantine-Input-input {
+		height: 34px;
+		min-height: 34px;
+	}
+
+	.search-input-border {
+		position: absolute;
+		left: 0;
+		margin-top: 34px;
+		height: calc(0.0625rem * var(--mantine-scale));
+		width: 100vw;
+		background-color: var(--mantine-color-default-border);
+	}
+}

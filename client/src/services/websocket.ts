@@ -78,6 +78,8 @@ export interface DownloadQueueCounts {
 export interface DownloadQueueStatus {
 	counts: DownloadQueueCounts;
 	activeItems: DownloadQueueItem[];
+	activeItemsLimit: number;
+	hasMoreItems: boolean;
 	isActive: boolean;
 }
 
@@ -199,6 +201,8 @@ export interface ServerMessage {
 	queue?: DownloadQueueStatus;
 	counts?: DownloadQueueCounts;
 	activeItems?: DownloadQueueItem[];
+	activeItemsLimit?: number;
+	hasMoreItems?: boolean;
 	isActive?: boolean;
 	// Download event fields
 	queueId?: number;

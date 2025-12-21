@@ -25,6 +25,7 @@ export interface DownloadContextValue {
 	currentDownload: CurrentDownload | null;
 	activeItems: DownloadQueueItem[];
 	counts: DownloadQueueCounts;
+	hasMoreItems: boolean;
 	isActive: boolean;
 	error: string | null;
 
@@ -63,6 +64,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 	const [currentDownload, setCurrentDownload] = useState<CurrentDownload | null>(null);
 	const [activeItems, setActiveItems] = useState<DownloadQueueItem[]>([]);
 	const [counts, setCounts] = useState<DownloadQueueCounts>(defaultCounts);
+	const [hasMoreItems, setHasMoreItems] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	
 	const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -93,11 +95,15 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 					if (message.queue) {
 						setCounts(message.queue.counts);
 						setActiveItems(message.queue.activeItems);
+						setHasMoreItems(message.queue.hasMoreItems ?? false);
 					} else if (message.counts) {
 						setCounts(message.counts);
 					}
 					if (message.activeItems) {
 						setActiveItems(message.activeItems);
+					}
+					if (message.hasMoreItems !== undefined) {
+						setHasMoreItems(message.hasMoreItems);
 					}
 					// Only update currentDownload from queue-status if we don't have one
 					// or if the queueId changed. Don't overwrite progress data!
@@ -247,6 +253,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 								setIsPaused(status.isPaused);
 								setCounts(status.queue.counts);
 								setActiveItems(status.queue.activeItems);
+								setHasMoreItems(status.queue.hasMoreItems ?? false);
 								setIsLoading(false);
 							}
 						} catch {
@@ -283,6 +290,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 			setIsPaused(status.isPaused);
 			setCounts(status.queue.counts);
 			setActiveItems(status.queue.activeItems);
+			setHasMoreItems(status.queue.hasMoreItems ?? false);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to refresh');
 		}
@@ -420,6 +428,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 		currentDownload,
 		activeItems,
 		counts,
+		hasMoreItems,
 		isActive,
 		error,
 		start,

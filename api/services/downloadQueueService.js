@@ -219,9 +219,10 @@ class DownloadQueueService {
 
 	/**
 	 * Get current queue status
+	 * @param {number} activeItemsLimit - Maximum number of active items to return (default 50)
 	 * @returns {Object} Queue status with counts and items
 	 */
-	getQueueStatus() {
+	getQueueStatus(activeItemsLimit = 50) {
 		const db = getDatabase();
 
 		const counts = db.prepare(`
@@ -246,11 +247,18 @@ class DownloadQueueService {
 				CASE WHEN dq.status = 'downloading' THEN 0 ELSE 1 END,
 				dq.priority DESC, 
 				e.pub_date_unix ASC
-		`).all();
+			LIMIT ?
+		`).all(activeItemsLimit);
+
+		// Calculate total active count for truncation detection
+		const totalActiveCount = counts.pending + counts.downloading;
+		const hasMoreItems = totalActiveCount > activeItems.length;
 
 		return {
 			counts,
 			activeItems,
+			activeItemsLimit,
+			hasMoreItems,
 			isActive: counts.downloading > 0 || counts.pending > 0
 		};
 	}

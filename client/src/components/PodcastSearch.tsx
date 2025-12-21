@@ -69,31 +69,35 @@ function PodcastSearch({
 	};
 
 	return (
-		<TextInput
-			variant='unstyled'
-			value={searchTerm}
-			onChange={(event) => setSearchTerm(event.currentTarget.value)}
-			onKeyDown={handleKeyDown}
-			placeholder={placeholder}
-			leftSection={
-				isSearching ? (
-					<Loader size="xs" />
-				) : (
-					<Search size={16} />
-				)
-			}
-			rightSection={
-				searchTerm && (
-					<X
-						size={16}
-						style={{ cursor: 'pointer' }}
-						onClick={handleClear}
-					/>
-				)
-			}
-			error={error}
-			bg="var(--mantine-color-body)"
-		/>
+		<>
+			<TextInput
+				className='search-input'
+				variant='unstyled'
+				value={searchTerm}
+				onChange={(event) => setSearchTerm(event.currentTarget.value)}
+				onKeyDown={handleKeyDown}
+				placeholder={placeholder}
+				leftSection={
+					isSearching ? (
+						<Loader size="xs" />
+					) : (
+						<Search size={16} />
+					)
+				}
+				rightSection={
+					searchTerm && (
+						<X
+							size={16}
+							style={{ cursor: 'pointer' }}
+							onClick={handleClear}
+						/>
+					)
+				}
+				error={error}
+				bg="var(--mantine-color-body)"
+			/>
+			<div className='search-input-border'>&nbsp;</div>
+		</>
 	);
 }
 

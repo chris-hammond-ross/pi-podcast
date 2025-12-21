@@ -52,6 +52,7 @@ function Downloads() {
 		currentDownload,
 		activeItems,
 		counts,
+		hasMoreItems,
 		error,
 		start,
 		stop,
@@ -196,7 +197,7 @@ function Downloads() {
 		}
 	}, []);
 
-	if (isLoading) {
+	if (!isLoading) {
 		return (
 			<Container size="sm" py="md">
 				<Group justify="center" py="xl">
@@ -208,6 +209,11 @@ function Downloads() {
 
 	const pendingItems = activeItems.filter(item => item.status === 'pending');
 	const hasCurrentDownload = currentDownload !== null;
+
+	// Calculate how many more items are not shown
+	const totalPendingCount = counts.pending;
+	const shownPendingCount = pendingItems.length;
+	const hiddenPendingCount = totalPendingCount - shownPendingCount;
 
 	// Split completed items into recent (last 24 hours) and older
 	const recentCompletedItems = completedItems.filter(
@@ -234,7 +240,7 @@ function Downloads() {
 							Current {hasCurrentDownload ? '(1)' : ''}
 						</Tabs.Tab>
 						<Tabs.Tab value="pending">
-							Pending {pendingItems.length > 0 ? `(${pendingItems.length})` : ''}
+							Pending {totalPendingCount > 0 ? `(${totalPendingCount})` : ''}
 						</Tabs.Tab>
 						<Tabs.Tab value="completed">
 							Done {completedItems.length > 0 ? `(${completedItems.length})` : ''}
@@ -454,6 +460,13 @@ function Downloads() {
 														</Group>
 													</Card>
 												))}
+
+												{/* Truncation message */}
+												{hasMoreItems && hiddenPendingCount > 0 && (
+													<Text size="sm" c="dimmed" ta="center" py="sm">
+														+ {hiddenPendingCount.toLocaleString()} more episode{hiddenPendingCount !== 1 ? 's' : ''} in queue
+													</Text>
+												)}
 											</Stack>
 										</>
 									) : (

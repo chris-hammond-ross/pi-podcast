@@ -24,6 +24,8 @@ export interface QueueResponse {
 	success: boolean;
 	counts: DownloadQueueCounts;
 	activeItems: DownloadQueueItem[];
+	activeItemsLimit: number;
+	hasMoreItems: boolean;
 	isActive: boolean;
 }
 
