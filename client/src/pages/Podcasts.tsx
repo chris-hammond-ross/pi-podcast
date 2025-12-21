@@ -38,7 +38,7 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { AlertCircle, X, Save, GripHorizontal, Trash, Play, Pause } from 'lucide-react';
-import { useMediaPlayer } from '../contexts';
+import { useMediaPlayer, useTheme } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
 import { getSubscriptionById, getAllDownloadedEpisodes, createUserPlaylist, addEpisodeToPlaylist } from '../services';
@@ -205,6 +205,9 @@ function Podcasts() {
 	const { tab, subscriptionId, episodeId } = useParams<{ tab: string; subscriptionId: string; episodeId: string; }>();
 	const navigate = useNavigate();
 	const location = useLocation();
+	const { theme } = useTheme();
+
+	const buttonColor = theme.navigation;
 
 	const {
 		queue,
@@ -509,6 +512,7 @@ function Podcasts() {
 
 	return (
 		<Tabs
+			color={buttonColor}
 			value={currentTab}
 			onChange={handleTabChange}
 			style={{

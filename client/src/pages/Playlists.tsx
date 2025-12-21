@@ -36,6 +36,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
+import { useTheme } from '../contexts';
 import { Pencil, Play, X, PencilLine, Trash, Save, GripHorizontal, Check } from 'lucide-react';
 import { useAutoPlaylists, useUserPlaylists } from '../hooks';
 import type { AutoPlaylist, PlaylistEpisode } from '../services';
@@ -184,8 +185,11 @@ function Playlists() {
 	const { playlists: userPlaylists, isLoading: userIsLoading, error: userError, refresh: refreshUserPlaylists } = useUserPlaylists();
 	const isMobile = useMediaQuery('(max-width: 768px)');
 
-	const { tab } = useParams<{ tab: string }>();
+	const { tab } = useParams<{ tab: string; }>();
 	const navigate = useNavigate();
+	const { theme } = useTheme();
+
+	const buttonColor = theme.navigation;
 
 	// Determine current tab from URL or default
 	const currentTab = tab && validTabs.includes(tab) ? tab : 'auto';
@@ -477,6 +481,7 @@ function Playlists() {
 
 	return (
 		<Tabs
+			color={buttonColor}
 			value={currentTab}
 			onChange={handleTabChange}
 			style={{

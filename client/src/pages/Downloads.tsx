@@ -23,7 +23,7 @@ import {
 	AlertCircle,
 	RefreshCw
 } from 'lucide-react';
-import { useDownloadContext } from '../contexts';
+import { useDownloadContext, useTheme } from '../contexts';
 import { EpisodeDetailModal, EpisodeRow } from '../components';
 import * as downloadsApi from '../services/downloads';
 import { getEpisode, getSubscriptionById, type EpisodeRecord } from '../services';
@@ -82,6 +82,10 @@ function Downloads() {
 
 	// Determine current tab from URL or default
 	const currentTab = tab && validTabs.includes(tab) ? tab : 'downloading';
+
+	const { theme } = useTheme();
+
+	const buttonColor = theme.navigation;
 
 	const fetchCompletedItems = useCallback(async () => {
 		setCompletedLoading(true);
@@ -226,6 +230,7 @@ function Downloads() {
 	return (
 		<>
 			<Tabs
+				color={buttonColor}
 				value={currentTab}
 				onChange={handleTabChange}
 				style={{

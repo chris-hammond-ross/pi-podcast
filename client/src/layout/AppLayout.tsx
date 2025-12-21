@@ -2,7 +2,7 @@ import { AppShell, Button, Group, Container, Indicator, rem } from '@mantine/cor
 import { Mic, ListMusic, Search, Settings, HardDriveDownload } from 'lucide-react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
-import { useDownloadContext } from '../contexts';
+import { useDownloadContext, useTheme } from '../contexts';
 import { MediaPlayer } from '../components';
 
 function AppLayout() {
@@ -11,12 +11,15 @@ function AppLayout() {
 	const isMobile = useMediaQuery('(max-width: 768px)');
 	const isActive = (path: string) => location.pathname.startsWith(path);
 	const { isActive: isDownloading } = useDownloadContext();
+	const { theme } = useTheme();
 
 	const navItems = [
 		{ path: '/podcasts', label: 'Podcasts', icon: Mic },
 		{ path: '/playlists', label: 'Playlists', icon: ListMusic },
 		{ path: '/search', label: 'Search', icon: Search }
 	];
+
+	const buttonColor = theme.navigation;
 
 	return (
 		<AppShell
@@ -39,6 +42,7 @@ function AppLayout() {
 						<Group gap="xs">
 							{navItems.map(({ path, label, icon: Icon }) => (
 								<Button
+									color={buttonColor}
 									key={path}
 									variant={isActive(path) ? 'filled' : 'light'}
 									leftSection={isMobile ? undefined : <Icon size={18} />}
@@ -49,6 +53,7 @@ function AppLayout() {
 							))}
 							<Indicator color="teal" offset={2} disabled={!isDownloading} processing={isDownloading}>
 								<Button
+									color={buttonColor}
 									variant={isActive('/downloads') ? 'filled' : 'light'}
 									leftSection={isMobile ? undefined : <HardDriveDownload size={18} />}
 									onClick={() => navigate('/downloads')}
@@ -59,6 +64,7 @@ function AppLayout() {
 						</Group>
 
 						<Button
+							color={buttonColor}
 							variant={isActive('/settings') ? 'filled' : 'light'}
 							leftSection={isMobile ? undefined : <Settings size={18} />}
 							onClick={() => navigate('/settings')}

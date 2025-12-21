@@ -68,3 +68,95 @@ function formatEdgeCaseDuration(duration: string): string {
 
 	return result.trim() || '0m';
 }
+
+export function getHexValue(color: string) {
+	switch (color) {
+		case "dark":
+			return "#2e2e2e";
+		case "gray":
+			return "#868e96";
+		case "red":
+			return "#fa5252";
+		case "pink":
+			return "#e64980";
+		case "grape":
+			return "#be4bdb";
+		case "violet":
+			return "#7950f2";
+		case "indigo":
+			return "#4c6ef5";
+		case "blue":
+			return "#228be6";
+		case "cyan":
+			return "#15aabf";
+		case "teal":
+			return "#12b886";
+		case "green":
+			return "#40c057";
+		case "lime":
+			return "#82c91e";
+		case "yellow":
+			return "#fab005";
+		case "orange":
+			return "#fd7e14";
+		default:
+			return "#228be6";
+	}
+};
+
+export function getColorName(hex: string) {
+	switch (hex.toLowerCase()) {
+		case "#2e2e2e":
+			return "dark";
+		case "#868e96":
+			return "gray";
+		case "#fa5252":
+			return "red";
+		case "#e64980":
+			return "pink";
+		case "#be4bdb":
+			return "grape";
+		case "#7950f2":
+			return "violet";
+		case "#4c6ef5":
+			return "indigo";
+		case "#228be6":
+			return "blue";
+		case "#15aabf":
+			return "cyan";
+		case "#12b886":
+			return "teal";
+		case "#40c057":
+			return "green";
+		case "#82c91e":
+			return "lime";
+		case "#fab005":
+			return "yellow";
+		case "#fd7e14":
+			return "orange";
+		default:
+			return "blue";
+	}
+};
+
+export const colorSwatches = [
+	"#2e2e2e",
+	"#868e96",
+	"#fa5252",
+	"#e64980",
+	"#be4bdb",
+	"#7950f2",
+	"#4c6ef5",
+	"#228be6",
+	"#15aabf",
+	"#12b886",
+	"#40c057",
+	"#82c91e",
+	"#fab005",
+	"#fd7e14"
+];
+
+export const DEFAULT_THEME = {
+	navigation: 'blue',
+	mediaPlayer: 'teal'
+};

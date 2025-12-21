@@ -30,7 +30,7 @@ import {
 	CalendarArrowDown,
 	CalendarArrowUp
 } from 'lucide-react';
-import { useMediaPlayer } from '../contexts';
+import { useMediaPlayer, useTheme } from '../contexts';
 import type { SortField, SortOrder } from '../services/mediaPlayer';
 
 /**
@@ -127,6 +127,7 @@ function MediaPlayer() {
 	const [seekValue, setSeekValue] = useState(0);
 	const [sortModalOpened, setSortModalOpened] = useState(false);
 	const location = useLocation();
+	const { theme } = useTheme();
 
 	const {
 		// State
@@ -293,6 +294,8 @@ function MediaPlayer() {
 	const displayProgress = isSeeking ? seekValue : progress;
 	const displayPosition = isSeeking ? (seekValue / 100) * duration : position;
 
+	const buttonColor = theme.mediaPlayer;
+
 	return (
 		<Container size="sm" px="md" py="xs" w="100%">
 			<Stack gap="xs" w="100%">
@@ -314,7 +317,7 @@ function MediaPlayer() {
 					</Text>
 					<Box style={{ flex: 1 }}>
 						<Slider
-							color="teal"
+							color={buttonColor}
 							size="sm"
 							value={displayProgress}
 							onChange={handleSeekChange}
@@ -339,7 +342,7 @@ function MediaPlayer() {
 					{/* Previous button */}
 					<ActionIcon
 						variant="light"
-						color="teal"
+						color={buttonColor}
 						size="lg"
 						aria-label="Previous"
 						disabled={!hasPrevious || !mpvConnected}
@@ -351,14 +354,14 @@ function MediaPlayer() {
 					{/* Play/Pause button */}
 					<ActionIcon
 						variant="light"
-						color="teal"
+						color={buttonColor}
 						size="lg"
 						aria-label={showPlayButton ? 'Play' : 'Pause'}
 						disabled={!hasPlayback || !mpvConnected}
 						onClick={handlePlayPause}
 					>
 						{isLoading ? (
-							<Loader size={20} color="teal" />
+							<Loader size={20} color={buttonColor} />
 						) : showPlayButton ? (
 							<Play size={20} style={{ marginLeft: 2 }} />
 						) : (
@@ -369,7 +372,7 @@ function MediaPlayer() {
 					{/* Next button */}
 					<ActionIcon
 						variant="light"
-						color="teal"
+						color={buttonColor}
 						size="lg"
 						aria-label="Next"
 						disabled={!hasNext || !mpvConnected}
@@ -381,7 +384,7 @@ function MediaPlayer() {
 					{/* Sort button */}
 					<ActionIcon
 						variant="light"
-						color="teal"
+						color={buttonColor}
 						size="lg"
 						aria-label="Sort"
 						disabled={!canModifyQueue || !mpvConnected}
@@ -405,7 +408,7 @@ function MediaPlayer() {
 						<Popover.Target>
 							<ActionIcon
 								variant="light"
-								color="teal"
+								color={buttonColor}
 								size="lg"
 								aria-label="Volume"
 								onClick={() => setVolumeOpen((o) => !o)}
@@ -426,7 +429,7 @@ function MediaPlayer() {
 								</Text>
 								<ActionIcon
 									variant="light"
-									color="teal"
+									color={buttonColor}
 									size="sm"
 									onClick={handleMuteToggle}
 									disabled={!mpvConnected}

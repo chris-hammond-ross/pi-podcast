@@ -16,11 +16,14 @@ import {
 	Skeleton,
 	useMantineColorScheme,
 	Center,
-	SegmentedControl
+	SegmentedControl,
+	ColorInput
 } from '@mantine/core';
 import { RefreshCw, Sun, Moon, Power, Bot } from 'lucide-react';
 import { BluetoothInterface } from '../components';
+import { useTheme } from '../contexts';
 import { restartServices, rebootSystem, getWebSocketService, type SystemStats } from '../services';
+import { getHexValue, getColorName, colorSwatches, DEFAULT_THEME } from '../utilities';
 
 const RESTART_OVERLAY_DURATION = 6000; // 6 seconds for service restart
 const REBOOT_OVERLAY_DURATION = 60000; // 60 seconds for system reboot
@@ -36,9 +39,16 @@ function Settings() {
 	const rebootIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	const { colorScheme, setColorScheme } = useMantineColorScheme();
+	const { theme, setNavigationColor, setMediaPlayerColor } = useTheme();
+
+	// Local state for the color inputs (hex values for display)
+	const [navigationColorHex, setNavigationColorHex] = useState(getHexValue(theme.navigation));
+	const [mediaPlayerColorHex, setMediaPlayerColorHex] = useState(getHexValue(theme.mediaPlayer));
 
 	const { tab } = useParams<{ tab: string; }>();
 	const navigate = useNavigate();
+
+	const buttonColor = theme.navigation;
 
 	// Determine current tab from URL or default
 	const currentTab = tab && validTabs.includes(tab) ? tab : 'bluetooth';
@@ -82,6 +92,18 @@ function Settings() {
 			unsubscribe();
 		};
 	}, []);
+
+	// Update theme context when navigation color changes
+	useEffect(() => {
+		const colorName = getColorName(navigationColorHex);
+		setNavigationColor(colorName);
+	}, [navigationColorHex, setNavigationColor]);
+
+	// Update theme context when media player color changes
+	useEffect(() => {
+		const colorName = getColorName(mediaPlayerColorHex);
+		setMediaPlayerColor(colorName);
+	}, [mediaPlayerColorHex, setMediaPlayerColor]);
 
 	const handleRestartService = async () => {
 		setIsRestarting(true);
@@ -140,6 +162,16 @@ function Settings() {
 
 	const rebootProgress = ((REBOOT_OVERLAY_DURATION / 1000 - rebootCountdown) / (REBOOT_OVERLAY_DURATION / 1000)) * 100;
 
+	const resetToDefaultColors = () => {
+		// Set localStorage colors
+		setNavigationColor(DEFAULT_THEME.navigation);
+		setMediaPlayerColor(DEFAULT_THEME.mediaPlayer);
+
+		// Set local state colors
+		setNavigationColorHex(getHexValue(DEFAULT_THEME.navigation));
+		setMediaPlayerColorHex(getHexValue(DEFAULT_THEME.mediaPlayer));
+	};
+
 	return (
 		<Box pos="relative" style={{ height: 'var(--main-content-height)' }}>
 			{/* Restart Service Overlay */}
@@ -185,6 +217,7 @@ function Settings() {
 			)}
 
 			<Tabs
+				color={buttonColor}
 				value={currentTab}
 				onChange={handleTabChange}
 				style={{
@@ -232,49 +265,85 @@ function Settings() {
 								<BluetoothInterface />
 							</Tabs.Panel>
 							<Tabs.Panel value="appearance">
-								<Card py="xs">
-									<SegmentedControl
-										fullWidth
-										value={colorScheme}
-										transitionDuration={300}
-										onChange={(value) => {
-											const newTheme = value as 'light' | 'dark';
-											setColorScheme(newTheme);
-											localStorage.setItem('mantine-color-scheme-value', newTheme);
-											localStorage.setItem('user-theme', newTheme);
-										}}
-										data={[
-											{
-												value: 'light',
-												label: (
-													<Center pr="xs" style={{ gap: 10 }}>
-														<Sun size={16} />
-														<span>Light</span>
-													</Center>
-												),
-											},
-											{
-												value: 'dark',
-												label: (
-													<Center pr="xs" style={{ gap: 10 }}>
-														<Moon size={16} />
-														<span>Dark</span>
-													</Center>
-												),
-											},
-											{
-												value: 'auto',
-												label: (
-													<Center pr="xs" style={{ gap: 10 }}>
-														<Bot size={16} />
-														<span>Auto</span>
-													</Center>
-												),
-											},
-										]}
-									/>
-								</Card>
-
+								<Stack>
+									<Card py="xs">
+										<SegmentedControl
+											fullWidth
+											value={colorScheme}
+											transitionDuration={300}
+											onChange={(value) => {
+												const newTheme = value as 'light' | 'dark';
+												setColorScheme(newTheme);
+												localStorage.setItem('mantine-color-scheme-value', newTheme);
+												localStorage.setItem('user-theme', newTheme);
+											}}
+											data={[
+												{
+													value: 'light',
+													label: (
+														<Center pr="xs" style={{ gap: 10 }}>
+															<Sun size={16} />
+															<span>Light</span>
+														</Center>
+													),
+												},
+												{
+													value: 'dark',
+													label: (
+														<Center pr="xs" style={{ gap: 10 }}>
+															<Moon size={16} />
+															<span>Dark</span>
+														</Center>
+													),
+												},
+												{
+													value: 'auto',
+													label: (
+														<Center pr="xs" style={{ gap: 10 }}>
+															<Bot size={16} />
+															<span>Auto</span>
+														</Center>
+													),
+												},
+											]}
+										/>
+									</Card>
+									<Card>
+										<Text size='sm' mb="sm">Navigation Color</Text>
+										<ColorInput
+											value={navigationColorHex}
+											onChange={setNavigationColorHex}
+											variant='filled'
+											placeholder="Choose the Navigation Color"
+											disallowInput
+											closeOnColorSwatchClick
+											withPicker={false}
+											withEyeDropper={false}
+											swatches={colorSwatches}
+										/>
+									</Card>
+									<Card>
+										<Text size='sm' mb="sm">Media Player Color</Text>
+										<ColorInput
+											value={mediaPlayerColorHex}
+											onChange={setMediaPlayerColorHex}
+											variant='filled'
+											placeholder="Choose the Media Player Color"
+											disallowInput
+											closeOnColorSwatchClick
+											withPicker={false}
+											withEyeDropper={false}
+											swatches={colorSwatches}
+										/>
+									</Card>
+									<Card>
+										<Button
+											variant='light'
+											color='blue'
+											onClick={resetToDefaultColors}
+										>Reset to Defalt Colors</Button>
+									</Card>
+								</Stack>
 							</Tabs.Panel>
 							<Tabs.Panel value="system">
 								<Stack gap="md">
