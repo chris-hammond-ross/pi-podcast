@@ -201,7 +201,7 @@ function Downloads() {
 		}
 	}, []);
 
-	if (!isLoading) {
+	if (isLoading) {
 		return (
 			<Container size="sm" py="md">
 				<Group justify="center" py="xl">

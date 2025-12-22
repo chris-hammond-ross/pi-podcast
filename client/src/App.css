@@ -115,8 +115,13 @@ button:focus-visible {
 		font-size: var(--mantine-font-size-xs);
 		padding-block: var(--mantine-spacing-sm);
 	}
+
+	.search-input-border {
+		display: none;
+	}
 }
 
+/* Desktop */
 @media (min-width: 767px) {
 	.search-input .mantine-Input-wrapper .mantine-Input-input {
 		height: 34px;

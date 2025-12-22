@@ -4,9 +4,12 @@
  * Devices are grouped by: Connected, Paired, Discovered
  */
 
-import { Stack, Group, Text, Alert, Button, Box, Switch, Loader, Divider, LoadingOverlay } from '@mantine/core';
-import { AlertCircle, Bluetooth, Search, SearchX, Battery, BatteryLow, BatteryMedium, BatteryFull, BatteryWarning } from 'lucide-react';
+import { useState } from 'react';
+import { Stack, Group, Text, Alert, Button, Box, Switch, Loader, Divider, ActionIcon } from '@mantine/core';
+import { AlertCircle, Bluetooth, Search, SearchX, Battery, BatteryLow, BatteryMedium, BatteryFull, BatteryWarning, Ellipsis } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useScanBluetooth, useBluetoothConnection, useBluetoothWebSocket, useBluetoothPower } from '../hooks';
+import BluetoothDeviceModal from './BluetoothDeviceModal';
 import type { BluetoothDevice } from '../services';
 
 export function BluetoothInterface() {
@@ -35,6 +38,12 @@ export function BluetoothInterface() {
 		error: powerError,
 		togglePower,
 	} = useBluetoothPower();
+
+	const location = useLocation();
+
+	// Modal state
+	const [selectedDevice, setSelectedDevice] = useState<BluetoothDevice | null>(null);
+	const [modalOpened, setModalOpened] = useState(false);
 
 	// Prefer WebSocket data when available, fall back to HTTP data
 	const devices = wsConnected ? wsDevices : httpDevices;
@@ -76,17 +85,23 @@ export function BluetoothInterface() {
 		}
 	};
 
+	const handleMenuClick = (device: BluetoothDevice, e: React.MouseEvent) => {
+		e.stopPropagation();
+		// Add history state for modal
+		window.history.pushState(null, '', location.pathname + location.search);
+		setSelectedDevice(device);
+		setModalOpened(true);
+	};
+
+	const handleModalClose = () => {
+		setModalOpened(false);
+		setSelectedDevice(null);
+	};
+
 	const hasDevices = devices.length > 0;
 
 	return (
 		<Box pos="relative" mih={200}>
-			<LoadingOverlay
-				visible={isLoading}
-				zIndex={1000}
-				overlayProps={{ radius: "sm", blur: 2 }}
-				loaderProps={{ size: 'md', type: 'dots' }}
-			/>
-
 			<Stack gap="md">
 				{/* Bluetooth Power Control */}
 				<Group justify="space-between" align="center" p="xs" bg="rgba(128, 128, 128, 0.1)" style={{ borderRadius: 8 }}>
@@ -131,6 +146,7 @@ export function BluetoothInterface() {
 								<DeviceGroup
 									devices={sortedConnected}
 									onDevicePress={handleDevicePress}
+									onMenuClick={handleMenuClick}
 									connectingDeviceMac={connectingDeviceMac}
 									disconnectingDeviceMac={disconnectingDeviceMac}
 									connectionStatus={connectionStatus}
@@ -145,6 +161,7 @@ export function BluetoothInterface() {
 								<DeviceGroup
 									devices={sortedPaired}
 									onDevicePress={handleDevicePress}
+									onMenuClick={handleMenuClick}
 									connectingDeviceMac={connectingDeviceMac}
 									disconnectingDeviceMac={disconnectingDeviceMac}
 									connectionStatus={connectionStatus}
@@ -159,6 +176,7 @@ export function BluetoothInterface() {
 								<DeviceGroup
 									devices={sortedDiscovered}
 									onDevicePress={handleDevicePress}
+									onMenuClick={handleMenuClick}
 									connectingDeviceMac={connectingDeviceMac}
 									disconnectingDeviceMac={disconnectingDeviceMac}
 									connectionStatus={connectionStatus}
@@ -186,6 +204,15 @@ export function BluetoothInterface() {
 					</Box>
 				)}
 			</Stack>
+
+			{/* Bluetooth Device Modal */}
+			{selectedDevice && (
+				<BluetoothDeviceModal
+					device={selectedDevice}
+					opened={modalOpened}
+					onClose={handleModalClose}
+				/>
+			)}
 		</Box>
 	);
 }
@@ -196,12 +223,13 @@ export function BluetoothInterface() {
 interface DeviceGroupProps {
 	devices: BluetoothDevice[];
 	onDevicePress: (device: BluetoothDevice) => void;
+	onMenuClick: (device: BluetoothDevice, e: React.MouseEvent) => void;
 	connectingDeviceMac: string | null;
 	disconnectingDeviceMac: string | null;
 	connectionStatus: string;
 }
 
-function DeviceGroup({ devices, onDevicePress, connectingDeviceMac, disconnectingDeviceMac, connectionStatus }: DeviceGroupProps) {
+function DeviceGroup({ devices, onDevicePress, onMenuClick, connectingDeviceMac, disconnectingDeviceMac, connectionStatus }: DeviceGroupProps) {
 	return (
 		<Stack gap={0}>
 			{devices.map((device, index) => (
@@ -209,6 +237,7 @@ function DeviceGroup({ devices, onDevicePress, connectingDeviceMac, disconnectin
 					key={device.mac}
 					device={device}
 					onPress={() => onDevicePress(device)}
+					onMenuClick={(e) => onMenuClick(device, e)}
 					isConnecting={connectingDeviceMac === device.mac}
 					isDisconnecting={disconnectingDeviceMac === device.mac}
 					connectionStatus={connectingDeviceMac === device.mac ? connectionStatus : null}
@@ -287,6 +316,7 @@ function BatteryIndicator({ level }: BatteryIndicatorProps) {
 interface DeviceRowProps {
 	device: BluetoothDevice;
 	onPress: () => void;
+	onMenuClick: (e: React.MouseEvent) => void;
 	isConnecting: boolean;
 	isDisconnecting: boolean;
 	connectionStatus: string | null;
@@ -294,7 +324,7 @@ interface DeviceRowProps {
 	isLast: boolean;
 }
 
-function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionStatus, isFirst, isLast }: DeviceRowProps) {
+function DeviceRow({ device, onPress, onMenuClick, isConnecting, isDisconnecting, connectionStatus, isFirst, isLast }: DeviceRowProps) {
 	const isConnected = device.is_connected ?? false;
 	const isOnline = device.is_online ?? true; // Default to online if not specified
 	const isPaired = device.paired ?? false;
@@ -328,46 +358,67 @@ function DeviceRow({ device, onPress, isConnecting, isDisconnecting, connectionS
 	const isMuted = isPaired && !isOnline && !isConnected;
 
 	return (
-		<Button
-			p="xs"
-			justify="left"
-			color={buttonColor}
-			variant="light"
-			onClick={onPress}
-			disabled={isLoading || isMuted}
-			style={{
-				height: "unset",
-				borderRadius: isFirst && isLast
-					? '8px'
-					: isFirst
-						? '8px 8px 0 0'
-						: isLast
-							? '0 0 8px 8px'
-							: '0',
-				cursor: isLoading ? 'wait' : isMuted ? 'not-allowed' : 'pointer',
-				opacity: isMuted ? 0.5 : isLoading ? 0.7 : 1,
-				transition: 'background-color 150ms ease',
-			}}
-		>
-			<Group justify="space-between" wrap="nowrap" w="100%">
-				<Box style={{ minWidth: 0, flex: 1 }}>
-					<Group gap="xs">
-						<Text fw={500} truncate c={isMuted ? 'dimmed' : undefined}>
-							{device.name}
-						</Text>
-						{isConnected && battery != null && (
-							<BatteryIndicator level={battery} />
-						)}
-					</Group>
+		<>
+			<Button
+				p="xs"
+				justify="left"
+				fullWidth
+				color={buttonColor}
+				variant="light"
+				onClick={onPress}
+				disabled={isLoading || isMuted}
+				styles={{
+					inner: {
+						justifyContent: 'space-between',
+					},
+					label: {
+						width: "100%"
+					}
+				}}
+				style={{
+					height: "unset",
+					borderRadius: isFirst && isLast
+						? '8px'
+						: isFirst
+							? '8px 8px 0 0'
+							: isLast
+								? '0 0 8px 8px'
+								: '0',
+					cursor: isLoading ? 'wait' : isMuted ? 'not-allowed' : 'pointer',
+					opacity: isMuted ? 0.5 : isLoading ? 0.7 : 1,
+					transition: 'background-color 150ms ease',
+				}}
+			>
+				<Group justify="space-between" wrap="nowrap" w="100%">
+					<Box style={{ minWidth: 0, flex: 1 }}>
+						<Group gap="xs">
+							<Text fw={500} truncate c={isMuted ? 'dimmed' : undefined}>
+								{device.name}
+							</Text>
+							{isConnected && battery != null && (
+								<BatteryIndicator level={battery} />
+							)}
+						</Group>
 
-					<Group gap="xs">
-						{isLoading && <Loader size={10} />}
-						<Text size="xs" c="dimmed">
-							{statusText}
-						</Text>
-					</Group>
-				</Box>
-			</Group>
-		</Button>
+						<Group gap="xs">
+							{isLoading && <Loader size={10} />}
+							<Text size="xs" c="dimmed">
+								{statusText}
+							</Text>
+						</Group>
+					</Box>
+				</Group>
+				{(isPaired || isConnected) && (
+					<ActionIcon
+						variant="light"
+						size="md"
+						aria-label="Menu"
+						onClick={onMenuClick}
+					>
+						<Ellipsis size={16} />
+					</ActionIcon>
+				)}
+			</Button>
+		</>
 	);
 }
