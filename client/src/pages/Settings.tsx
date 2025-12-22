@@ -265,7 +265,7 @@ function Settings() {
 								<BluetoothInterface />
 							</Tabs.Panel>
 							<Tabs.Panel value="appearance">
-								<Stack>
+								<Stack className='appearance-section'>
 									<Card py="xs">
 										<SegmentedControl
 											fullWidth
@@ -315,6 +315,7 @@ function Settings() {
 											onChange={setNavigationColorHex}
 											variant='filled'
 											placeholder="Choose the Navigation Color"
+											description={`Selected: ${getColorName(navigationColorHex).toUpperCase()}`}
 											disallowInput
 											closeOnColorSwatchClick
 											withPicker={false}
@@ -329,6 +330,7 @@ function Settings() {
 											onChange={setMediaPlayerColorHex}
 											variant='filled'
 											placeholder="Choose the Media Player Color"
+											description={`Selected: ${getColorName(mediaPlayerColorHex).toUpperCase()}`}
 											disallowInput
 											closeOnColorSwatchClick
 											withPicker={false}

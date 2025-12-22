@@ -87,6 +87,13 @@ button:focus-visible {
 	outline: none !important;
 }
 
+.appearance-section input,
+.appearance-section input:focus,
+.appearance-section input:focus-visible {
+	border: none !important;
+	outline: none !important;
+}
+
 /* Spin animation for download in progress icon */
 @keyframes spin {
 	from {
