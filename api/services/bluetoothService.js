@@ -1045,6 +1045,14 @@ class BluetoothService {
 			this.stopBatteryPolling();
 		}
 
+		// Remove device from database
+		try {
+			this.deviceModel.delete(mac);
+			console.log('[database] Deleted device:', mac);
+		} catch (err) {
+			console.error('[database] Failed to delete device:', mac, err.message);
+		}
+
 		this.broadcast({
 			type: 'device-removed',
 			mac: mac

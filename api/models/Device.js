@@ -49,7 +49,8 @@ class Device {
 				UPDATE bluetooth_devices
 				SET last_connected = 1, last_seen = strftime('%s', 'now')
 				WHERE mac_address = ?
-			`)
+			`),
+			delete: this.db.prepare('DELETE FROM bluetooth_devices WHERE mac_address = ?')
 		};
 	}
 
@@ -155,6 +156,16 @@ class Device {
 	updateTrusted(mac, trusted) {
 		this.ensureInitialized();
 		return this.statements.updateTrusted.run(trusted ? 1 : 0, mac);
+	}
+
+	/**
+	 * Delete a device from the database
+	 * @param {string} mac - The MAC address
+	 * @returns {Object} The result of the delete operation
+	 */
+	delete(mac) {
+		this.ensureInitialized();
+		return this.statements.delete.run(mac);
 	}
 }
 
