@@ -86,8 +86,6 @@ function Search() {
 		// The modal will close via onSubscribed callback
 	}, []);
 
-	console.log(resultCount);
-
 	return (
 		<Container
 			size="sm"
