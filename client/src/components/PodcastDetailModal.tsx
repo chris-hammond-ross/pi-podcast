@@ -376,7 +376,7 @@ function PodcastDetailModal({
 		if (episode.downloaded_at) {
 			return (
 				<EpisodeActionsModal
-					episodeId={episode.id}
+					episode={episode}
 					subscriptionName={subscription?.name}
 					onEpisodeDeleted={handleEpisodeDeleted}
 				/>

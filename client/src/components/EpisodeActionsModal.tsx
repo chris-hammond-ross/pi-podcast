@@ -34,16 +34,15 @@ import {
 import type { EpisodeRecord, UserPlaylist } from '../services';
 
 interface EpisodeActionsModalProps {
-	episodeId: number;
+	episode: EpisodeRecord;
 	subscriptionName?: string;
 	onEpisodeDeleted?: (episodeId: number) => void;
 }
 
-function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: EpisodeActionsModalProps) {
+function EpisodeActionsModal({ episode, subscriptionName, onEpisodeDeleted }: EpisodeActionsModalProps) {
 	const [modalOpened, setModalOpened] = useState(false);
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [isShowingPlaylistInterface, setIsShowingPlaylistInterface] = useState(false);
-	const [episode, setEpisode] = useState<EpisodeRecord | null>(null);
 	const location = useLocation();
 
 	// Playlist state
@@ -53,26 +52,8 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 	const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
 	const [isAddingToPlaylist, setIsAddingToPlaylist] = useState(false);
 
-	const { getEpisodeById, updateEpisode } = useEpisodesContext();
+	const { updateEpisode } = useEpisodesContext();
 	const { play, addToQueue, removeEpisodeFromQueue } = useMediaPlayer();
-
-	// Load episode data
-	useEffect(() => {
-		let mounted = true;
-
-		const loadEpisode = async () => {
-			const ep = await getEpisodeById(episodeId);
-			if (mounted && ep) {
-				setEpisode(ep);
-			}
-		};
-
-		loadEpisode();
-
-		return () => {
-			mounted = false;
-		};
-	}, [episodeId, getEpisodeById]);
 
 	// Handle browser back button to close modal
 	useEffect(() => {
@@ -132,8 +113,6 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 	};
 
 	const handlePlay = async () => {
-		if (!episode) return;
-
 		try {
 			await play(episode.id);
 			notifications.show({
@@ -155,8 +134,6 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 	};
 
 	const handleAddToQueue = async () => {
-		if (!episode) return;
-
 		try {
 			await addToQueue(episode.id);
 			notifications.show({
@@ -178,8 +155,6 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 	};
 
 	const handleDelete = async () => {
-		if (!episode) return;
-
 		setIsDeleting(true);
 		try {
 			// First, remove from queue if present (this also handles stopping playback if needed)
@@ -205,14 +180,6 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 				file_path: null,
 				file_size: null
 			});
-
-			// Update local state
-			setEpisode(prev => prev ? {
-				...prev,
-				downloaded_at: null,
-				file_path: null,
-				file_size: null
-			} : null);
 
 			// Notify parent component that episode was deleted
 			if (onEpisodeDeleted) {
@@ -253,7 +220,7 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 	};
 
 	const handleCreatePlaylistAndAdd = async () => {
-		if (!episode || !isPlaylistNameValid()) return;
+		if (!isPlaylistNameValid()) return;
 
 		setIsCreatingPlaylist(true);
 		try {
@@ -284,8 +251,6 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 	};
 
 	const handleAddToExistingPlaylist = async (playlist: UserPlaylist) => {
-		if (!episode) return;
-
 		setIsAddingToPlaylist(true);
 		try {
 			await addEpisodeToPlaylist(playlist.id, episode.id);
@@ -308,8 +273,6 @@ function EpisodeActionsModal({ episodeId, subscriptionName, onEpisodeDeleted }: 
 			setIsAddingToPlaylist(false);
 		}
 	};
-
-	if (!episode) return null;
 
 	return (
 		<>

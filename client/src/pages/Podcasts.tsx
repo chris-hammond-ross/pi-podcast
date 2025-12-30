@@ -805,7 +805,7 @@ function Podcasts() {
 								getItemKey={(episode) => episode.id}
 								renderItem={(episode) => (
 									<EpisodeRow
-										episodeId={episode.id}
+										episode={episode}
 										subscriptionName={episode.subscription_name}
 										showDownloadStatus={false}
 										onEpisodeDeleted={handleEpisodeDeleted}

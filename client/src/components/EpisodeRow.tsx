@@ -1,59 +1,42 @@
-import { useEffect, useState } from 'react';
-import { Card, Group, Text, Skeleton, Badge } from '@mantine/core';
+import { useState, useEffect } from 'react';
+import { Card, Group, Text, Badge } from '@mantine/core';
 import { useLocation } from 'react-router-dom';
-import { useEpisodesContext, useDownloadContext, useMediaPlayer } from '../contexts';
+import { useDownloadContext, useMediaPlayer, useEpisodesContext } from '../contexts';
 import EpisodeActionsModal from './EpisodeActionsModal';
 import EpisodeDetailModal from './EpisodeDetailModal';
 import { formatDate, formatDuration } from '../utilities';
 import type { EpisodeRecord } from '../services';
 
 interface EpisodeRowProps {
-	episodeId: number;
+	episode: EpisodeRecord;
 	subscriptionName?: string;
 	showDownloadStatus?: boolean;
 	onEpisodeDeleted?: (episodeId: number) => void;
 }
 
 function EpisodeRow({
-	episodeId,
+	episode,
 	subscriptionName,
 	showDownloadStatus = true,
 	onEpisodeDeleted
 }: EpisodeRowProps) {
 	const [detailModalOpened, setDetailModalOpened] = useState(false);
-	const [actionsModalOpened, setActionsModalOpened] = useState(false);
-	const { getEpisodeById, updateEpisode, isLoading: isEpisodeLoading } = useEpisodesContext();
+	const [localEpisode, setLocalEpisode] = useState<EpisodeRecord>(episode);
 	const { currentDownload } = useDownloadContext();
 	const { currentEpisode, isPlaying } = useMediaPlayer();
-	const [episode, setEpisode] = useState<EpisodeRecord | null>(null);
+	const { updateEpisode } = useEpisodesContext();
 	const location = useLocation();
 
-	// Load episode on mount or when episodeId changes
+	// Update local episode when prop changes
 	useEffect(() => {
-		let mounted = true;
-
-		const loadEpisode = async () => {
-			const ep = await getEpisodeById(episodeId);
-			if (mounted && ep) {
-				setEpisode(ep);
-			}
-		};
-
-		loadEpisode();
-
-		return () => {
-			mounted = false;
-		};
-	}, [episodeId, getEpisodeById]);
+		setLocalEpisode(episode);
+	}, [episode]);
 
 	// Handle browser back button to close modals
 	useEffect(() => {
 		const handlePopState = () => {
 			if (detailModalOpened) {
 				setDetailModalOpened(false);
-			}
-			if (actionsModalOpened) {
-				setActionsModalOpened(false);
 			}
 		};
 
@@ -62,7 +45,7 @@ function EpisodeRow({
 		return () => {
 			window.removeEventListener('popstate', handlePopState);
 		};
-	}, [detailModalOpened, actionsModalOpened]);
+	}, [detailModalOpened]);
 
 	const handleCardClick = () => {
 		// Add history state for modal
@@ -79,7 +62,7 @@ function EpisodeRow({
 	};
 
 	const handleEpisodeUpdate = (updatedEpisode: EpisodeRecord) => {
-		setEpisode(updatedEpisode);
+		setLocalEpisode(updatedEpisode);
 		updateEpisode(updatedEpisode.id, updatedEpisode);
 	};
 
@@ -90,23 +73,8 @@ function EpisodeRow({
 		}
 	};
 
-	// Show loading skeleton if episode is being fetched
-	if (isEpisodeLoading(episodeId) || !episode) {
-		return (
-			<Card withBorder p="sm">
-				<Group justify="space-between" align="center" wrap="nowrap">
-					<div style={{ flex: 1, minWidth: 0 }}>
-						<Skeleton height={16} width="70%" mb={8} />
-						<Skeleton height={12} width="50%" />
-					</div>
-					<Skeleton height={28} width={28} circle />
-				</Group>
-			</Card>
-		);
-	}
-
-	const isDownloading = currentDownload?.episodeId === episode.id;
-	const isCurrentlyPlaying = currentEpisode?.id === episode.id && isPlaying;
+	const isDownloading = currentDownload?.episodeId === localEpisode.id;
+	const isCurrentlyPlaying = currentEpisode?.id === localEpisode.id && isPlaying;
 
 	return (
 		<>
@@ -123,11 +91,11 @@ function EpisodeRow({
 								truncate
 								style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
 							>
-								{episode.title}
+								{localEpisode.title}
 							</Text>
-							{episode.duration && (
+							{localEpisode.duration && (
 								<Text span c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-									• {formatDuration(episode.duration)}
+									• {formatDuration(localEpisode.duration)}
 								</Text>
 							)}
 							{showDownloadStatus && (
@@ -146,12 +114,12 @@ function EpisodeRow({
 							)}
 						</Group>
 						<Text size="xs" c="dimmed" truncate>
-							{episode.pub_date && `${formatDate(episode.pub_date)} • `}
+							{localEpisode.pub_date && `${formatDate(localEpisode.pub_date)} • `}
 							{subscriptionName && subscriptionName}
 						</Text>
 					</div>
-					<EpisodeActionsModal 
-						episodeId={episodeId} 
+					<EpisodeActionsModal
+						episode={localEpisode}
 						subscriptionName={subscriptionName}
 						onEpisodeDeleted={handleEpisodeDeleted}
 					/>
@@ -160,7 +128,7 @@ function EpisodeRow({
 
 			{/* Episode Detail Modal */}
 			<EpisodeDetailModal
-				episode={episode}
+				episode={localEpisode}
 				subscriptionName={subscriptionName}
 				opened={detailModalOpened}
 				onClose={handleDetailModalClose}

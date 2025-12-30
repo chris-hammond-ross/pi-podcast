@@ -24,7 +24,7 @@ import {
 	RefreshCw
 } from 'lucide-react';
 import { useDownloadContext, useTheme } from '../contexts';
-import { EpisodeDetailModal, EpisodeRow } from '../components';
+import { EpisodeDetailModal, DownloadedItemRow } from '../components';
 import * as downloadsApi from '../services/downloads';
 import { getEpisode, getSubscriptionById, type EpisodeRecord } from '../services';
 import type { DownloadQueueItem } from '../services/websocket';
@@ -165,25 +165,6 @@ function Downloads() {
 		}
 	}, [navigate]);
 
-	const handleEpisodeClick = useCallback((item: DownloadQueueItem) => {
-		// Open modal directly, then navigate to update URL
-		setIsLoadingEpisode(true);
-		getEpisode(item.episode_id)
-			.then(response => {
-				setSelectedEpisode(response.episode);
-				setSubscriptionName(item.subscription_name || '');
-				setEpisodeModalOpened(true);
-				isNavigatingRef.current = true;
-				navigate(`/downloads/completed/${item.episode_id}`);
-			})
-			.catch(err => {
-				console.error('Failed to load episode:', err);
-			})
-			.finally(() => {
-				setIsLoadingEpisode(false);
-			});
-	}, [navigate]);
-
 	const handleEpisodeClose = useCallback(() => {
 		setEpisodeModalOpened(false);
 		setSelectedEpisode(null);
@@ -199,6 +180,12 @@ function Downloads() {
 				prev.filter(item => item.episode_id !== updatedEpisode.id)
 			);
 		}
+	}, []);
+
+	const handleEpisodeDeleted = useCallback((deletedEpisodeId: number) => {
+		setCompletedItems(prev =>
+			prev.filter(item => item.episode_id !== deletedEpisodeId)
+		);
 	}, []);
 
 	if (isLoading) {
@@ -537,10 +524,10 @@ function Downloads() {
 												<>
 													<Divider label="Recent" />
 													{recentCompletedItems.map((item) => (
-														<EpisodeRow
+														<DownloadedItemRow
 															key={item.id}
-															episodeId={item.episode_id}
-															subscriptionName={item.subscription_name}
+															item={item}
+															onEpisodeDeleted={handleEpisodeDeleted}
 														/>
 													))}
 												</>
@@ -554,10 +541,10 @@ function Downloads() {
 														mt={recentCompletedItems.length > 0 ? 'md' : undefined}
 													/>
 													{olderCompletedItems.map((item) => (
-														<EpisodeRow
+														<DownloadedItemRow
 															key={item.id}
-															episodeId={item.id}
-															subscriptionName={item.subscription_name}
+															item={item}
+															onEpisodeDeleted={handleEpisodeDeleted}
 														/>
 													))}
 												</>
