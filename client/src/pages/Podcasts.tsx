@@ -201,9 +201,8 @@ function Podcasts() {
 	// Episodes refresh key - increment to trigger VirtualScrollList refresh
 	const [episodesRefreshKey, setEpisodesRefreshKey] = useState(0);
 
-	// Scroll area viewport ref for VirtualScrollList
+	// Scroll area ref for VirtualScrollList
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
-	const scrollViewportRef = useRef<HTMLDivElement>(null);
 
 	// Save Playlist modal state
 	const [savePlaylistModalOpened, setSavePlaylistModalOpened] = useState(false);
@@ -232,16 +231,6 @@ function Podcasts() {
 
 	// Determine current tab from URL or default
 	const currentTab = tab && validTabs.includes(tab) ? tab : 'podcasts';
-
-	// Get viewport ref from ScrollArea when it mounts
-	useEffect(() => {
-		if (scrollAreaRef.current) {
-			const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-			if (viewport) {
-				scrollViewportRef.current = viewport as HTMLDivElement;
-			}
-		}
-	}, [currentTab]); // Re-run when tab changes since ScrollArea might re-mount
 
 	// Fetch function for VirtualScrollList
 	const fetchEpisodesPage = useCallback(async (offset: number, limit: number) => {
@@ -815,7 +804,6 @@ function Podcasts() {
 								loaderColor="blue"
 								loadThreshold={300}
 								refreshDeps={[episodesRefreshKey]}
-								scrollViewportRef={scrollViewportRef}
 								emptyContent={
 									<Card
 										style={{
