@@ -40,7 +40,7 @@ import { notifications } from '@mantine/notifications';
 import { AlertCircle, X, Save, GripHorizontal, Trash, Play, Pause } from 'lucide-react';
 import { useMediaPlayer, useTheme } from '../contexts';
 import { useSubscriptions } from '../hooks';
-import { PodcastResults, PodcastDetailModal, EpisodeRow } from '../components';
+import { PodcastResults, PodcastDetailModal, EpisodeRow, VirtualScrollList } from '../components';
 import { getSubscriptionById, getAllDownloadedEpisodes, createUserPlaylist, addEpisodeToPlaylist } from '../services';
 import { formatDuration } from '../utilities';
 import type { Subscription, DownloadedEpisodeRecord } from '../services';
@@ -190,11 +190,12 @@ function Podcasts() {
 	const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null);
 	const isMobile = useMediaQuery('(max-width: 768px)');
 
-	// Downloaded episodes state
-	const [downloadedEpisodes, setDownloadedEpisodes] = useState<DownloadedEpisodeRecord[]>([]);
-	const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
-	const [episodesError, setEpisodesError] = useState<string | null>(null);
-	const [episodesLoaded, setEpisodesLoaded] = useState(false);
+	// Episodes refresh key - increment to trigger VirtualScrollList refresh
+	const [episodesRefreshKey, setEpisodesRefreshKey] = useState(0);
+
+	// Scroll area viewport ref for VirtualScrollList
+	const scrollAreaRef = useRef<HTMLDivElement>(null);
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
 
 	// Save Playlist modal state
 	const [savePlaylistModalOpened, setSavePlaylistModalOpened] = useState(false);
@@ -224,30 +225,34 @@ function Podcasts() {
 	// Determine current tab from URL or default
 	const currentTab = tab && validTabs.includes(tab) ? tab : 'podcasts';
 
-	// Fetch downloaded episodes
-	const fetchDownloadedEpisodes = useCallback(async () => {
-		setIsLoadingEpisodes(true);
-		setEpisodesError(null);
-		try {
-			const response = await getAllDownloadedEpisodes({
-				orderBy: 'pub_date',
-				order: 'DESC'
-			});
-			setDownloadedEpisodes(response.episodes);
-			setEpisodesLoaded(true);
-		} catch (err) {
-			setEpisodesError(err instanceof Error ? err.message : 'Failed to load episodes');
-		} finally {
-			setIsLoadingEpisodes(false);
+	// Get viewport ref from ScrollArea when it mounts
+	useEffect(() => {
+		if (scrollAreaRef.current) {
+			const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+			if (viewport) {
+				scrollViewportRef.current = viewport as HTMLDivElement;
+			}
 		}
+	}, [currentTab]); // Re-run when tab changes since ScrollArea might re-mount
+
+	// Fetch function for VirtualScrollList
+	const fetchEpisodesPage = useCallback(async (offset: number, limit: number) => {
+		const response = await getAllDownloadedEpisodes({
+			orderBy: 'pub_date',
+			order: 'DESC',
+			limit,
+			offset
+		});
+		return {
+			items: response.episodes,
+			total: response.total
+		};
 	}, []);
 
-	// Load downloaded episodes on mount
-	useEffect(() => {
-		if (!episodesLoaded) {
-			fetchDownloadedEpisodes();
-		}
-	}, [episodesLoaded, fetchDownloadedEpisodes]);
+	// Handle episode deletion - trigger refresh of VirtualScrollList
+	const handleEpisodeDeleted = useCallback((_deletedEpisodeId: number) => {
+		setEpisodesRefreshKey(prev => prev + 1);
+	}, []);
 
 	// Handle URL changes for subscription/episode modal
 	useEffect(() => {
@@ -326,8 +331,8 @@ function Podcasts() {
 		isNavigatingRef.current = true;
 		navigate(`/podcasts/${currentTab}`);
 		// Refresh downloaded episodes when modal closes in case something changed
-		fetchDownloadedEpisodes();
-	}, [navigate, currentTab, fetchDownloadedEpisodes]);
+		setEpisodesRefreshKey(prev => prev + 1);
+	}, [navigate, currentTab]);
 
 	const handleSubscriptionUpdate = useCallback((updated: Subscription) => {
 		setSelectedSubscription(updated);
@@ -338,8 +343,8 @@ function Podcasts() {
 		// Refresh subscriptions list after unsubscribe
 		refresh();
 		// Refresh downloaded episodes too
-		fetchDownloadedEpisodes();
-	}, [refresh, fetchDownloadedEpisodes]);
+		setEpisodesRefreshKey(prev => prev + 1);
+	}, [refresh]);
 
 	const handleEpisodeOpen = useCallback((epId: number) => {
 		if (selectedSubscription) {
@@ -356,11 +361,6 @@ function Podcasts() {
 			navigate(`/podcasts/${currentTab}/${selectedSubscription.id}`);
 		}
 	}, [navigate, selectedSubscription, currentTab]);
-
-	// Handle episode deletion - remove from downloaded episodes list
-	const handleEpisodeDeleted = useCallback((deletedEpisodeId: number) => {
-		setDownloadedEpisodes(prev => prev.filter(ep => ep.id !== deletedEpisodeId));
-	}, []);
 
 	const openSavePlaylistModal = () => {
 		setPlaylistName('');
@@ -683,6 +683,7 @@ function Podcasts() {
 
 			{currentTab !== 'queue' && (
 				<ScrollArea
+					ref={scrollAreaRef}
 					style={{ flex: 1 }}
 					scrollbars="y"
 					scrollbarSize={4}
@@ -774,49 +775,53 @@ function Podcasts() {
 								flexDirection: 'column'
 							}}
 						>
-							{isLoadingEpisodes ? (
-								<Stack gap="sm">
-									{[...Array(6).keys()].map(i => (
-										<Card key={i} withBorder p="sm">
-											<Group justify="space-between" align="center" wrap="nowrap">
-												<div style={{ flex: 1, minWidth: 0 }}>
-													<Skeleton height={16} width="70%" mb={8} />
-													<Skeleton height={12} width="50%" />
-												</div>
-												<Skeleton height={28} width={28} circle />
-											</Group>
-										</Card>
-									))}
-								</Stack>
-							) : episodesError ? (
-								<Alert icon={<AlertCircle size={16} />} color="red" variant="light">
-									{episodesError}
-								</Alert>
-							) : downloadedEpisodes.length === 0 ? (
-								<Card
-									mb="-1rem"
-									style={{
-										flex: 1,
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center'
-									}}
-								>
-									<Text c="dimmed">No episodes have been downloaded</Text>
-								</Card>
-							) : (
-								<Stack gap="xs">
-									{downloadedEpisodes.map(episode => (
-										<EpisodeRow
-											key={episode.id}
-											episodeId={episode.id}
-											subscriptionName={episode.subscription_name}
-											showDownloadStatus={false}
-											onEpisodeDeleted={handleEpisodeDeleted}
-										/>
-									))}
-								</Stack>
-							)}
+							<VirtualScrollList<DownloadedEpisodeRecord>
+								fetchPage={fetchEpisodesPage}
+								pageSize={100}
+								maxItems={500}
+								getItemKey={(episode) => episode.id}
+								renderItem={(episode) => (
+									<EpisodeRow
+										episodeId={episode.id}
+										subscriptionName={episode.subscription_name}
+										showDownloadStatus={false}
+										onEpisodeDeleted={handleEpisodeDeleted}
+									/>
+								)}
+								gap="xs"
+								loaderColor="blue"
+								loadThreshold={300}
+								refreshDeps={[episodesRefreshKey]}
+								scrollViewportRef={scrollViewportRef}
+								emptyContent={
+									<Card
+										style={{
+											flex: 1,
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+											minHeight: '200px'
+										}}
+									>
+										<Text c="dimmed">No episodes have been downloaded</Text>
+									</Card>
+								}
+								loadingContent={
+									<Stack gap="sm">
+										{[...Array(6).keys()].map(i => (
+											<Card key={i} withBorder p="sm">
+												<Group justify="space-between" align="center" wrap="nowrap">
+													<div style={{ flex: 1, minWidth: 0 }}>
+														<Skeleton height={16} width="70%" mb={8} />
+														<Skeleton height={12} width="50%" />
+													</div>
+													<Skeleton height={28} width={28} circle />
+												</Group>
+											</Card>
+										))}
+									</Stack>
+								}
+							/>
 						</Tabs.Panel>
 					</Container>
 				</ScrollArea>

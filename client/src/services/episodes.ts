@@ -44,6 +44,7 @@ export interface DownloadedEpisodesResponse {
 	success: boolean;
 	episodes: DownloadedEpisodeRecord[];
 	count: number;
+	total: number;
 }
 
 export interface EpisodeCountsResponse {

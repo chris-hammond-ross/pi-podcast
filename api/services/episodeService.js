@@ -112,6 +112,18 @@ class EpisodeService {
 	}
 
 	/**
+	 * Get total count of all downloaded episodes across all subscriptions
+	 * @returns {number} Total count of downloaded episodes
+	 */
+	getTotalDownloadedCount() {
+		const db = getDatabase();
+		const result = db.prepare(
+			'SELECT COUNT(*) as count FROM episodes WHERE downloaded_at IS NOT NULL'
+		).get();
+		return result.count;
+	}
+
+	/**
 	 * Get all downloaded episodes across all subscriptions
 	 * @param {Object} options - Query options
 	 * @param {number} options.limit - Max episodes to return

@@ -21,11 +21,13 @@ router.get('/downloaded', (req, res) => {
 		if (order) options.order = order;
 
 		const episodes = episodeService.getAllDownloadedEpisodes(options);
+		const total = episodeService.getTotalDownloadedCount();
 
 		res.json({
 			success: true,
 			episodes,
-			count: episodes.length
+			count: episodes.length,
+			total
 		});
 	} catch (err) {
 		res.status(500).json({
