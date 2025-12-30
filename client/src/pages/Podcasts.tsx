@@ -41,13 +41,21 @@ import { AlertCircle, X, Save, GripHorizontal, Trash, Play, Pause } from 'lucide
 import { useMediaPlayer, useTheme } from '../contexts';
 import { useSubscriptions } from '../hooks';
 import { PodcastResults, PodcastDetailModal, EpisodeRow, VirtualScrollList } from '../components';
-import { getSubscriptionById, getAllDownloadedEpisodes, createUserPlaylist, addEpisodeToPlaylist } from '../services';
+import { getSubscriptionById, getAllDownloadedEpisodes, getMockDownloadedEpisodes, createUserPlaylist, addEpisodeToPlaylist } from '../services';
 import { formatDuration } from '../utilities';
 import type { Subscription, DownloadedEpisodeRecord } from '../services';
 
 const TRASH_DROP_ID = 'trash-drop-zone';
 
 const validTabs = ['podcasts', 'queue', 'episodes'];
+
+// ============================================================================
+// TESTING: Use mock data for testing infinite scroll
+// Configure via environment variables (see .env.demo)
+// ============================================================================
+const USE_MOCK_EPISODES = import.meta.env.VITE_USE_MOCK_EPISODES === 'true';
+const MOCK_TOTAL_EPISODES = parseInt(import.meta.env.VITE_MOCK_TOTAL_EPISODES) || 2000;
+const MOCK_DELAY_MS = parseInt(import.meta.env.VITE_MOCK_DELAY_MS) || 200;
 
 interface SortableQueueItemProps {
 	item: typeof queue[number];
@@ -237,6 +245,21 @@ function Podcasts() {
 
 	// Fetch function for VirtualScrollList
 	const fetchEpisodesPage = useCallback(async (offset: number, limit: number) => {
+		if (USE_MOCK_EPISODES) {
+			// Use mock endpoint for testing
+			const response = await getMockDownloadedEpisodes({
+				limit,
+				offset,
+				totalEpisodes: MOCK_TOTAL_EPISODES,
+				delay: MOCK_DELAY_MS
+			});
+			return {
+				items: response.episodes,
+				total: response.total
+			};
+		}
+
+		// Use real endpoint
 		const response = await getAllDownloadedEpisodes({
 			orderBy: 'pub_date',
 			order: 'DESC',

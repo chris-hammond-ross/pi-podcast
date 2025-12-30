@@ -77,6 +77,13 @@ export interface GetAllDownloadedOptions {
 	order?: 'ASC' | 'DESC';
 }
 
+export interface GetMockDownloadedOptions {
+	limit?: number;
+	offset?: number;
+	totalEpisodes?: number;
+	delay?: number;
+}
+
 /**
  * Get episodes for a subscription
  */
@@ -136,6 +143,37 @@ export async function getAllDownloadedEpisodes(
 	if (!response.ok) {
 		const error = await response.json();
 		throw new Error(error.error || 'Failed to get downloaded episodes');
+	}
+
+	return response.json();
+}
+
+/**
+ * Get mock downloaded episodes for testing pagination
+ * This endpoint generates fake episode data for testing infinite scroll
+ */
+export async function getMockDownloadedEpisodes(
+	options: GetMockDownloadedOptions = {}
+): Promise<DownloadedEpisodesResponse> {
+	const params = new URLSearchParams();
+	
+	if (options.limit) params.append('limit', String(options.limit));
+	if (options.offset) params.append('offset', String(options.offset));
+	if (options.totalEpisodes) params.append('totalEpisodes', String(options.totalEpisodes));
+	if (options.delay) params.append('delay', String(options.delay));
+
+	const query = params.toString();
+	const response = await fetch(
+		`${API_BASE_URL}/api/episodes/downloaded/mock${query ? `?${query}` : ''}`,
+		{
+			method: 'GET',
+			headers: { 'Content-Type': 'application/json' }
+		}
+	);
+
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to get mock episodes');
 	}
 
 	return response.json();

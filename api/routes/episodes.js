@@ -7,6 +7,92 @@ const playlistService = require('../services/playlistService');
 const { DOWNLOAD_DIR } = require('../config/constants');
 
 /**
+ * GET /api/episodes/downloaded/mock
+ * Generate mock downloaded episodes for testing pagination
+ * Query params:
+ *   - totalEpisodes: Total number of mock episodes to simulate (default: 2000)
+ *   - limit: Number of episodes per page
+ *   - offset: Starting offset
+ *   - delay: Artificial delay in ms to simulate network latency (default: 0)
+ */
+router.get('/downloaded/mock', async (req, res) => {
+	try {
+		const totalEpisodes = parseInt(req.query.totalEpisodes) || 2000;
+		const limit = parseInt(req.query.limit) || 100;
+		const offset = parseInt(req.query.offset) || 0;
+		const delay = parseInt(req.query.delay) || 0;
+
+		// Add artificial delay if specified
+		if (delay > 0) {
+			await new Promise(resolve => setTimeout(resolve, delay));
+		}
+
+		// Generate mock episodes for the requested page
+		const episodes = [];
+		const startIndex = offset;
+		const endIndex = Math.min(offset + limit, totalEpisodes);
+
+		const podcastNames = [
+			'The Daily Tech Show',
+			'History Uncovered',
+			'Science Weekly',
+			'Comedy Hour',
+			'True Crime Stories',
+			'Business Insights',
+			'Health & Wellness',
+			'Sports Talk Radio'
+		];
+
+		for (let i = startIndex; i < endIndex; i++) {
+			// Create a date going backwards from today (newer episodes have lower indices)
+			const pubDate = new Date();
+			pubDate.setDate(pubDate.getDate() - i);
+			
+			const podcastIndex = i % podcastNames.length;
+			const episodeNumber = totalEpisodes - i;
+
+			episodes.push({
+				id: 10000 + i, // Use high IDs to avoid conflicts with real data
+				subscription_id: podcastIndex + 1,
+				guid: `mock-episode-${i}`,
+				title: `Episode ${episodeNumber}: Mock Episode Title That Could Be Quite Long`,
+				description: `This is a mock episode description for testing purposes. Episode ${episodeNumber} of the series.`,
+				pub_date: pubDate.toISOString(),
+				pub_date_unix: Math.floor(pubDate.getTime() / 1000),
+				duration: String(Math.floor(Math.random() * 3600) + 600), // 10-70 minutes
+				audio_url: `https://example.com/mock-episode-${i}.mp3`,
+				audio_type: 'audio/mpeg',
+				audio_length: Math.floor(Math.random() * 50000000) + 10000000,
+				image_url: null,
+				file_path: `/mock/path/episode-${i}.mp3`,
+				file_size: Math.floor(Math.random() * 50000000) + 10000000,
+				downloaded_at: Math.floor(Date.now() / 1000) - (i * 3600),
+				created_at: Math.floor(pubDate.getTime() / 1000),
+				playback_position: 0,
+				playback_completed: 0,
+				last_played_at: null,
+				subscription_name: podcastNames[podcastIndex],
+				subscription_artwork: null
+			});
+		}
+
+		console.log(`[episodes] Mock endpoint: returning ${episodes.length} episodes (offset: ${offset}, total: ${totalEpisodes})`);
+
+		res.json({
+			success: true,
+			episodes,
+			count: episodes.length,
+			total: totalEpisodes
+		});
+	} catch (err) {
+		res.status(500).json({
+			success: false,
+			error: err.message
+		});
+	}
+});
+
+/**
  * GET /api/episodes/downloaded
  * Get all downloaded episodes across all subscriptions
  */
