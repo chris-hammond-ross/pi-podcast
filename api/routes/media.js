@@ -176,24 +176,11 @@ router.put('/volume', async (req, res) => {
 /**
  * GET /api/media/queue
  * Get current queue
- * NOTE: For large queues (>200 items), returns empty items array - use /queue/page instead
  */
 router.get('/queue', (req, res) => {
 	try {
-		const LARGE_QUEUE_THRESHOLD = 200;
 		const queue = mediaPlayerService.getQueue();
-		
-		// For large queues, return only metadata to prevent overwhelming the client
-		if (queue.length > LARGE_QUEUE_THRESHOLD) {
-			console.log(`[media-route] Large queue (${queue.length} items) - returning metadata only`);
-			res.json({
-				items: [], // Empty - use /queue/page endpoint for paginated access
-				currentIndex: queue.currentIndex,
-				length: queue.length
-			});
-		} else {
-			res.json(queue);
-		}
+		res.json(queue);
 	} catch (error) {
 		console.error('[media-route] Error getting queue:', error);
 		res.status(500).json({ error: error.message });
