@@ -167,27 +167,22 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 					break;
 
 				case 'media:queue-update':
-					// DISABLED: Full queue loading - only update metadata, not items
-					if (DISABLE_FULL_QUEUE_LOADING) {
-						// Only update position and length, not the full items array
-						if (message.currentIndex !== undefined) {
-							setQueuePosition(message.currentIndex);
-						}
-						if (message.length !== undefined) {
-							setQueueLength(message.length);
-						}
-						// Skip setting queue items to avoid memory issues
-						console.log('[MediaPlayer] Skipping full queue update (DISABLE_FULL_QUEUE_LOADING=true), length:', message.length);
-					} else {
-						if (message.items) {
-							setQueue(message.items);
-						}
-						if (message.currentIndex !== undefined) {
-							setQueuePosition(message.currentIndex);
-						}
-						if (message.length !== undefined) {
-							setQueueLength(message.length);
-						}
+					// Always update position and length
+					if (message.currentIndex !== undefined) {
+						setQueuePosition(message.currentIndex);
+					}
+					if (message.length !== undefined) {
+						setQueueLength(message.length);
+					}
+					
+					// Only update items if not disabled AND if items array has content
+					// (Server sends empty items array for large queues)
+					if (!DISABLE_FULL_QUEUE_LOADING && message.items && message.items.length > 0) {
+						setQueue(message.items);
+					} else if (DISABLE_FULL_QUEUE_LOADING) {
+						console.log('[MediaPlayer] Skipping queue items (DISABLE_FULL_QUEUE_LOADING=true), length:', message.length);
+					} else if (message.items && message.items.length === 0 && message.length && message.length > 0) {
+						console.log('[MediaPlayer] Large queue detected - server sent empty items, length:', message.length);
 					}
 					break;
 

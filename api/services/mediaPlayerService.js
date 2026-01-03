@@ -1394,12 +1394,28 @@ class MediaPlayerService extends EventEmitter {
 
 	/**
 	 * Broadcast current queue to all clients
+	 * NOTE: For large queues, only sends metadata to avoid overwhelming clients
 	 */
 	broadcastQueue() {
-		this.broadcast({
-			type: 'media:queue-update',
-			...this.getQueue()
-		});
+		// Threshold for "large queue" - above this, only send metadata
+		const LARGE_QUEUE_THRESHOLD = 200;
+		
+		if (this.queue.length > LARGE_QUEUE_THRESHOLD) {
+			// For large queues, only send metadata (no items array)
+			console.log(`[media] Broadcasting queue metadata only (${this.queue.length} items exceeds threshold of ${LARGE_QUEUE_THRESHOLD})`);
+			this.broadcast({
+				type: 'media:queue-update',
+				items: [], // Empty array - clients should use paginated API
+				currentIndex: this.queuePosition,
+				length: this.queue.length
+			});
+		} else {
+			// For small queues, send full data as before
+			this.broadcast({
+				type: 'media:queue-update',
+				...this.getQueue()
+			});
+		}
 	}
 
 	// ===== Playback Control Methods =====
