@@ -12,9 +12,9 @@ import { useSubscriptions } from '../hooks';
 import { PodcastDetailModal } from '../components';
 import { getSubscriptionById } from '../services';
 import type { Subscription } from '../services';
-import { Episodes, Podcasts as PodcastsTab, Queue } from './tabs';
+import { Episodes, Podcasts as PodcastsTab, Queue, TestTab } from './tabs';
 
-const validTabs = ['podcasts', 'queue', 'episodes'];
+const validTabs = ['podcasts', 'queue', 'episodes', 'test'];
 
 function Podcasts() {
 	const { subscriptions, isLoading, error, refresh } = useSubscriptions();
@@ -188,6 +188,9 @@ function Podcasts() {
 					<Tabs.Tab value="episodes">
 						Episodes
 					</Tabs.Tab>
+					<Tabs.Tab value="test">
+						Test
+					</Tabs.Tab>
 				</Tabs.List>
 				<div
 					style={{
@@ -253,6 +256,18 @@ function Podcasts() {
 								refreshKey={episodesRefreshKey}
 								onEpisodeDeleted={handleEpisodeDeleted}
 							/>
+						</Tabs.Panel>
+
+						<Tabs.Panel
+							value="test"
+							pb="md"
+							style={{
+								flex: 1,
+								display: 'flex',
+								flexDirection: 'column'
+							}}
+						>
+							<TestTab />
 						</Tabs.Panel>
 					</Container>
 				</ScrollArea>

@@ -1355,6 +1355,44 @@ class MediaPlayerService extends EventEmitter {
 	}
 
 	/**
+	 * Get a page/window of the queue for virtualized display
+	 * Only returns the essential data needed for rendering
+	 * @param {number} offset - Starting index in the queue
+	 * @param {number} limit - Maximum number of items to return
+	 * @returns {Object} Queue page information
+	 */
+	getQueuePage(offset, limit) {
+		const totalLength = this.queue.length;
+		
+		// Clamp offset to valid range
+		const clampedOffset = Math.max(0, Math.min(offset, Math.max(0, totalLength - 1)));
+		
+		// Calculate the actual slice
+		const endIndex = Math.min(clampedOffset + limit, totalLength);
+		const slicedItems = this.queue.slice(clampedOffset, endIndex);
+		
+		// Map to minimal data structure for transfer
+		const items = slicedItems.map((item, i) => {
+			const absoluteIndex = clampedOffset + i;
+			return {
+				index: absoluteIndex,
+				episodeId: item.episodeId,
+				title: item.episode.title,
+				duration: item.episode.duration ? parseInt(item.episode.duration, 10) : undefined,
+				isPlaying: absoluteIndex === this.queuePosition
+			};
+		});
+		
+		return {
+			items,
+			startIndex: slicedItems.length > 0 ? clampedOffset : 0,
+			endIndex: slicedItems.length > 0 ? endIndex - 1 : 0,
+			totalLength,
+			currentIndex: this.queuePosition
+		};
+	}
+
+	/**
 	 * Broadcast current queue to all clients
 	 */
 	broadcastQueue() {
