@@ -37,7 +37,7 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useTheme } from '../contexts';
-import { Pencil, Play, X, PencilLine, Trash, Save, GripHorizontal, Check } from 'lucide-react';
+import { Pencil, Play, X, PencilLine, Trash, Save, GripHorizontal, Check, Plus } from 'lucide-react';
 import { useAutoPlaylists, useUserPlaylists } from '../hooks';
 import type { AutoPlaylist, PlaylistEpisode } from '../services';
 import {
@@ -257,6 +257,94 @@ function Playlists() {
 			await playQueueIndex(0);
 		} catch (err) {
 			console.error('[Playlists] Failed to play user playlist:', err);
+		}
+	};
+
+	const handleAddUserPlaylist = async (playlistId: number) => {
+		try {
+			// Get all episodes in this user playlist (already in playlist order)
+			const response = await getPlaylistEpisodes(playlistId);
+
+			if (response.episodes.length === 0) {
+				console.warn('[Playlists] No episodes in playlist to add');
+				notifications.show({
+					color: 'yellow',
+					message: 'No episodes in playlist to add',
+					position: 'top-right',
+					autoClose: 2000
+				});
+				return;
+			}
+
+			const episodeIds = response.episodes.map(ep => ep.id);
+
+			// Add episodes to the queue without clearing or auto-playing
+			await addMultipleToQueue(episodeIds);
+
+			notifications.show({
+				color: 'teal',
+				message: (
+					<Text size="xs" c="dimmed">
+						Added <Text span c="var(--mantine-color-text)">{episodeIds.length}</Text> episode{episodeIds.length !== 1 ? 's' : ''} to queue
+					</Text>
+				),
+				position: 'top-right',
+				autoClose: 1500
+			});
+		} catch (err) {
+			console.error('[Playlists] Failed to add user playlist to queue:', err);
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to add playlist to queue',
+				position: 'top-right',
+				autoClose: 3000
+			});
+		}
+	};
+
+	const handleAddAutoPlaylist = async (subscriptionId: number) => {
+		try {
+			// Get all downloaded episodes for this subscription, sorted by pub_date DESC
+			const response = await getEpisodes(subscriptionId, {
+				downloaded: true,
+				orderBy: 'pub_date',
+				order: 'DESC'
+			});
+
+			if (response.episodes.length === 0) {
+				console.warn('[Playlists] No downloaded episodes to add');
+				notifications.show({
+					color: 'yellow',
+					message: 'No downloaded episodes to add',
+					position: 'top-right',
+					autoClose: 2000
+				});
+				return;
+			}
+
+			const episodeIds = response.episodes.map(ep => ep.id);
+
+			// Add episodes to the queue without clearing or auto-playing
+			await addMultipleToQueue(episodeIds);
+
+			notifications.show({
+				color: 'teal',
+				message: (
+					<Text size="xs" c="dimmed">
+						Added <Text span c="var(--mantine-color-text)">{episodeIds.length}</Text> episode{episodeIds.length !== 1 ? 's' : ''} to queue
+					</Text>
+				),
+				position: 'top-right',
+				autoClose: 1500
+			});
+		} catch (err) {
+			console.error('[Playlists] Failed to add auto playlist to queue:', err);
+			notifications.show({
+				color: 'red',
+				message: err instanceof Error ? err.message : 'Failed to add playlist to queue',
+				position: 'top-right',
+				autoClose: 3000
+			});
 		}
 	};
 
@@ -702,7 +790,7 @@ function Playlists() {
 															({playlist.episode_count})
 														</Text>
 													</Group>
-													<Group>
+													<Group gap="xs">
 														<ActionIcon
 															variant="light"
 															color="grape"
@@ -717,9 +805,18 @@ function Playlists() {
 															color="cyan"
 															onClick={() => handlePlayUserPlaylist(playlist.id)}
 															title="Play Playlist"
-															disabled={playlist.episode_count === 0}
+															disabled={(playlist.episode_count === 0 || playlist.episode_count > 500)}
 														>
 															<Play size={16} />
+														</ActionIcon>
+														<ActionIcon
+															variant="light"
+															color="teal"
+															onClick={() => handleAddUserPlaylist(playlist.id)}
+															title="Add to Queue"
+															disabled={playlist.episode_count === 0}
+														>
+															<Plus size={16} />
 														</ActionIcon>
 													</Group>
 
@@ -786,15 +883,26 @@ function Playlists() {
 													({playlist.episode_count})
 												</Text>
 											</Group>
-											<ActionIcon
-												variant="light"
-												color="cyan"
-												onClick={() => handlePlayAutoPlaylist(playlist.subscription_id)}
-												title="Play Playlist"
-												disabled={playlist.episode_count === 0}
-											>
-												<Play size={16} />
-											</ActionIcon>
+											<Group gap="xs">
+												<ActionIcon
+													variant="light"
+													color="cyan"
+													onClick={() => handlePlayAutoPlaylist(playlist.subscription_id)}
+													title="Play Playlist"
+													disabled={(playlist.episode_count === 0 || playlist.episode_count > 500)}
+												>
+													<Play size={16} />
+												</ActionIcon>
+												<ActionIcon
+													variant="light"
+													color="teal"
+													onClick={() => handleAddAutoPlaylist(playlist.subscription_id)}
+													title="Add to Queue"
+													disabled={playlist.episode_count === 0}
+												>
+													<Plus size={16} />
+												</ActionIcon>
+											</Group>
 										</Group>
 									</Card>
 								))}
