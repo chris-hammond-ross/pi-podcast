@@ -756,12 +756,13 @@ class MediaPlayerService extends EventEmitter {
 	}
 
 	/**
-	 * Add an episode to the end of the queue
+	 * Add an episode to the end of the queue (internal method, no broadcast)
 	 * @param {number} episodeId - Episode ID to add
 	 * @param {boolean} autoPlay - Whether to auto-start playback if queue was empty (default: false)
+	 * @param {boolean} skipBroadcast - Whether to skip broadcasting queue update (default: false)
 	 * @returns {Promise<Object>} Result with queue info
 	 */
-	async addToQueue(episodeId, autoPlay = false) {
+	async addToQueue(episodeId, autoPlay = false, skipBroadcast = false) {
 		const episode = this.validateEpisodeForQueue(episodeId);
 
 		// Check if already in queue
@@ -789,7 +790,10 @@ class MediaPlayerService extends EventEmitter {
 			this.queuePosition = 0;
 		}
 
-		this.broadcastQueue();
+		// Only broadcast if not skipped (for batch operations)
+		if (!skipBroadcast) {
+			this.broadcastQueue();
+		}
 
 		return {
 			success: true,
@@ -799,30 +803,104 @@ class MediaPlayerService extends EventEmitter {
 	}
 
 	/**
-	 * Add multiple episodes to the queue
+	 * Add multiple episodes to the queue efficiently
+	 * Batches MPV commands and only broadcasts once at the end
 	 * @param {number[]} episodeIds - Array of episode IDs to add
 	 * @param {boolean} autoPlay - Whether to auto-start playback if queue was empty (default: false)
 	 * @returns {Promise<Object>} Result with queue info
 	 */
 	async addMultipleToQueue(episodeIds, autoPlay = false) {
-		const added = [];
-		const errors = [];
+		const releaseLock = await this.acquireLock('addMultipleToQueue');
 
-		for (const episodeId of episodeIds) {
-			try {
-				await this.addToQueue(episodeId, autoPlay);
-				added.push(episodeId);
-			} catch (err) {
-				errors.push({ episodeId, error: err.message });
+		try {
+			const added = [];
+			const errors = [];
+			const wasEmpty = this.queue.length === 0 && !this.isPlaying;
+
+			console.log(`[media] Adding ${episodeIds.length} episodes to queue (batch operation)`);
+
+			// Validate all episodes first and collect valid ones
+			const validEpisodes = [];
+			const existingIds = new Set(this.queue.map(item => item.episodeId));
+
+			for (const episodeId of episodeIds) {
+				try {
+					// Skip if already in queue
+					if (existingIds.has(episodeId)) {
+						errors.push({ episodeId, error: 'Episode already in queue' });
+						continue;
+					}
+
+					const episode = this.validateEpisodeForQueue(episodeId);
+					validEpisodes.push(episode);
+					existingIds.add(episodeId); // Track to avoid duplicates within the batch
+				} catch (err) {
+					errors.push({ episodeId, error: err.message });
+				}
 			}
-		}
 
-		return {
-			success: true,
-			added: added.length,
-			errors: errors.length > 0 ? errors : undefined,
-			queueLength: this.queue.length
-		};
+			if (validEpisodes.length === 0) {
+				return {
+					success: true,
+					added: 0,
+					errors: errors.length > 0 ? errors : undefined,
+					queueLength: this.queue.length
+				};
+			}
+
+			// Batch add to internal queue
+			for (const episode of validEpisodes) {
+				this.queue.push({
+					episodeId: episode.id,
+					episode: episode,
+					filePath: episode.file_path
+				});
+			}
+
+			// Batch add to MPV playlist
+			// Process in chunks to avoid overwhelming MPV
+			const BATCH_SIZE = 100;
+			for (let i = 0; i < validEpisodes.length; i += BATCH_SIZE) {
+				const chunk = validEpisodes.slice(i, i + BATCH_SIZE);
+
+				for (let j = 0; j < chunk.length; j++) {
+					const episode = chunk[j];
+					const isFirst = i === 0 && j === 0;
+					const mode = (autoPlay && wasEmpty && isFirst) ? 'append-play' : 'append';
+
+					try {
+						await this.sendCommand(['loadfile', episode.file_path, mode]);
+						added.push(episode.id);
+					} catch (err) {
+						console.error(`[media] Failed to add episode ${episode.id} to MPV:`, err.message);
+						errors.push({ episodeId: episode.id, error: err.message });
+					}
+				}
+
+				// Small delay between chunks to prevent overwhelming the system
+				if (i + BATCH_SIZE < validEpisodes.length) {
+					await new Promise(resolve => setTimeout(resolve, 10));
+				}
+			}
+
+			if (autoPlay && wasEmpty && added.length > 0) {
+				this.queuePosition = 0;
+			}
+
+			console.log(`[media] Batch add complete: ${added.length} added, ${errors.length} errors`);
+
+			// Single broadcast at the end
+			this.broadcastQueue();
+
+			return {
+				success: true,
+				added: added.length,
+				errors: errors.length > 0 ? errors : undefined,
+				queueLength: this.queue.length
+			};
+		} finally {
+			releaseLock();
+		}
 	}
 
 	/**
