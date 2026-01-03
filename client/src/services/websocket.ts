@@ -265,6 +265,7 @@ export class WebSocketService {
 	private reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
 	private heartbeatTimeoutId: ReturnType<typeof setTimeout> | null = null;
 	private isIntentionallyClosed: boolean = false;
+	private connectPromise: Promise<void> | null = null;
 
 	constructor(config: WebSocketServiceConfig = {}) {
 		// Use environment variable if set, otherwise derive from current page location
@@ -297,7 +298,13 @@ export class WebSocketService {
 			return Promise.resolve();
 		}
 
-		return new Promise((resolve, reject) => {
+		// If already connecting, return the existing promise to prevent duplicate connections
+		if (this.connectPromise) {
+			console.log('[WebSocketService] Connection in progress, waiting...');
+			return this.connectPromise;
+		}
+
+		this.connectPromise = new Promise((resolve, reject) => {
 			try {
 				console.log('[WebSocketService] Connecting to', this.url);
 				this.ws = new WebSocket(this.url);
@@ -306,6 +313,7 @@ export class WebSocketService {
 				this.ws.onopen = () => {
 					console.log('[WebSocketService] Connected');
 					this.reconnectAttempts = 0;
+					this.connectPromise = null;
 					this.startHeartbeat();
 					resolve();
 				};
@@ -316,11 +324,13 @@ export class WebSocketService {
 
 				this.ws.onerror = (event) => {
 					console.error('[WebSocketService] Error:', event);
+					this.connectPromise = null;
 					reject(new Error('WebSocket connection error'));
 				};
 
 				this.ws.onclose = () => {
 					console.log('[WebSocketService] Closed');
+					this.connectPromise = null;
 					this.stopHeartbeat();
 
 					if (!this.isIntentionallyClosed) {
@@ -329,9 +339,12 @@ export class WebSocketService {
 				};
 			} catch (error) {
 				console.error('[WebSocketService] Connection failed:', error);
+				this.connectPromise = null;
 				reject(error);
 			}
 		});
+
+		return this.connectPromise;
 	}
 
 	/**
@@ -340,6 +353,7 @@ export class WebSocketService {
 	public disconnect(): void {
 		console.log('[WebSocketService] Disconnecting');
 		this.isIntentionallyClosed = true;
+		this.connectPromise = null;
 		this.stopHeartbeat();
 
 		if (this.reconnectTimeoutId) {
@@ -358,6 +372,13 @@ export class WebSocketService {
 	 */
 	public isConnected(): boolean {
 		return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+	}
+
+	/**
+	 * Check if currently connecting
+	 */
+	public isConnecting(): boolean {
+		return this.connectPromise !== null;
 	}
 
 	/**
@@ -394,8 +415,8 @@ export class WebSocketService {
 	private handleMessage(data: string): void {
 		try {
 			const message: ServerMessage = JSON.parse(data);
-			// Only log non-stats messages to avoid console spam
-			if (message.type !== 'system:stats') {
+			// Only log non-frequent messages to avoid console spam
+			if (message.type !== 'system:stats' && message.type !== 'media:time-update') {
 				console.log('[WebSocketService] Message received:', message.type);
 			}
 
