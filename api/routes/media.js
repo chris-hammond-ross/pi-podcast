@@ -188,25 +188,6 @@ router.get('/queue', (req, res) => {
 });
 
 /**
- * GET /api/media/queue/page
- * Get a page/window of the queue for virtualized display
- * Query params: offset (default 0), limit (default 100, max 500)
- * Returns only the essential data needed for display
- */
-router.get('/queue/page', (req, res) => {
-	try {
-		const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
-		const limit = Math.min(500, Math.max(1, parseInt(req.query.limit, 10) || 100));
-
-		const page = mediaPlayerService.getQueuePage(offset, limit);
-		res.json(page);
-	} catch (error) {
-		console.error('[media-route] Error getting queue page:', error);
-		res.status(500).json({ error: error.message });
-	}
-});
-
-/**
  * POST /api/media/queue
  * Add episode(s) to queue
  * Body: { episodeId: number } or { episodeIds: number[] }

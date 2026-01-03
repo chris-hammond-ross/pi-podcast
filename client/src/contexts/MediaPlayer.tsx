@@ -2,21 +2,12 @@
  * Media Player Context
  * Provides media playback state, queue management, and controls to the entire app
  * with real-time WebSocket updates
- * 
- * NOTE: Full queue loading is DISABLED for testing the paginated TestTab component.
- * The queue array will always be empty - use the TestTab for queue display instead.
  */
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { getWebSocketService, type ServerMessage, type MediaCurrentEpisode, type MediaQueueItem } from '../services/websocket';
 import * as mediaApi from '../services/mediaPlayer';
 import type { SortField, SortOrder } from '../services/mediaPlayer';
-
-// =============================================================================
-// TESTING FLAG - Set to false to re-enable full queue loading
-// =============================================================================
-const DISABLE_FULL_QUEUE_LOADING = true;
-// =============================================================================
 
 export interface MediaPlayerContextValue {
 	// Playback State
@@ -82,7 +73,7 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 	const [mpvConnected, setMpvConnected] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	// Queue state - NOTE: queue array is disabled when DISABLE_FULL_QUEUE_LOADING is true
+	// Queue state
 	const [queue, setQueue] = useState<MediaQueueItem[]>([]);
 	const [queuePosition, setQueuePosition] = useState(-1);
 	const [queueLength, setQueueLength] = useState(0);
@@ -167,27 +158,14 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 					break;
 
 				case 'media:queue-update':
-					// DISABLED: Full queue loading - only update metadata, not items
-					if (DISABLE_FULL_QUEUE_LOADING) {
-						// Only update position and length, not the full items array
-						if (message.currentIndex !== undefined) {
-							setQueuePosition(message.currentIndex);
-						}
-						if (message.length !== undefined) {
-							setQueueLength(message.length);
-						}
-						// Skip setting queue items to avoid memory issues
-						console.log('[MediaPlayer] Skipping full queue update (DISABLE_FULL_QUEUE_LOADING=true), length:', message.length);
-					} else {
-						if (message.items) {
-							setQueue(message.items);
-						}
-						if (message.currentIndex !== undefined) {
-							setQueuePosition(message.currentIndex);
-						}
-						if (message.length !== undefined) {
-							setQueueLength(message.length);
-						}
+					if (message.items) {
+						setQueue(message.items);
+					}
+					if (message.currentIndex !== undefined) {
+						setQueuePosition(message.currentIndex);
+					}
+					if (message.length !== undefined) {
+						setQueueLength(message.length);
 					}
 					break;
 
@@ -243,17 +221,12 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 								setIsLoading(false);
 							}
 
-							// DISABLED: Full queue loading on init
-							if (!DISABLE_FULL_QUEUE_LOADING) {
-								// Also fetch queue
-								const queueInfo = await mediaApi.getQueue();
-								if (mounted) {
-									setQueue(queueInfo.items);
-									setQueuePosition(queueInfo.currentIndex);
-									setQueueLength(queueInfo.length);
-								}
-							} else {
-								console.log('[MediaPlayer] Skipping initial queue fetch (DISABLE_FULL_QUEUE_LOADING=true)');
+							// Also fetch queue
+							const queueInfo = await mediaApi.getQueue();
+							if (mounted) {
+								setQueue(queueInfo.items);
+								setQueuePosition(queueInfo.currentIndex);
+								setQueueLength(queueInfo.length);
 							}
 						} catch {
 							if (mounted) {
@@ -300,21 +273,7 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 	}, []);
 
 	// Helper to refresh queue from API
-	// DISABLED: When DISABLE_FULL_QUEUE_LOADING is true, this only refreshes metadata
 	const refreshQueue = useCallback(async () => {
-		if (DISABLE_FULL_QUEUE_LOADING) {
-			// Only refresh status to get queue position/length
-			try {
-				const status = await mediaApi.getMediaStatus();
-				setQueuePosition(status.queuePosition);
-				setQueueLength(status.queueLength);
-				console.log('[MediaPlayer] refreshQueue: Only refreshing metadata (DISABLE_FULL_QUEUE_LOADING=true)');
-			} catch (err) {
-				setError(err instanceof Error ? err.message : 'Failed to refresh queue metadata');
-			}
-			return;
-		}
-
 		try {
 			const queueInfo = await mediaApi.getQueue();
 			setQueue(queueInfo.items);
@@ -453,15 +412,13 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 	const removeFromQueue = useCallback(async (index: number) => {
 		setError(null);
 
-		// Store previous state for rollback (only if queue is populated)
+		// Store previous state for rollback
 		const previousQueue = queue;
 		const previousLength = queueLength;
 		const previousPosition = queuePosition;
 
-		// Optimistically update state immediately (skip if queue disabled)
-		if (!DISABLE_FULL_QUEUE_LOADING) {
-			setQueue(prev => prev.filter((_, i) => i !== index));
-		}
+		// Optimistically update state immediately
+		setQueue(prev => prev.filter((_, i) => i !== index));
 		setQueueLength(prev => prev - 1);
 
 		// Adjust queue position if needed
@@ -475,9 +432,7 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 			await mediaApi.removeFromQueue(index);
 		} catch (err) {
 			// Rollback on error
-			if (!DISABLE_FULL_QUEUE_LOADING) {
-				setQueue(previousQueue);
-			}
+			setQueue(previousQueue);
 			setQueueLength(previousLength);
 			setQueuePosition(previousPosition);
 
@@ -520,23 +475,19 @@ export function MediaPlayerProvider({ children }: { children: ReactNode }) {
 		// Store previous state for rollback
 		const previousQueue = queue;
 
-		// Optimistically update state immediately (skip if queue disabled)
-		if (!DISABLE_FULL_QUEUE_LOADING) {
-			setQueue(prev => {
-				const newQueue = [...prev];
-				const [removed] = newQueue.splice(from, 1);
-				newQueue.splice(to, 0, removed);
-				return newQueue;
-			});
-		}
+		// Optimistically update state immediately
+		setQueue(prev => {
+			const newQueue = [...prev];
+			const [removed] = newQueue.splice(from, 1);
+			newQueue.splice(to, 0, removed);
+			return newQueue;
+		});
 
 		try {
 			await mediaApi.moveInQueue(from, to);
 		} catch (err) {
 			// Rollback on error
-			if (!DISABLE_FULL_QUEUE_LOADING) {
-				setQueue(previousQueue);
-			}
+			setQueue(previousQueue);
 
 			const message = err instanceof Error ? err.message : 'Failed to reorder queue';
 			setError(message);
