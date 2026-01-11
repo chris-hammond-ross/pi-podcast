@@ -75,6 +75,8 @@ export interface GetAllDownloadedOptions {
 	offset?: number;
 	orderBy?: string;
 	order?: 'ASC' | 'DESC';
+	filter?: string;
+	subscriptionId?: number;
 }
 
 export interface GetMockDownloadedOptions {
@@ -82,6 +84,8 @@ export interface GetMockDownloadedOptions {
 	offset?: number;
 	totalEpisodes?: number;
 	delay?: number;
+	filter?: string;
+	subscriptionId?: number;
 }
 
 /**
@@ -130,6 +134,8 @@ export async function getAllDownloadedEpisodes(
 	if (options.offset) params.append('offset', String(options.offset));
 	if (options.orderBy) params.append('orderBy', options.orderBy);
 	if (options.order) params.append('order', options.order);
+	if (options.filter) params.append('filter', options.filter);
+	if (options.subscriptionId) params.append('subscriptionId', String(options.subscriptionId));
 
 	const query = params.toString();
 	const response = await fetch(
@@ -161,6 +167,8 @@ export async function getMockDownloadedEpisodes(
 	if (options.offset) params.append('offset', String(options.offset));
 	if (options.totalEpisodes) params.append('totalEpisodes', String(options.totalEpisodes));
 	if (options.delay) params.append('delay', String(options.delay));
+	if (options.filter) params.append('filter', options.filter);
+	if (options.subscriptionId) params.append('subscriptionId', String(options.subscriptionId));
 
 	const query = params.toString();
 	const response = await fetch(

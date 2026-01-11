@@ -14,6 +14,8 @@ const { DOWNLOAD_DIR } = require('../config/constants');
  *   - limit: Number of episodes per page
  *   - offset: Starting offset
  *   - delay: Artificial delay in ms to simulate network latency (default: 0)
+ *   - filter: Filter keyword to search in title/description
+ *   - subscriptionId: Filter by subscription ID
  */
 router.get('/downloaded/mock', async (req, res) => {
 	try {
@@ -21,6 +23,8 @@ router.get('/downloaded/mock', async (req, res) => {
 		const limit = parseInt(req.query.limit) || 100;
 		const offset = parseInt(req.query.offset) || 0;
 		const delay = parseInt(req.query.delay) || 0;
+		const filter = req.query.filter || null;
+		const subscriptionId = req.query.subscriptionId ? parseInt(req.query.subscriptionId) : null;
 
 		// Add artificial delay if specified
 		if (delay > 0) {
@@ -28,10 +32,8 @@ router.get('/downloaded/mock', async (req, res) => {
 		}
 
 		// Generate mock episodes for the requested page
-		const episodes = [];
-		const startIndex = offset;
-		const endIndex = Math.min(offset + limit, totalEpisodes);
-
+		const allEpisodes = [];
+		
 		const podcastNames = [
 			'The Daily Tech Show',
 			'History Uncovered',
@@ -43,7 +45,8 @@ router.get('/downloaded/mock', async (req, res) => {
 			'Sports Talk Radio'
 		];
 
-		for (let i = startIndex; i < endIndex; i++) {
+		// Generate all episodes first (for filtering)
+		for (let i = 0; i < totalEpisodes; i++) {
 			// Create a date going backwards from today (newer episodes have lower indices)
 			const pubDate = new Date();
 			pubDate.setDate(pubDate.getDate() - i);
@@ -51,7 +54,7 @@ router.get('/downloaded/mock', async (req, res) => {
 			const podcastIndex = i % podcastNames.length;
 			const episodeNumber = totalEpisodes - i;
 
-			episodes.push({
+			allEpisodes.push({
 				id: 10000 + i, // Use high IDs to avoid conflicts with real data
 				subscription_id: podcastIndex + 1,
 				guid: `mock-episode-${i}`,
@@ -76,13 +79,32 @@ router.get('/downloaded/mock', async (req, res) => {
 			});
 		}
 
-		console.log(`[episodes] Mock endpoint: returning ${episodes.length} episodes (offset: ${offset}, total: ${totalEpisodes})`);
+		// Apply subscription filter if provided
+		let filteredEpisodes = allEpisodes;
+		if (subscriptionId) {
+			filteredEpisodes = filteredEpisodes.filter(ep => ep.subscription_id === subscriptionId);
+		}
+
+		// Apply text filter if provided
+		if (filter && filter.trim()) {
+			const searchTerm = filter.trim().toLowerCase();
+			filteredEpisodes = filteredEpisodes.filter(ep => 
+				ep.title.toLowerCase().includes(searchTerm) || 
+				ep.description.toLowerCase().includes(searchTerm)
+			);
+		}
+
+		// Apply pagination to filtered results
+		const total = filteredEpisodes.length;
+		const episodes = filteredEpisodes.slice(offset, offset + limit);
+
+		console.log(`[episodes] Mock endpoint: returning ${episodes.length} episodes (offset: ${offset}, total: ${total}, filter: ${filter || 'none'}, subscriptionId: ${subscriptionId || 'none'})`);
 
 		res.json({
 			success: true,
 			episodes,
 			count: episodes.length,
-			total: totalEpisodes
+			total
 		});
 	} catch (err) {
 		res.status(500).json({
@@ -95,19 +117,28 @@ router.get('/downloaded/mock', async (req, res) => {
 /**
  * GET /api/episodes/downloaded
  * Get all downloaded episodes across all subscriptions
+ * Query params:
+ *   - limit: Max episodes to return
+ *   - offset: Offset for pagination
+ *   - orderBy: Column to order by (default: pub_date)
+ *   - order: ASC or DESC (default: DESC)
+ *   - filter: Filter keyword to search in title/description
+ *   - subscriptionId: Filter by subscription ID
  */
 router.get('/downloaded', (req, res) => {
 	try {
-		const { limit, offset, orderBy, order } = req.query;
+		const { limit, offset, orderBy, order, filter, subscriptionId } = req.query;
 
 		const options = {};
 		if (limit) options.limit = parseInt(limit);
 		if (offset) options.offset = parseInt(offset);
 		if (orderBy) options.orderBy = orderBy;
 		if (order) options.order = order;
+		if (filter) options.filter = filter;
+		if (subscriptionId) options.subscriptionId = parseInt(subscriptionId);
 
 		const episodes = episodeService.getAllDownloadedEpisodes(options);
-		const total = episodeService.getTotalDownloadedCount();
+		const total = episodeService.getTotalDownloadedCount(options);
 
 		res.json({
 			success: true,

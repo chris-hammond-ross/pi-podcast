@@ -113,13 +113,31 @@ class EpisodeService {
 
 	/**
 	 * Get total count of all downloaded episodes across all subscriptions
+	 * @param {Object} options - Query options
+	 * @param {string} options.filter - Filter keyword to search in title/description
+	 * @param {number} options.subscriptionId - Filter by subscription ID
 	 * @returns {number} Total count of downloaded episodes
 	 */
-	getTotalDownloadedCount() {
+	getTotalDownloadedCount(options = {}) {
 		const db = getDatabase();
-		const result = db.prepare(
-			'SELECT COUNT(*) as count FROM episodes WHERE downloaded_at IS NOT NULL'
-		).get();
+		const { filter = null, subscriptionId = null } = options;
+
+		let sql = 'SELECT COUNT(*) as count FROM episodes WHERE downloaded_at IS NOT NULL';
+		const params = [];
+
+		if (subscriptionId) {
+			sql += ' AND subscription_id = ?';
+			params.push(subscriptionId);
+		}
+
+		if (filter && filter.trim()) {
+			const searchTerm = `%${filter.trim()}%`;
+			sql += ' AND (title LIKE ? OR description LIKE ?)';
+			params.push(searchTerm, searchTerm);
+		}
+
+		const stmt = db.prepare(sql);
+		const result = params.length > 0 ? stmt.get(...params) : stmt.get();
 		return result.count;
 	}
 
@@ -130,6 +148,8 @@ class EpisodeService {
 	 * @param {number} options.offset - Offset for pagination
 	 * @param {string} options.orderBy - Column to order by (default: pub_date)
 	 * @param {string} options.order - ASC or DESC (default: DESC)
+	 * @param {string} options.filter - Filter keyword to search in title/description
+	 * @param {number} options.subscriptionId - Filter by subscription ID
 	 * @returns {Array} List of downloaded episodes with subscription info
 	 */
 	getAllDownloadedEpisodes(options = {}) {
@@ -138,7 +158,9 @@ class EpisodeService {
 			limit = null,
 			offset = 0,
 			orderBy = 'pub_date',
-			order = 'DESC'
+			order = 'DESC',
+			filter = null,
+			subscriptionId = null
 		} = options;
 
 		// Validate orderBy to prevent SQL injection
@@ -157,9 +179,23 @@ class EpisodeService {
 			FROM episodes e
 			JOIN subscriptions s ON e.subscription_id = s.id
 			WHERE e.downloaded_at IS NOT NULL
-			ORDER BY e.${safeOrderBy} ${safeOrder}
 		`;
 		const params = [];
+
+		// Add subscription filter if provided
+		if (subscriptionId) {
+			sql += ' AND e.subscription_id = ?';
+			params.push(subscriptionId);
+		}
+
+		// Add text filter condition if provided
+		if (filter && filter.trim()) {
+			const searchTerm = `%${filter.trim()}%`;
+			sql += ' AND (e.title LIKE ? OR e.description LIKE ?)';
+			params.push(searchTerm, searchTerm);
+		}
+
+		sql += ` ORDER BY e.${safeOrderBy} ${safeOrder}`;
 
 		if (limit) {
 			sql += ' LIMIT ? OFFSET ?';

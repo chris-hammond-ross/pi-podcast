@@ -4,7 +4,7 @@ import {
 	Container,
 	Alert,
 	ScrollArea,
-	Tabs,
+	Tabs
 } from '@mantine/core';
 import { AlertCircle } from 'lucide-react';
 import { useTheme } from '../contexts';
@@ -203,10 +203,18 @@ function Podcasts() {
 					&nbsp;
 				</div>
 
+				{/* Queue and Episodes tabs manage their own scroll */}
 				{currentTab === 'queue' && <Queue />}
+				{currentTab === 'episodes' && (
+					<Episodes
+						refreshKey={episodesRefreshKey}
+						onEpisodeDeleted={handleEpisodeDeleted}
+					/>
+				)}
 			</Container>
 
-			{currentTab !== 'queue' && (
+			{/* Only Podcasts tab uses the shared ScrollArea */}
+			{currentTab === 'podcasts' && (
 				<ScrollArea
 					ref={scrollAreaRef}
 					style={{ flex: 1 }}
@@ -237,21 +245,6 @@ function Podcasts() {
 								isLoadingSubscription={isLoadingSubscription}
 								selectedSubscription={selectedSubscription}
 								onPodcastClick={handlePodcastClick}
-							/>
-						</Tabs.Panel>
-
-						<Tabs.Panel
-							value="episodes"
-							pb="md"
-							style={{
-								flex: 1,
-								display: 'flex',
-								flexDirection: 'column'
-							}}
-						>
-							<Episodes
-								refreshKey={episodesRefreshKey}
-								onEpisodeDeleted={handleEpisodeDeleted}
 							/>
 						</Tabs.Panel>
 					</Container>
