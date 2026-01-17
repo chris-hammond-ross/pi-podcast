@@ -68,29 +68,32 @@ function SortableQueueItem({ item, isCurrentEpisode, queueIndex, onPlayEpisode }
 		transition,
 		opacity: isDragging ? 0.5 : 1,
 		cursor: 'default',
+		display: 'flex',
+		justifyContent: 'center'
 	};
 
 	return (
 		<Card
 			ref={setNodeRef}
 			style={style}
-			p="sm"
+			px="sm"
+			mah={52}
 			bg={isCurrentEpisode ? "var(--mantine-color-teal-light)" : undefined}
 		>
 			<Group justify="space-between" align="center" wrap="nowrap">
 				<div style={{ flex: 1, minWidth: 0 }}>
-					<Group gap={4} wrap="nowrap">
+					<Group gap={4} wrap="nowrap" justify="space-between">
 						<Text
 							size="sm"
 							c={isCurrentEpisode ? "var(--mantine-color-teal-light-color)" : undefined}
-							truncate
+							lineClamp={2}
 							style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
 						>
 							{item.title}
 						</Text>
 						{item.duration && (
 							<Text c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-								• {formatDuration(item.duration)}
+								{formatDuration(item.duration)}
 							</Text>
 						)}
 					</Group>
@@ -431,25 +434,26 @@ function Queue() {
 				<DragOverlay>
 					{activeDragItem ? (
 						<Card
-							p="sm"
+							px="sm"
+							mah={52}
 							shadow="lg"
-							style={{ cursor: 'grabbing' }}
+							style={{ cursor: 'grabbing', display: 'flex', justifyContent: 'center' }}
 							bg={currentEpisode?.id === activeDragItem.episodeId ? "var(--mantine-color-teal-light)" : undefined}
 						>
 							<Group justify="space-between" align="center" wrap="nowrap">
 								<div style={{ flex: 1, minWidth: 0 }}>
-									<Group gap={4} wrap="nowrap">
+									<Group gap={4} wrap="nowrap" justify="space-between">
 										<Text
 											size="sm"
 											c={currentEpisode?.id === activeDragItem.episodeId ? "var(--mantine-color-teal-light-color)" : undefined}
-											truncate
+											lineClamp={2}
 											style={{ flexShrink: 1, minWidth: 0, maxWidth: 'fit-content' }}
 										>
 											{activeDragItem.title}
 										</Text>
 										{activeDragItem.duration && (
 											<Text c="dimmed" size="xs" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-												• {formatDuration(activeDragItem.duration)}
+												{formatDuration(activeDragItem.duration)}
 											</Text>
 										)}
 									</Group>
