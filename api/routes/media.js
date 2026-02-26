@@ -171,6 +171,27 @@ router.put('/volume', async (req, res) => {
 	}
 });
 
+/**
+ * PUT /api/media/volume/adjust
+ * Adjust volume relative to current level
+ * Body: { step: number } (e.g. 5 for +5%, -5 for -5%)
+ */
+router.put('/volume/adjust', async (req, res) => {
+	try {
+		const { step } = req.body;
+
+		if (typeof step !== 'number') {
+			return res.status(400).json({ error: 'Step must be a number' });
+		}
+
+		const volume = await mediaPlayerService.adjustVolume(step);
+		res.json({ success: true, volume });
+	} catch (error) {
+		console.error('[media-route] Error adjusting volume:', error);
+		res.status(500).json({ error: error.message });
+	}
+});
+
 // ===== Queue Management Routes =====
 
 /**

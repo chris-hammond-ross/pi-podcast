@@ -1538,6 +1538,18 @@ class MediaPlayerService extends EventEmitter {
 	}
 
 	/**
+	 * Adjust volume relative to current level
+	 * @param {number} step - Volume adjustment (positive or negative, e.g. 5 or -5)
+	 * @returns {Promise<number>} New volume level
+	 */
+	async adjustVolume(step) {
+		const newVolume = Math.max(0, Math.min(100, this.volume + step));
+		await this.setProperty('volume', newVolume);
+		this.volume = newVolume;
+		return newVolume;
+	}
+
+	/**
 	 * Get current playback status
 	 * @returns {Object} Status object
 	 */
