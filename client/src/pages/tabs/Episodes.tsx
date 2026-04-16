@@ -116,7 +116,8 @@ const EpisodeSearchBar = memo(function EpisodeSearchBar({
 				onChange={(e) => setSearchValue(e.currentTarget.value)}
 				onKeyDown={handleKeyDown}
 				style={{
-					flexGrow: 1
+					flexGrow: 1,
+					minWidth: 0
 				}}
 			/>
 			<ActionIcon
