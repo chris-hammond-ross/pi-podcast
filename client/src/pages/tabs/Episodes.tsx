@@ -93,7 +93,7 @@ const EpisodeSearchBar = memo(function EpisodeSearchBar({
 	};
 
 	return (
-		<Group gap="xs" py="md">
+		<Group gap="xs" py="md" wrap="nowrap">
 			<TextInput
 				ref={inputRef}
 				variant="default"
